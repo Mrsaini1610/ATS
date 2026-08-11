@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { FaBell, FaSun } from "react-icons/fa";
 import Sidebar from "./Sidebar";
-import UserDropdown from "./Userdropdown";
+import UserDropdown from "./UserDropdown";
 import {
     DropdownMenu,
     DropdownMenuContent,

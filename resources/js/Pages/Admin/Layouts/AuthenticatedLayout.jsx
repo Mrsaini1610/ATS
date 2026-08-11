@@ -1,14 +1,16 @@
+import UserDropdown from "./UserDropdown";
 import { useAlerts } from "@/Components/Alerts";
 import ApplicationLogo from "@/Components/ApplicationLogo";
 import Modal from "@/Components/Modal";
 import NavLink from "@/Components/NavLink";
 import { Link, router, usePage } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
+
 import { Toaster } from "react-hot-toast";
 import { FaSun } from "react-icons/fa6";
 import { FaBell } from "react-icons/fa";
 
-import UserDropdown from "./UserDropdown";
+
 import Sidebar from "./Sidebar";
 import { route } from "ziggy-js";
 import {
