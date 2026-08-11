@@ -1,1 +1,0 @@
-import{j as r}from"./app-BXr70667.js";function n({className:x="",disabled:t,children:e,...p}){return r.jsx("button",{...p,className:`flex items-center gap-[5px] px-[20px] py-[12px] text-[15px] text-white rounded-[10px] bluebtbg   ${t&&"opacity-25"} `+x,disabled:t,children:e})}export{n as P};
