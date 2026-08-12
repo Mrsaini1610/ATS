@@ -75,88 +75,113 @@ class AuthController extends Controller
     /**
      * Step 2: Verify OTP via sessionInfo + code & Auto-Register/Login
      */
-    public function verifyOtp(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'phone'       => 'required|numeric|digits:10',
-            'sessionInfo' => 'required|string',
-            'code'        => 'required|numeric|digits:6',
-        ]);
+public function verifyOtp(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'phone'       => 'required|numeric|digits:10',
+        'sessionInfo' => 'required|string',
+        'code'        => 'required|numeric|digits:6',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Validation error',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'status'  => false,
+            'message' => 'Validation error',
+            'errors'  => $validator->errors()
+        ], 422);
+    }
 
-        $phone       = $request->phone;
-        $sessionInfo = $request->sessionInfo;
-        $code        = $request->code;
-        $apiKey      = env('VITE_FIREBASE_API_KEY');
+    $phone       = $request->phone;
+    $sessionInfo = $request->sessionInfo;
+    $code        = $request->code;
+    $apiKey      = env('VITE_FIREBASE_API_KEY');
 
-        try {
-            // 1. Internally Exchange sessionInfo + OTP Code for Firebase ID Token
-            $response = Http::withoutVerifying()
-                ->timeout(15)
-                ->post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key={$apiKey}", [
-                    'sessionInfo' => $sessionInfo,
-                    'code'        => $code,
-                ]);
-
-            if (!$response->successful()) {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'OTP Verification Failed',
-                    'error'   => $response->json('error.message', 'Invalid or expired OTP.')
-                ], 400);
-            }
-
-            $firebasePhone  = $response->json('phoneNumber');
-            $formattedPhone = '+91' . $phone;
-
-            if ($firebasePhone !== $formattedPhone) {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Phone number mismatch with Firebase verification.'
-                ], 400);
-            }
-
-            // 2. Fetch or Create User
-            $user = User::where('phone', $phone)->first();
-            $isNewUser = false;
-
-            if (!$user) {
-                $user = User::create([
-                    'phone'    => $phone,
-                    'username' => 'user_' . substr($phone, -4) . rand(100, 999),
-                ]);
-                $isNewUser = true;
-            }
-
-            $user->update([
-                'is_online'   => true,
-                'last_active' => now()
+    try {
+        // 1. Firebase se OTP Verify karna
+        $response = Http::withoutVerifying()
+            ->timeout(15)
+            ->post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key={$apiKey}", [
+                'sessionInfo' => $sessionInfo,
+                'code'        => $code,
             ]);
 
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            return response()->json([
-                'status'      => true,
-                'message'     => $isNewUser ? 'User registered and logged in successfully' : 'Login successful',
-                'is_new_user' => $isNewUser,
-                'token'       => $token,
-                'user'        => $user
-            ], 200);
-
-        } catch (Throwable $e) {
+        if (!$response->successful()) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Server Error: ' . $e->getMessage()
-            ], 500);
+                'message' => 'OTP Verification Failed',
+                'error'   => $response->json('error.message', 'Invalid or expired OTP.')
+            ], 400);
         }
+
+        $firebasePhone  = $response->json('phoneNumber');
+        $formattedPhone = '+91' . $phone;
+
+        if ($firebasePhone !== $formattedPhone) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Phone number mismatch with Firebase verification.'
+            ], 400);
+        }
+
+        // 2. Database me check karna
+        // Agar aap SoftDeletes (withTrashed) use kar rahe hain:
+        $user = User::withTrashed()->where('phone', $phone)->first();
+        
+        // Agar SoftDeletes nahi hai aur 'is_deleted' ya 'status' column hai, to is tarah check karein:
+        // $user = User::where('phone', $phone)->first();
+
+        $isNewUser = false;
+
+        if ($user) {
+            // Check 1: Agar Laravel SoftDeletes se user deleted hai
+            if (method_exists($user, 'trashed') && $user->trashed()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Aapka account delete ho chuka hai. Kripya support se sampark karein.'
+                ], 403);
+            }
+
+            // Check 2: Agar aapne koi 'is_deleted' ya 'status' column banaya hai
+            if (isset($user->is_deleted) && $user->is_deleted == true) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Aapka account delete ho chuka hai.'
+                ], 403);
+            }
+
+        } else {
+            // User nahi mila -> Naya User Create karein
+            $user = User::create([
+                'phone'    => $phone,
+                'username' => 'user_' . substr($phone, -4) . rand(100, 999),
+            ]);
+            $isNewUser = true;
+        }
+
+        // User status update
+        $user->update([
+            'is_online'   => true,
+            'last_active' => now()
+        ]);
+
+        // Authentication Token Generate karna (Laravel Sanctum)
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'status'      => true,
+            'message'     => $isNewUser ? 'User registered and logged in successfully' : 'Login successful',
+            'is_new_user' => $isNewUser,
+            'token'       => $token,
+            'user'        => $user
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'status'  => false,
+            'message' => 'Server Error: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Logout User

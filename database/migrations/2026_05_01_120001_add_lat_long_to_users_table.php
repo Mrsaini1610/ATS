@@ -11,13 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('users')) {
-            return;
-        }
-
         Schema::table('users', function (Blueprint $table) {
-            $table->decimal('latitude', 10, 8)->nullable()->after('whatsapp_phone')->comment('User location latitude');
-            $table->decimal('longitude', 11, 8)->nullable()->after('latitude')->comment('User location longitude');
+            // Check karein ki agar latitude column nahi hai tabhi add karein
+            if (!Schema::hasColumn('users', 'latitude')) {
+                $table->decimal('latitude', 10, 8)->nullable()->comment('User location latitude');
+            }
+
+            // Check karein ki agar longitude column nahi hai tabhi add karein
+            if (!Schema::hasColumn('users', 'longitude')) {
+                $table->decimal('longitude', 11, 8)->nullable()->comment('User location longitude');
+            }
         });
     }
 
@@ -27,7 +30,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['latitude', 'longitude']);
+            if (Schema::hasColumn('users', 'latitude')) {
+                $table->dropColumn('latitude');
+            }
+            if (Schema::hasColumn('users', 'longitude')) {
+                $table->dropColumn('longitude');
+            }
         });
     }
 };

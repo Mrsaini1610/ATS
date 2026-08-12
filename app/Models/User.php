@@ -12,40 +12,21 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $table = 'users';
-
-    // Standard Auto-Increment ID
-    protected $primaryKey = 'id';
-
     protected $fillable = [
-        'uuid',
-        'username',
-        'phone',
-        'skills',
-        'experience_years',
-        'education',
-        'last_salary',
-        'current_ctc',
-        'expected_ctc',
-        'notice_period_days',
-        'address',
-        'city',
-        'state',
-        'pincode',
-        'latitude',
-        'longitude',
-        'is_online',
-        'last_active'
+        'uuid', 'username', 'full_name', 'email', 'phone', 'gender', 'dob',
+        'total_experience_years', 'current_ctc', 'expected_ctc',
+        'notice_period_days', 'bio', 'profile_picture', 'skills',
+        'address', 'city', 'state', 'pincode', 'latitude', 'longitude',
+        'is_online', 'last_active'
     ];
 
     protected $casts = [
         'skills' => 'array',
-        'education' => 'array',
         'is_online' => 'boolean',
         'last_active' => 'datetime',
+        'dob' => 'date',
     ];
 
-    // Auto-generate UUID when creating a new record
     protected static function booted()
     {
         static::creating(function ($user) {
@@ -53,5 +34,21 @@ class User extends Authenticatable
                 $user->uuid = (string) Str::uuid();
             }
         });
+    }
+
+    public function educations() {
+        return $this->hasMany(UserEducation::class);
+    }
+
+    public function experiences() {
+        return $this->hasMany(UserExperience::class);
+    }
+
+    public function resumes() {
+        return $this->hasMany(UserResume::class);
+    }
+
+    public function applications() {
+        return $this->hasMany(JobApplication::class);
     }
 }
