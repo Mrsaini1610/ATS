@@ -130,8 +130,7 @@ class AuthController extends Controller
             if (!$user) {
                 $user = User::create([
                     'phone'    => $phone,
-                    // 'username' => 'user_' . substr($phone, -4) . rand(100, 999),
-                    'username' => 'user_' . $phone, // Directly phone append karein
+                    'username' => 'user_' . $phone,
                 ]);
                 $isNewUser = true;
             }
@@ -142,6 +141,9 @@ class AuthController extends Controller
             ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Relations load kiye gaye hain taaki candidate ka poora data sath me mile
+            $user->load(['educations', 'experiences', 'resumes', 'certificates']);
 
             return response()->json([
                 'status'      => true,

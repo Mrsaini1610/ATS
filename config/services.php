@@ -53,5 +53,8 @@ return [
     'google_maps' => [
         'key' => env('GOOGLE_MAPS_API_KEY'),
     ],
+    'firebase' => [
+        'api_key' => env('VITE_FIREBASE_API_KEY'),
+    ],
 
 ];

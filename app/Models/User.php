@@ -57,4 +57,9 @@ public function getProfilePictureUrlAttribute()
     public function applications() {
         return $this->hasMany(JobApplication::class);
     }
+
+    public function certificates()
+    {
+        return $this->hasMany(UserCertificate::class);
+    }
 }

@@ -15,17 +15,26 @@ class UserProfileController extends Controller
     /**
      * Complete Profile Fetch API
      */
-    public function getProfile(Request $request)
-    {
-        $user = $request->user()->load(['educations', 'experiences', 'resumes']);
-        
-        return response()->json([
-            'status' => true,
-            'data'   => $user
-        ], 200);
-    }
+/**
+ * Complete Profile Fetch API
+ */
+public function getProfile(Request $request)
+{
+    $user = $request->user()->load([
+        'educations',
+        'experiences',
+        'resumes',
+        'certificates'
+    ]);
 
-    /**
+    return response()->json([
+        'status' => true,
+        'message'=> 'Profile fetched successfully',
+        'data'   => $user
+    ], 200);
+}
+
+/**
      * Update Candidate Profile
      */
     public function updateProfile(Request $request)
@@ -35,12 +44,20 @@ class UserProfileController extends Controller
         $validator = Validator::make($request->all(), [
             'full_name'              => 'sometimes|string|max:255',
             'email'                  => 'sometimes|email|unique:users,email,' . $user->id,
+            'gender'                 => 'sometimes|nullable|string|in:Male,Female,Other',
+            'dob'                    => 'sometimes|nullable|date_format:Y-m-d',
             'skills'                 => 'sometimes|array',
-            'total_experience_years' => 'sometimes|numeric',
-            'current_ctc'            => 'sometimes|numeric',
-            'expected_ctc'           => 'sometimes|numeric',
-            'notice_period_days'     => 'sometimes|integer',
-            'bio'                    => 'sometimes|string',
+            'total_experience_years' => 'sometimes|nullable|numeric',
+            'current_ctc'            => 'sometimes|nullable|numeric',
+            'expected_ctc'           => 'sometimes|nullable|numeric',
+            'notice_period_days'     => 'sometimes|nullable|integer',
+            'bio'                    => 'sometimes|nullable|string',
+            'address'                => 'sometimes|nullable|string',
+            'city'                   => 'sometimes|nullable|string',
+            'state'                  => 'sometimes|nullable|string',
+            'pincode'                => 'sometimes|nullable|string|max:10',
+            'latitude'               => 'sometimes|nullable|numeric',
+            'longitude'              => 'sometimes|nullable|numeric',
             'profile_picture'        => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
@@ -53,10 +70,12 @@ class UserProfileController extends Controller
         }
 
         try {
+            // Sabhi zaroori columns ko yahan shamil kiya gaya hai
             $data = $request->only([
-                'full_name', 'email', 'skills', 'total_experience_years',
-                'current_ctc', 'expected_ctc', 'notice_period_days', 'bio',
-                'address', 'city', 'state', 'pincode'
+                'full_name', 'email', 'gender', 'dob', 'skills',
+                'total_experience_years', 'current_ctc', 'expected_ctc',
+                'notice_period_days', 'bio', 'address', 'city',
+                'state', 'pincode', 'latitude', 'longitude'
             ]);
 
             if ($request->hasFile('profile_picture')) {
@@ -98,7 +117,7 @@ class UserProfileController extends Controller
 
         $user = $request->user();
         $file = $request->file('resume');
-        
+
         $path = $file->store('resumes/' . $user->id, 'public');
 
         // Check if first resume -> make default
@@ -121,59 +140,63 @@ class UserProfileController extends Controller
     /**
      * Apply for a Job
      */
-    public function applyJob(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'job_id'             => 'required|exists:jobs,id',
-            'resume_id'          => 'required|exists:user_resumes,id',
-            'expected_ctc'       => 'nullable|numeric',
-            'notice_period_days' => 'nullable|integer',
-            'cover_note'         => 'nullable|string'
-        ]);
+/**
+ * Apply for a Job
+ */
+public function applyJob(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'job_id'       => 'required',
+        'resume_id'    => 'required|exists:user_resumes,id',
+        'cover_letter' => 'nullable|string'
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        $user = $request->user();
-
-        // Security check: Verify resume belongs to authenticated user
-        $resume = UserResume::where('id', $request->resume_id)->where('user_id', $user->id)->first();
-        if (!$resume) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unauthorized access to the specified resume.'
-            ], 403);
-        }
-
-        // Duplicate Check
-        $alreadyApplied = JobApplication::where('user_id', $user->id)
-            ->where('job_id', $request->job_id)
-            ->exists();
-
-        if ($alreadyApplied) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'You have already applied for this job.'
-            ], 400);
-        }
-
-        $application = JobApplication::create([
-            'user_id'            => $user->id,
-            'job_id'             => $request->job_id,
-            'resume_id'          => $request->resume_id,
-            'expected_ctc'       => $request->expected_ctc ?? $user->expected_ctc,
-            'notice_period_days' => $request->notice_period_days ?? $user->notice_period_days,
-            'cover_note'         => $request->cover_note,
-            'status'             => 'applied'
-        ]);
-
-        return response()->json([
-            'status'      => true,
-            'message'     => 'Application submitted successfully',
-            'application' => $application
-        ], 201);
+    if ($validator->fails()) {
+        return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
     }
+
+    $user = $request->user();
+
+    // Security check: Verify resume belongs to authenticated user
+    $resume = UserResume::where('id', $request->resume_id)->where('user_id', $user->id)->first();
+    if (!$resume) {
+        return response()->json([
+            'status'  => false,
+            'message' => 'Unauthorized access to the specified resume.'
+        ], 403);
+    }
+
+    // Duplicate Check
+    $alreadyApplied = JobApplication::where('candidate_id', $user->id)
+        ->where('job_id', $request->job_id)
+        ->exists();
+
+    if ($alreadyApplied) {
+        return response()->json([
+            'status'  => false,
+            'message' => 'You have already applied for this job.'
+        ], 400);
+    }
+
+    $application = JobApplication::create([
+        'candidate_id'         => $user->id,
+        'job_id'               => $request->job_id,
+        'resume_url'           => $resume->file_path,
+        'cover_letter'         => $request->cover_letter,
+        'candidate_name'       => $user->full_name ?? $user->username,
+        'candidate_email'      => $user->email,
+        'candidate_phone'      => $user->phone,
+        'candidate_skills'     => $user->skills,
+        'candidate_experience' => $user->total_experience_years,
+        'status'               => 'applied'
+    ]);
+
+    return response()->json([
+        'status'      => true,
+        'message'     => 'Application submitted successfully',
+        'application' => $application
+    ], 201);
+}
 
     /**
      * Delete Resume
