@@ -130,7 +130,8 @@ class AuthController extends Controller
             if (!$user) {
                 $user = User::create([
                     'phone'    => $phone,
-                    'username' => 'user_' . substr($phone, -4) . rand(100, 999),
+                    // 'username' => 'user_' . substr($phone, -4) . rand(100, 999),
+                    'username' => 'user_' . $phone, // Directly phone append karein
                 ]);
                 $isNewUser = true;
             }

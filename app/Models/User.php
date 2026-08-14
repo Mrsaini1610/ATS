@@ -35,6 +35,12 @@ class User extends Authenticatable
             }
         });
     }
+    protected $appends = ['profile_picture_url'];
+
+public function getProfilePictureUrlAttribute()
+{
+    return $this->profile_picture ? asset('storage/' . $this->profile_picture) : null;
+}
 
     public function educations() {
         return $this->hasMany(UserEducation::class);

@@ -174,4 +174,73 @@ class UserProfileController extends Controller
             'application' => $application
         ], 201);
     }
+
+    /**
+     * Delete Resume
+     */
+    public function deleteResume(Request $request, $id)
+    {
+        $user = $request->user();
+        $resume = $user->resumes()->where('id', $id)->first();
+
+        if (!$resume) {
+            return response()->json(['status' => false, 'message' => 'Resume not found.'], 404);
+        }
+
+        Storage::disk('public')->delete($resume->file_path);
+        $resume->delete();
+
+        return response()->json(['status' => true, 'message' => 'Resume deleted successfully.'], 200);
+    }
+
+    /**
+     * Add Education
+     */
+    public function addEducation(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'degree'      => 'required|string|max:255',
+            'institution' => 'required|string|max:255',
+            'start_year'  => 'required|digits:4',
+            'end_year'    => 'nullable|digits:4',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $education = $request->user()->educations()->create($request->all());
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Education added successfully',
+            'data'    => $education
+        ], 201);
+    }
+
+    /**
+     * Add Experience
+     */
+    public function addExperience(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'designation'  => 'required|string|max:255',
+            'company_name' => 'required|string|max:255',
+            'start_date'   => 'required|date',
+            'end_date'     => 'nullable|date|after_or_equal:start_date',
+            'is_current'   => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $experience = $request->user()->experiences()->create($request->all());
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Experience added successfully',
+            'data'    => $experience
+        ], 201);
+    }
 }
