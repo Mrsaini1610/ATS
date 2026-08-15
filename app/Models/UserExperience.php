@@ -11,18 +11,21 @@ class UserExperience extends Model
     protected $fillable = [
         'user_id',
         'company_name',
-        'job_title', // या designation
+        'designation',
         'start_date',
         'end_date',
-        'location',
-        'description',
-        'is_current'
+        'is_current',
+        'description'
     ];
-
 
     protected $casts = [
         'is_current' => 'boolean',
         'start_date' => 'date',
         'end_date'   => 'date',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

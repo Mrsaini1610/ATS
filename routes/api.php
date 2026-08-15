@@ -10,11 +10,11 @@ Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
 // Protected Endpoints (Requires valid Bearer Token)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
-    
+
     // Candidate Profile Routes
     Route::get('/profile', [UserProfileController::class, 'getProfile']); // Changed to GET (Recommended)
     Route::post('/profile/update', [UserProfileController::class, 'updateProfile']);
-    
+
     // Resume Routes
     Route::post('/profile/upload-resume', [UserProfileController::class, 'uploadResume']);
     Route::delete('/profile/resume/{id}', [UserProfileController::class, 'deleteResume']);
@@ -23,10 +23,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Education & Experience Routes (NEW)
     Route::post('/profile/education', [UserProfileController::class, 'addEducation']);
     Route::delete('/profile/education/{id}', [UserProfileController::class, 'deleteEducation']);
-    
+
     Route::post('/profile/experience', [UserProfileController::class, 'addExperience']);
     Route::delete('/profile/experience/{id}', [UserProfileController::class, 'deleteExperience']);
-    
+
+    // Certificate Routes (NEW)
+    Route::post('/profile/certificate', [UserProfileController::class, 'addCertificate']);
+    Route::delete('/profile/certificate/{id}', [UserProfileController::class, 'deleteCertificate']);
+
     // Application Route
     Route::post('/jobs/apply', [UserProfileController::class, 'applyJob']);
+
 });

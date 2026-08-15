@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class UserCertificate extends Model
 {
-    protected $table = 'user_certificates'; // अपनी टेबल का नाम चेक कर लें
+    protected $table = 'user_certificates';
 
     protected $fillable = [
         'user_id',
@@ -16,6 +16,11 @@ class UserCertificate extends Model
         'expiration_date',
         'credential_id',
         'credential_url'
+    ];
+
+    protected $casts = [
+        'issue_date'      => 'date',
+        'expiration_date' => 'date',
     ];
 
     public function user()
