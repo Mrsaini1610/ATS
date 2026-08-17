@@ -9,37 +9,69 @@ use App\Http\Controllers\Api\ExperienceController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\JobController;
 
+// ==========================================
 // Public Endpoints
-Route::post('/send-otp', [AuthController::class, 'sendOtp']);
-Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+// ==========================================
+Route::controller(AuthController::class)->group(function () {
+    Route::post('/send-otp', 'sendOtp');
+    Route::post('/verify-otp', 'verifyOtp');
+});
 
+// ==========================================
 // Protected Endpoints (Requires valid Bearer Token)
+// ==========================================
 Route::middleware('auth:sanctum')->group(function () {
+
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/get-home-data', [JobController::class, 'getHomeData']);
 
-    // Profile Endpoints
-    Route::get('/profile', [UserProfileController::class, 'getProfile']);
-    Route::post('/profile/update', [UserProfileController::class, 'updateProfile']);
+    // --------------------------------------
+    // Profile Section Group (/profile/...)
+    // --------------------------------------
+    Route::prefix('profile')->group(function () {
 
-    // Resume Endpoints
-    Route::post('/profile/upload-resume', [ResumeController::class, 'uploadResume']);
-    Route::post('/profile/resume/delete/{id}', [ResumeController::class, 'deleteResume']); // Method POST kiya gaya
-    Route::post('/profile/resume/{id}/set-default', [ResumeController::class, 'setDefaultResume']);
+        // User Profile
+        Route::controller(UserProfileController::class)->group(function () {
+            Route::get('/', 'getProfile');
+            Route::post('/update', 'updateProfile');
+        });
 
-    // Education Endpoints
-    Route::post('/profile/education', [EducationController::class, 'addEducation']);
-    Route::post('/profile/education/{id}', [EducationController::class, 'deleteEducation']);
+        // Resume
+        Route::controller(ResumeController::class)->group(function () {
+            Route::post('/upload-resume', 'uploadResume');
+            Route::post('/resume/delete/{id}', 'deleteResume');
+            Route::post('/resume/{id}/set-default', 'setDefaultResume');
+        });
 
-    // Experience Endpoints
-    Route::post('/profile/experience', [ExperienceController::class, 'addExperience']);
-    Route::post('/profile/experience/{id}', [ExperienceController::class, 'deleteExperience']);
+        // Education
+        Route::controller(EducationController::class)->prefix('education')->group(function () {
+            Route::get('/', 'getEducation');
+            Route::post('/', 'addEducation');
+            Route::post('/{id}', 'deleteEducation');
+        });
 
-    // Certificate Endpoints
-    Route::post('/profile/certificate', [CertificateController::class, 'addCertificate']);
-    Route::post('/profile/certificate/{id}', [CertificateController::class, 'deleteCertificate']);
+        // Experience
+        Route::controller(ExperienceController::class)->prefix('experience')->group(function () {
+            Route::get('/', 'getExperience');
+            Route::post('/', 'addExperience');
+            Route::post('/{id}', 'deleteExperience');
+        });
 
-    // Job Endpoints
-    Route::get('/jobs', [JobController::class, 'getJobs']);
-    Route::get('/jobs/{id}', [JobController::class, 'getJobDetail']);
-    Route::post('/jobs/apply', [JobController::class, 'applyJob']);
+        // Certificate
+        Route::controller(CertificateController::class)->prefix('certificate')->group(function () {
+            Route::get('/', 'getCertificate');
+            Route::post('/', 'addCertificate');
+            Route::post('/{id}', 'deleteCertificate');
+        });
+    });
+
+    // --------------------------------------
+    // Job Section Group (/jobs/...)
+    // --------------------------------------
+    Route::controller(JobController::class)->prefix('jobs')->group(function () {
+        Route::get('/', 'getJobs');
+        Route::get('/{id}', 'getJobDetail');
+        Route::post('/apply', 'applyJob');
+    });
+
 });

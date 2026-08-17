@@ -13,17 +13,14 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'uuid', 'username', 'full_name', 'email', 'phone', 'password',
+        'uuid', 'category_id', 'username', 'full_name', 'email', 'phone', 'password',
         'gender', 'dob', 'total_experience_years', 'current_ctc', 'expected_ctc',
         'notice_period_days', 'bio', 'profile_picture', 'skills',
         'address', 'city', 'state', 'pincode', 'latitude', 'longitude',
         'is_online', 'last_active'
     ];
 
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
+    protected $hidden = ['password', 'remember_token'];
 
     protected $casts = [
         'skills'      => 'array',
@@ -50,6 +47,11 @@ class User extends Authenticatable
         return $this->profile_picture ? asset('storage/' . $this->profile_picture) : null;
     }
 
+    public function category()
+    {
+        return $this->belongsTo(Category::class, 'category_id');
+    }
+
     public function educations()
     {
         return $this->hasMany(UserEducation::class, 'user_uuid', 'uuid');
@@ -60,11 +62,15 @@ class User extends Authenticatable
         return $this->hasMany(UserExperience::class, 'user_uuid', 'uuid');
     }
 
+    public function latestExperience()
+    {
+        return $this->hasOne(UserExperience::class, 'user_uuid', 'uuid')->latestOfMany();
+    }
+
     public function resumes()
     {
         return $this->hasMany(UserResume::class, 'user_uuid', 'uuid');
     }
-    
 
     public function certificates()
     {

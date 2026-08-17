@@ -11,23 +11,15 @@ class Category extends Model
 
     protected $table = 'categories';
 
-    protected $fillable = [
-        'name',
-        'slug',
-        'description',
-        'status',
-    ];
+    protected $fillable = ['name', 'slug', 'description', 'status'];
 
-    /**
-     * Category has many JobPosts
-     */
     public function jobPosts()
     {
-        return $this->hasMany(JobPost::class, 'category_id', 'id');
+        return $this->hasMany(JobPost::class, 'category_id');
     }
 
     public function subcategories()
     {
-        return $this->hasMany(Subcategory::class, 'category_id', 'id');
+        return $this->hasMany(Subcategory::class, 'category_id');
     }
 }

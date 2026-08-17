@@ -48,6 +48,9 @@ return new class extends Migration
 
                 $table->rememberToken();
                 $table->timestamps();
+                if (!Schema::hasColumn('users', 'category_id')) {
+                $table->foreignId('category_id')->nullable()->after('uuid')->constrained('categories')->onDelete('set null');
+            }
             });
         }
     }
@@ -58,5 +61,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('users');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['category_id']);
+            $table->dropColumn('category_id');
+        });
     }
 };

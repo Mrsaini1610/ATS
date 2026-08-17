@@ -12,6 +12,19 @@ class ExperienceController extends Controller
     /**
      * Add candidate experience
      */
+    public function getExperience(Request $request)
+    {
+        $user = $request->user();
+        $experiences = $user->experiences()->get();
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Experience records retrieved successfully.',
+            'data'    => $experiences
+        ], 200);
+    }
+
+
     public function addExperience(Request $request)
     {
         $validator = Validator::make($request->all(), [

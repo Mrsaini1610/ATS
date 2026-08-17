@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\JobPost;
 use App\Models\JobApplication;
 use App\Models\UserResume;
+use App\Models\Category; // <--- Added Category Model Import
+use App\Models\Company;  // <--- Added Company Model Import
+use App\Models\Subcategory; // <--- Added Subcategory Model Import
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
@@ -13,8 +16,116 @@ use Throwable;
 class JobController extends Controller
 {
     /**
-     * Get Jobs (Recommended, All, Category Wise with Pagination)
+     * Get Home Screen Data
      */
+  public function getHomeData(Request $request)
+{
+    $user = $request->user();
+    
+    // User ke Latest Experience se Designation nikalna
+    $latestExp = $user->latestExperience;
+    $userDesignation = $latestExp ? $latestExp->designation : null;
+
+    // 1. ALL JOBS LOCATIONS
+    $jobLocations = JobPost::where('status', 'active')
+        ->whereNotNull('location')
+        ->distinct()
+        ->pluck('location');
+
+    // 2. ADVANCED RECOMMENDED JOBS ALGORITHM
+    $recommendedJobs = JobPost::with(['company', 'category', 'subCategory'])
+        ->where('status', 'active')
+        ->where(function ($q) use ($user, $userDesignation) {
+            $userSkills = $user->skills ?? [];
+            $userCategory = $user->category_id ?? null;
+            $userCity = $user->city ?? null;
+            $userExpYears = $user->total_experience_years ?? null;
+
+            // Match Category & Subcategory
+            if (!empty($userCategory)) {
+                $q->orWhere('category_id', $userCategory);
+            }
+
+            // Match Location (City)
+            if (!empty($userCity)) {
+                $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
+            }
+
+            // Match Designation (Title & Description)
+            if (!empty($userDesignation)) {
+                $q->orWhere('title', 'LIKE', '%' . $userDesignation . '%')
+                  ->orWhere('description', 'LIKE', '%' . $userDesignation . '%');
+            }
+
+            // Match Experience Years
+            if (!empty($userExpYears)) {
+                $q->orWhere('experience', 'LIKE', '%' . $userExpYears . '%');
+            }
+
+            // Match Skills
+            if (!empty($userSkills)) {
+                foreach ($userSkills as $skill) {
+                    $q->orWhereJsonContains('skills', $skill)
+                      ->orWhere('skills', 'LIKE', '%' . $skill . '%')
+                      ->orWhere('title', 'LIKE', '%' . $skill . '%');
+                }
+            }
+        })
+        ->orderBy('id', 'desc')
+        ->take(6)
+        ->get();
+
+    // Fallback: Default Latest Jobs if no recommendation match
+    if ($recommendedJobs->isEmpty()) {
+        $recommendedJobs = JobPost::with(['company', 'category', 'subCategory'])
+            ->where('status', 'active')
+            ->orderBy('id', 'desc')
+            ->take(6)
+            ->get();
+    }
+
+    // 3. BROWSE BY CATEGORY WITH SUBCATEGORIES
+    $categories = Category::with(['subcategories'])
+        ->withCount(['jobPosts' => function ($query) {
+            $query->where('status', 'active');
+        }])
+        ->orderBy('job_posts_count', 'desc')
+        ->get();
+
+    // 4. TOP COMPANIES HIRING
+    $topCompanies = Company::withCount(['jobPosts' => function ($query) {
+            $query->where('status', 'active');
+        }])
+        ->having('job_posts_count', '>', 0)
+        ->orderBy('job_posts_count', 'desc')
+        ->take(10)
+        ->get();
+
+    // 5. TRENDING SKILLS
+    $trendingSkills = JobPost::where('status', 'active')
+        ->whereNotNull('skills')
+        ->get()
+        ->pluck('skills')
+        ->flatten()
+        ->filter()
+        ->countBy()
+        ->sortDesc()
+        ->take(10)
+        ->keys()
+        ->values();
+
+    return response()->json([
+        'status'  => true,
+        'message' => 'Home data fetched successfully',
+        'data'    => [
+            'locations'        => $jobLocations,
+            'recommended_jobs' => $recommendedJobs,
+            'categories'       => $categories,
+            'top_companies'    => $topCompanies,
+            'trending_skills'  => $trendingSkills
+        ]
+    ], 200);
+}
     public function getJobs(Request $request)
     {
         $user = $request->user();

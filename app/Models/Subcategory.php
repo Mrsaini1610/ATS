@@ -11,20 +11,15 @@ class Subcategory extends Model
 
     protected $table = 'subcategories';
 
-    protected $fillable = [
-        'category_id',
-        'name',
-        'slug',
-        'description',
-        'image',
-        'status', // 1 = Active, 0 = Inactive
-    ];
+    protected $fillable = ['category_id', 'name', 'slug', 'status'];
 
-    /**
-     * Subcategory kisi ek Parent Category se belong karti hai (Belongs-to Relationship)
-     */
     public function category()
     {
-        return $this->belongsTo(Category::class, 'category_id', 'id');
+        return $this->belongsTo(Category::class, 'category_id');
+    }
+
+    public function jobPosts()
+    {
+        return $this->hasMany(JobPost::class, 'sub_category_id');
     }
 }
