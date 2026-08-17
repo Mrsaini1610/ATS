@@ -6,11 +6,44 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Throwable;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class ResumeController extends Controller
 {
+    /**
+     * Get all active resumes of the authenticated user
+     */
+    public function getResumes(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            $resumes = $user->resumes()
+                ->where('is_delete', 0)
+                ->latest()
+                ->get()
+                ->map(function ($resume) {
+                    $resume->file_url = $resume->file_path
+                        ? asset('storage/' . $resume->file_path)
+                        : null;
+                    return $resume;
+                });
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Resumes fetched successfully',
+                'data'    => $resumes
+            ], 200);
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Failed to fetch resumes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Upload candidate resume
      */
@@ -33,14 +66,18 @@ class ResumeController extends Controller
             $user = $request->user();
             $file = $request->file('resume');
 
-            $path = $file->store('resumes/' . $user->uuid, 'public');
-            $isDefault = $user->resumes()->count() === 0;
+            $folder = $user->uuid ?? $user->id;
+            $path = $file->store('resumes/' . $folder, 'public');
+
+            // Check active non-deleted resumes for default flag
+            $isDefault = $user->resumes()->where('is_delete', 0)->count() === 0;
 
             $resume = $user->resumes()->create([
                 'title'      => $request->title ?? $file->getClientOriginalName(),
                 'file_path'  => $path,
                 'file_type'  => strtolower($file->getClientOriginalExtension()),
-                'is_default' => $isDefault
+                'is_default' => $isDefault,
+                'is_delete'  => 0
             ]);
 
             return response()->json([
@@ -58,12 +95,31 @@ class ResumeController extends Controller
     }
 
     /**
-     * Set specific resume as default
+     * Update resume (title or replace file)
      */
-    public function setDefaultResume(Request $request, $id)
+    public function updateResume(Request $request, $id)
     {
+        $validator = Validator::make($request->all(), [
+            'title'  => 'nullable|string|max:255',
+            'resume' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
         $user = $request->user();
-        $resume = $user->resumes()->where('id', $id)->first();
+
+        $resume = $user->resumes()
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)->orWhere('uuid', $id);
+            })
+            ->where('is_delete', 0)
+            ->first();
 
         if (!$resume) {
             return response()->json([
@@ -72,8 +128,76 @@ class ResumeController extends Controller
             ], 404);
         }
 
-        // Reset other resumes and set selected one
-        $user->resumes()->update(['is_default' => false]);
+        try {
+            $hasUpdate = false;
+
+            if ($request->filled('title')) {
+                $resume->title = $request->title;
+                $hasUpdate = true;
+            }
+
+            if ($request->hasFile('resume')) {
+                $file = $request->file('resume');
+
+                if ($resume->file_path && Storage::disk('public')->exists($resume->file_path)) {
+                    Storage::disk('public')->delete($resume->file_path);
+                }
+
+                $folder = $user->uuid ?? $user->id;
+                $resume->file_path = $file->store('resumes/' . $folder, 'public');
+                $resume->file_type = strtolower($file->getClientOriginalExtension());
+
+                if (!$request->filled('title')) {
+                    $resume->title = $file->getClientOriginalName();
+                }
+
+                $hasUpdate = true;
+            }
+
+            if (!$hasUpdate) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'No fields provided to update.'
+                ], 400);
+            }
+
+            $resume->save();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Resume updated successfully',
+                'resume'  => $resume
+            ], 200);
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Failed to update resume: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Set specific resume as default
+     */
+    public function setDefaultResume(Request $request, $id)
+    {
+        $user = $request->user();
+        $resume = $user->resumes()
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)->orWhere('uuid', $id);
+            })
+            ->where('is_delete', 0)
+            ->first();
+
+        if (!$resume) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Resume not found or unauthorized.'
+            ], 404);
+        }
+
+        $user->resumes()->where('is_delete', 0)->update(['is_default' => false]);
         $resume->update(['is_default' => true]);
 
         return response()->json([
@@ -82,45 +206,43 @@ class ResumeController extends Controller
         ], 200);
     }
 
-
     /**
-     * Delete Resume (POST method)
+     * Soft Delete Resume
      */
     public function deleteResume(Request $request, $id)
     {
         $user = $request->user();
 
-        // 1. Check karein ki resume authenticated user ka hi hai (ID ya UUID dono support karega)
         $resume = $user->resumes()
             ->where(function ($query) use ($id) {
-                $query->where('id', $id)
-                    ->orWhere('uuid', $id);
+                $query->where('id', $id)->orWhere('uuid', $id);
             })
+            ->where('is_delete', 0)
             ->first();
 
         if (!$resume) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Resume not found or you are not authorized to delete it.'
+                'message' => 'Resume not found or already deleted.'
             ], 404);
         }
 
         try {
             DB::transaction(function () use ($user, $resume) {
                 $wasDefault = $resume->is_default;
-                $filePath   = $resume->file_path;
 
-                // Storage se file delete karein
-                if ($filePath && Storage::disk('public')->exists($filePath)) {
-                    Storage::disk('public')->delete($filePath);
-                }
+                // Soft delete mark
+                $resume->is_delete = 1;
+                $resume->is_default = false;
+                $resume->save();
 
-                // Record delete karein
-                $resume->delete();
-
-                // Agar deleted resume default tha, toh bache hue pehle resume ko default bana dein
+                // Agar deleted resume default tha, toh next active resume ko default bana dein
                 if ($wasDefault) {
-                    $nextResume = $user->resumes()->latest()->first();
+                    $nextResume = $user->resumes()
+                        ->where('is_delete', 0)
+                        ->latest()
+                        ->first();
+
                     if ($nextResume) {
                         $nextResume->update(['is_default' => true]);
                     }
@@ -138,6 +260,5 @@ class ResumeController extends Controller
                 'message' => 'Failed to delete resume: ' . $e->getMessage()
             ], 500);
         }
-
     }
 }

@@ -18,11 +18,13 @@ class UserResume extends Model
         'title',
         'file_path',
         'file_type',
-        'is_default'
+        'is_default',
+        'is_delete',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'is_delete'  => 'integer',
     ];
 
     protected $appends = ['file_url'];
@@ -32,6 +34,9 @@ class UserResume extends Model
         static::creating(function ($model) {
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
+            }
+            if (!isset($model->is_delete)) {
+                $model->is_delete = 0;
             }
         });
     }

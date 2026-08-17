@@ -20,7 +20,10 @@ class User extends Authenticatable
         'is_online', 'last_active'
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     protected $casts = [
         'skills'      => 'array',
@@ -47,33 +50,39 @@ class User extends Authenticatable
         return $this->profile_picture ? asset('storage/' . $this->profile_picture) : null;
     }
 
+    // Category Relation
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
 
+    // Educations with active records filter
     public function educations()
     {
-        return $this->hasMany(UserEducation::class, 'user_uuid', 'uuid');
+        return $this->hasMany(UserEducation::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
+    // Experiences with active records filter
     public function experiences()
     {
-        return $this->hasMany(UserExperience::class, 'user_uuid', 'uuid');
+        return $this->hasMany(UserExperience::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
+    // Latest Active Experience
     public function latestExperience()
     {
-        return $this->hasOne(UserExperience::class, 'user_uuid', 'uuid')->latestOfMany();
+        return $this->hasOne(UserExperience::class, 'user_uuid', 'uuid')->where('is_delete', 0)->latestOfMany();
     }
 
+    // Resumes with active records filter
     public function resumes()
     {
-        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid');
+        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
+    // Certificates with active records filter
     public function certificates()
     {
-        return $this->hasMany(UserCertificate::class, 'user_uuid', 'uuid');
+        return $this->hasMany(UserCertificate::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 }

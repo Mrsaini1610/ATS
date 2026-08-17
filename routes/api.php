@@ -30,38 +30,43 @@ Route::middleware('auth:sanctum')->group(function () {
     // --------------------------------------
     Route::prefix('profile')->group(function () {
 
-        // User Profile
+        // User Profile (/profile, /profile/update)
         Route::controller(UserProfileController::class)->group(function () {
             Route::get('/', 'getProfile');
             Route::post('/update', 'updateProfile');
         });
 
-        // Resume
-        Route::controller(ResumeController::class)->group(function () {
-            Route::post('/upload-resume', 'uploadResume');
-            Route::post('/resume/delete/{id}', 'deleteResume');
-            Route::post('/resume/{id}/set-default', 'setDefaultResume');
+        // Resume (/profile/resume/...)
+        Route::controller(ResumeController::class)->prefix('resume')->group(function () {
+            Route::get('/', 'getResumes');                         // GET  /profile/resume
+            Route::post('/upload', 'uploadResume');                // POST /profile/resume/upload
+            Route::post('/update/{id}', 'updateResume');           // POST /profile/resume/update/{id}
+            Route::post('/delete/{id}', 'deleteResume');           // POST /profile/resume/delete/{id}
+            Route::post('/{id}/set-default', 'setDefaultResume');  // POST /profile/resume/{id}/set-default
         });
 
-        // Education
+        // Education (/profile/education/...)
         Route::controller(EducationController::class)->prefix('education')->group(function () {
-            Route::get('/', 'getEducation');
-            Route::post('/', 'addEducation');
-            Route::post('/{id}', 'deleteEducation');
+            Route::get('/', 'getEducations');                      // GET  /profile/education
+            Route::post('/', 'addEducation');                      // POST /profile/education
+            Route::post('/update/{id}', 'updateEducation');        // POST /profile/education/update/{id}
+            Route::post('/delete/{id}', 'deleteEducation');        // POST /profile/education/delete/{id}
         });
 
-        // Experience
+        // Experience (/profile/experience/...)
         Route::controller(ExperienceController::class)->prefix('experience')->group(function () {
-            Route::get('/', 'getExperience');
-            Route::post('/', 'addExperience');
-            Route::post('/{id}', 'deleteExperience');
+            Route::get('/', 'getExperiences');                     // GET  /profile/experience
+            Route::post('/', 'addExperience');                     // POST /profile/experience
+            Route::post('/update/{id}', 'updateExperience');       // POST /profile/experience/update/{id}
+            Route::post('/delete/{id}', 'deleteExperience');       // POST /profile/experience/delete/{id}
         });
 
-        // Certificate
+        // Certificate (/profile/certificate/...)
         Route::controller(CertificateController::class)->prefix('certificate')->group(function () {
-            Route::get('/', 'getCertificate');
-            Route::post('/', 'addCertificate');
-            Route::post('/{id}', 'deleteCertificate');
+            Route::get('/', 'getCertificates');                    // GET  /profile/certificate
+            Route::post('/', 'addCertificate');                    // POST /profile/certificate
+            Route::post('/update/{id}', 'updateCertificate');      // POST /profile/certificate/update/{id}
+            Route::post('/delete/{id}', 'deleteCertificate');      // POST /profile/certificate/delete/{id}
         });
     });
 
@@ -69,9 +74,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Job Section Group (/jobs/...)
     // --------------------------------------
     Route::controller(JobController::class)->prefix('jobs')->group(function () {
-        Route::get('/', 'getJobs');
-        Route::get('/{id}', 'getJobDetail');
-        Route::post('/apply', 'applyJob');
+        Route::get('/', 'getJobs');                                // GET  /jobs
+        Route::get('/{id}', 'getJobDetail');                       // GET  /jobs/{id}
+        Route::post('/apply', 'applyJob');                         // POST /jobs/apply
     });
 
 });

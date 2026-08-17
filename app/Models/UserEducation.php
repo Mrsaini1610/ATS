@@ -20,12 +20,14 @@ class UserEducation extends Model
         'field_of_study',
         'start_year',
         'end_year',
-        'percentage_or_cgpa'
+        'percentage_or_cgpa',
+        'is_delete',
     ];
 
     protected $casts = [
         'start_year' => 'integer',
         'end_year'   => 'integer',
+        'is_delete'  => 'integer',
     ];
 
     protected static function booted()
@@ -33,6 +35,9 @@ class UserEducation extends Model
         static::creating(function ($model) {
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
+            }
+            if (!isset($model->is_delete)) {
+                $model->is_delete = 0;
             }
         });
     }

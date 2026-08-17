@@ -17,15 +17,17 @@ class UserCertificate extends Model
         'user_uuid',
         'title',
         'issuing_organization',
+        'is_delete',
         'issue_date',
         'expiration_date',
         'credential_id',
-        'credential_url'
+        'credential_url',
     ];
 
     protected $casts = [
         'issue_date'      => 'date',
         'expiration_date' => 'date',
+        'is_delete'       => 'integer',
     ];
 
     protected static function booted()
@@ -33,6 +35,9 @@ class UserCertificate extends Model
         static::creating(function ($model) {
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
+            }
+            if (!isset($model->is_delete)) {
+                $model->is_delete = 0;
             }
         });
     }
