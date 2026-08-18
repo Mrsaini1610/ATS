@@ -4,25 +4,36 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class SavedJob extends Model
 {
     use HasFactory;
 
+    protected $table = 'saved_jobs';
+
     protected $fillable = [
-        'member_id',
-        'job_id',
+        'uuid',
+        'user_uuid',
+        'job_uuid',
     ];
 
-    public function member(): BelongsTo
+    protected static function booted()
     {
-        return $this->belongsTo(Member::class, 'member_id');
+        static::creating(function ($savedJob) {
+            if (empty($savedJob->uuid)) {
+                $savedJob->uuid = (string) Str::uuid();
+            }
+        });
     }
 
-    public function job(): BelongsTo
+    public function user()
     {
-        return $this->belongsTo(Job::class, 'job_id');
+        return $this->belongsTo(User::class, 'user_uuid', 'uuid');
+    }
+
+    public function job()
+    {
+        return $this->belongsTo(Job::class, 'job_uuid', 'uuid');
     }
 }
-

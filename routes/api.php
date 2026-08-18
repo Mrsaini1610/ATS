@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\EducationController;
 use App\Http\Controllers\Api\ExperienceController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\JobController;
+use App\Http\Controllers\Api\CompanyController;
 
 // ==========================================
 // Public Endpoints
@@ -74,9 +75,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Job Section Group (/jobs/...)
     // --------------------------------------
     Route::controller(JobController::class)->prefix('jobs')->group(function () {
-        Route::get('/', 'getJobs');                                // GET  /jobs
-        Route::get('/{id}', 'getJobDetail');                       // GET  /jobs/{id}
-        Route::post('/apply', 'applyJob');                         // POST /jobs/apply
+        Route::get('/', 'getJobs');
+        Route::get('/search', 'searchJobs');
+        Route::get('/saved', 'getSavedJobs');        // GET  /jobs/saved (Saved jobs list)
+        Route::post('/save-toggle', 'toggleSaveJob');// POST /jobs/save-toggle (Save / Unsave)
+        Route::get('/{uuid}', 'getJobDetail');
+        Route::post('/apply', 'applyJob');
     });
 
+
+    // --------------------------------------
+    // Company Section Group (/companies/...)
+    // --------------------------------------
+    Route::controller(CompanyController::class)->prefix('companies')->group(function () {
+        Route::get('/{uuid}', 'getCompanyDetail'); // GET /companies/{uuid}
+    });
+
+    
 });

@@ -85,4 +85,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserCertificate::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
+    // Saved Jobs Relation
+    public function savedJobs()
+    {
+        return $this->hasMany(SavedJob::class, 'user_uuid', 'uuid');
+    }
+
 }
