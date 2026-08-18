@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Subcategory extends Model
 {
@@ -11,7 +12,25 @@ class Subcategory extends Model
 
     protected $table = 'subcategories';
 
-    protected $fillable = ['category_id', 'name', 'slug', 'status'];
+    protected $fillable = [
+        'uuid',
+        'category_id',
+        'name',
+        'slug',
+        'status',
+    ];
+
+    /**
+     * Boot function to automatically generate UUID on creation
+     */
+    protected static function booted()
+    {
+        static::creating(function ($subcategory) {
+            if (empty($subcategory->uuid)) {
+                $subcategory->uuid = (string) Str::uuid();
+            }
+        });
+    }
 
     public function category()
     {
