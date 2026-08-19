@@ -116,20 +116,24 @@ class JobController extends Controller
         ], 200);
     }
 
-    /**
-     * Search & Filter Jobs (Supports both Sectioned View and Paginated View)
-     */
+/**
+ * Search & Filter Jobs (Supports both Sectioned View and Paginated View)
+ */
 public function filterJobs(Request $request)
 {
     $user = $request->user();
 
-    // 1. Capture Inputs (Supports both URL Query Params & JSON Body)
+    // 1. Capture Inputs
     $search       = $request->input('search');
     $location     = $request->input('location');
     $categoryUuid = $request->input('category_uuid');
     $jobType      = $request->input('job_type');
     $experience   = $request->input('experience');
-    $salary       = $request->input('salary');
+
+    // Salary Inputs
+    $minSalary    = $request->input('min_salary'); // e.g. 10 (10 LPA)
+    $maxSalary    = $request->input('max_salary'); // e.g. 15 (15 LPA)
+    $salaryType   = $request->input('salary_type'); // optional: yearly, monthly, weekly etc.
 
     // 2. Base Query Setup
     $query = JobPost::with([
@@ -171,9 +175,36 @@ public function filterJobs(Request $request)
         $query->where('experience', 'LIKE', "%{$experience}%");
     }
 
-    // 8. Salary Filter
-    if ($request->filled('salary')) {
-        $query->where('salary', 'LIKE', "%{$salary}%");
+    // 8. Specific Salary Type Filter (Optional)
+    if ($request->filled('salary_type')) {
+        $query->where('salary_type', $salaryType);
+    }
+
+    // 8.1 Normalized Salary SQL Expressions (All types converted to Annual LPA)
+    $normalizedMinSql = "CASE
+        WHEN salary_type = 'yearly' THEN min_lpa
+        WHEN salary_type = 'halfyearly' THEN (min_lpa * 2)
+        WHEN salary_type = 'quarterly' THEN (min_lpa * 4)
+        WHEN salary_type = 'monthly' THEN (min_lpa * 12)
+        WHEN salary_type = 'weekly' THEN (min_lpa * 52)
+        ELSE min_lpa END";
+
+    $normalizedMaxSql = "CASE
+        WHEN salary_type = 'yearly' THEN max_lpa
+        WHEN salary_type = 'halfyearly' THEN (max_lpa * 2)
+        WHEN salary_type = 'quarterly' THEN (max_lpa * 4)
+        WHEN salary_type = 'monthly' THEN (max_lpa * 12)
+        WHEN salary_type = 'weekly' THEN (max_lpa * 52)
+        ELSE max_lpa END";
+
+    // Min Check: Job ka min package user ke min budget ke barabar ya bada hona chahiye (Min to Min)
+    if ($request->filled('min_salary')) {
+        $query->whereRaw("{$normalizedMinSql} >= ?", [(float) $minSalary]);
+    }
+
+    // Max Check: Job ka max package user ke max budget ke barabar ya chhota hona chahiye (Max to Max)
+    if ($request->filled('max_salary')) {
+        $query->whereRaw("{$normalizedMaxSql} <= ?", [(float) $maxSalary]);
     }
 
     // 9. Fetch Saved & Applied Status for Current User
@@ -236,6 +267,9 @@ public function filterJobs(Request $request)
         'data'       => $jobs
     ], 200);
 }
+
+
+
     /**
      * Get Jobs List (Tab-wise listing)
      */
@@ -306,135 +340,136 @@ public function filterJobs(Request $request)
     // }
 
 
-public function getJobs(Request $request)
-{
-    $user = $request->user();
-    $tab  = $request->query('tab', 'recommended');
+    public function getJobs(Request $request)
+    {
+        $user = $request->user();
+        $tab  = $request->query('tab', 'recommended');
 
-    // 1. Base Query with Relations
-    $query = JobPost::with(['company', 'category'])->where('status', 'active');
+        // 1. Base Query with Relations
+        $query = JobPost::with(['company', 'category'])->where('status', 'active');
 
-    // 2. Recommended Jobs Logic
-    if ($user) {
-        $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
-        $userCity   = $user->city;
+        // 2. Recommended Jobs Logic
+        if ($user) {
+            $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+            $userCity   = $user->city;
 
-        if (!empty($userSkills) || !empty($userCity)) {
-            $query->where(function ($q) use ($userSkills, $userCity) {
-                if (!empty($userSkills)) {
-                    foreach ($userSkills as $skill) {
-                        $q->orWhereJsonContains('skills', $skill)
-                          ->orWhere('skills', 'LIKE', '%' . $skill . '%')
-                          ->orWhere('title', 'LIKE', '%' . $skill . '%');
+            if (!empty($userSkills) || !empty($userCity)) {
+                $query->where(function ($q) use ($userSkills, $userCity) {
+                    if (!empty($userSkills)) {
+                        foreach ($userSkills as $skill) {
+                            $q->orWhereJsonContains('skills', $skill)
+                            ->orWhere('skills', 'LIKE', '%' . $skill . '%')
+                            ->orWhere('title', 'LIKE', '%' . $skill . '%');
+                        }
                     }
-                }
-                if (!empty($userCity)) {
-                    $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
-                }
-            });
-        }
-    }
-
-    // 3. Saved & Applied Jobs Data
-    $savedJobUuids = [];
-    $userApplications = collect();
-
-    if ($user) {
-        $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
-            ->pluck('job_uuid')
-            ->toArray();
-
-        $userApplications = JobApplication::where('candidate_id', $user->id)
-            ->latest()
-            ->get()
-            ->groupBy('job_id');
-    }
-
-    // 4. Fetch Jobs Data
-    $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
-        $applications = $userApplications->get($job->id);
-        $latestApplication = $applications ? $applications->first() : null;
-
-        $canApply = true;
-        $reapplyAt = null;
-        $status = null;
-
-        if ($latestApplication) {
-            $status = strtolower($latestApplication->status);
-
-            switch ($status) {
-                case 'pending':
-                case 'applied':
-                case 'selected':
-                case 'cancelled':
-                    $canApply = false;
-                    break;
-
-                case 'rejected':
-                    $reapplyAt = Carbon::parse($latestApplication->updated_at)->addDays(60);
-                    $canApply  = now()->gte($reapplyAt);
-                    break;
+                    if (!empty($userCity)) {
+                        $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
+                    }
+                });
             }
         }
 
-        $jobArray = $job->toArray();
-        $jobArray['has_applied']        = !is_null($latestApplication);
-        $jobArray['is_saved']          = in_array($job->uuid, $savedJobUuids);
-        $jobArray['can_apply']         = $canApply;
-        $jobArray['application_status'] = $status;
-        $jobArray['reapply_at']         = $reapplyAt?->toISOString();
+        // 3. Saved & Applied Jobs Data
+        $savedJobUuids = [];
+        $userApplications = collect();
 
-        return $jobArray;
-    });
+        if ($user) {
+            $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
+                ->pluck('job_uuid')
+                ->toArray();
 
-    // 5. Fetch DB Categories
-    $categoriesList = Category::whereIn('id', function ($q) {
-        $q->select('category_id')
-          ->from('job_posts')
-          ->where('status', 'active')
-          ->whereNotNull('category_id');
-    })->select('id', 'name', 'uuid')->get();
+            $userApplications = JobApplication::where('candidate_id', $user->id)
+                ->latest()
+                ->get()
+                ->groupBy('job_id');
+        }
 
-    // // 6. Merge Default Categories ("Recommended Jobs" & "All Jobs")
-    // $defaultCategories = collect([
-    //     ['id' => 'recommended', 'name' => 'Recommended Jobs', 'uuid' => 'recommended'],
-    //     ['id' => 'all',         'name' => 'All Jobs',         'uuid' => 'all'],
-    // ]);
+        // 4. Fetch Jobs Data
+        $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
+            $applications = $userApplications->get($job->id);
+            $latestApplication = $applications ? $applications->first() : null;
 
-    // $categoriesList = $defaultCategories->concat($dbCategories);
+            $canApply = true;
+            $reapplyAt = null;
+            $status = null;
 
-    // 7. Filters Metadata for UI
-    $metaFilters = [
-        'categories'  => $categoriesList,
+            if ($latestApplication) {
+                $status = strtolower($latestApplication->status);
 
-        'locations'   => JobPost::where('status', 'active')
-            ->whereNotNull('location')
-            ->distinct()
-            ->pluck('location')
-            ->values(),
+                switch ($status) {
+                    case 'pending':
+                    case 'applied':
+                    case 'selected':
+                    case 'cancelled':
+                        $canApply = false;
+                        break;
 
-        'job_types'   => JobPost::where('status', 'active')
-            ->whereNotNull('job_type')
-            ->distinct()
-            ->pluck('job_type')
-            ->values(),
+                    case 'rejected':
+                        $reapplyAt = Carbon::parse($latestApplication->updated_at)->addDays(60);
+                        $canApply  = now()->gte($reapplyAt);
+                        break;
+                }
+            }
 
-        'experiences' => JobPost::where('status', 'active')
-            ->whereNotNull('experience')
-            ->distinct()
-            ->pluck('experience')
-            ->values(),
-    ];
+            $jobArray = $job->toArray();
+            $jobArray['has_applied']        = !is_null($latestApplication);
+            $jobArray['is_saved']          = in_array($job->uuid, $savedJobUuids);
+            $jobArray['can_apply']         = $canApply;
+            $jobArray['application_status'] = $status;
+            $jobArray['reapply_at']         = $reapplyAt?->toISOString();
 
-    // 8. Response
-    return response()->json([
-        'status'     => true,
-        'message'    => 'Recommended jobs fetched successfully',
-        'active_tab' => $tab,
-        'filters'    => $metaFilters,
-        'data'       => $jobs
-    ], 200);
-} /**
+            return $jobArray;
+        });
+
+        // 5. Fetch DB Categories
+        $categoriesList = Category::whereIn('id', function ($q) {
+            $q->select('category_id')
+            ->from('job_posts')
+            ->where('status', 'active')
+            ->whereNotNull('category_id');
+        })->select('id', 'name', 'uuid')->get();
+
+        // // 6. Merge Default Categories ("Recommended Jobs" & "All Jobs")
+        // $defaultCategories = collect([
+        //     ['id' => 'recommended', 'name' => 'Recommended Jobs', 'uuid' => 'recommended'],
+        //     ['id' => 'all',         'name' => 'All Jobs',         'uuid' => 'all'],
+        // ]);
+
+        // $categoriesList = $defaultCategories->concat($dbCategories);
+
+        // 7. Filters Metadata for UI
+        $metaFilters = [
+            'categories'  => $categoriesList,
+
+            'locations'   => JobPost::where('status', 'active')
+                ->whereNotNull('location')
+                ->distinct()
+                ->pluck('location')
+                ->values(),
+
+            'job_types'   => JobPost::where('status', 'active')
+                ->whereNotNull('job_type')
+                ->distinct()
+                ->pluck('job_type')
+                ->values(),
+
+            'experiences' => JobPost::where('status', 'active')
+                ->whereNotNull('experience')
+                ->distinct()
+                ->pluck('experience')
+                ->values(),
+        ];
+
+        // 8. Response
+        return response()->json([
+            'status'     => true,
+            'message'    => 'Recommended jobs fetched successfully',
+            'active_tab' => $tab,
+            'filters'    => $metaFilters,
+            'data'       => $jobs
+        ], 200);
+    }
+    /**
      * Get Single Job Detail by UUID
      */
     public function getJobDetail(Request $request, $uuid)
