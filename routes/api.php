@@ -76,7 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // --------------------------------------
     Route::controller(JobController::class)->prefix('find-job')->group(function () {
         Route::post('/', 'getJobs');
-        Route::get('/search', 'searchJobs');
+        Route::post('/filter', 'filterJobs');
         Route::get('/saved', 'getSavedJobs');        // GET  /jobs/saved (Saved jobs list)
         Route::post('/save-toggle', 'toggleSaveJob');// POST /jobs/save-toggle (Save / Unsave)
         Route::get('/{uuid}', 'getJobDetail');

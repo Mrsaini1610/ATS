@@ -119,209 +119,123 @@ class JobController extends Controller
     /**
      * Search & Filter Jobs (Supports both Sectioned View and Paginated View)
      */
-    public function searchJobs(Request $request)
-    {
-        $user = $request->user();
+public function filterJobs(Request $request)
+{
+    $user = $request->user();
 
-        // 1. Capture Filters & View Preference
-        $search       = $request->query('search');
-        $location     = $request->query('location');
-        $categoryUuid = $request->query('category_uuid');
-        $companyUuid  = $request->query('company_uuid');
-        $jobType      = $request->query('job_type');
-        $expMin       = $request->query('exp_min');
-        $expMax       = $request->query('exp_max');
-        $salaryMin    = $request->query('salary_min');
-        $salaryMax    = $request->query('salary_max');
+    // 1. Capture Inputs (Supports both URL Query Params & JSON Body)
+    $search       = $request->input('search');
+    $location     = $request->input('location');
+    $categoryUuid = $request->input('category_uuid');
+    $jobType      = $request->input('job_type');
+    $experience   = $request->input('experience');
+    $salary       = $request->input('salary');
 
-        $viewType     = $request->query('view_type', 'sections');
-        $perPage      = $request->filled('per_page') ? (int) $request->query('per_page') : 15;
+    // 2. Base Query Setup
+    $query = JobPost::with([
+        'company:id,uuid,name,logo,location',
+        'category:id,uuid,name'
+    ])->where('status', 'active');
 
-        // 2. Base Query Setup
-        $baseQuery = JobPost::with([
-            'company:id,uuid,name,logo,location',
-            'category:id,uuid,name'
-        ])->where('status', 'active');
-
-        // Keyword Search
-        if ($request->filled('search')) {
-            $baseQuery->where(function ($q) use ($search) {
-                $q->where('title', 'LIKE', "%{$search}%")
-                    ->orWhere('description', 'LIKE', "%{$search}%")
-                    ->orWhere('skills', 'LIKE', "%{$search}%")
-                    ->orWhereHas('company', function ($comp) use ($search) {
-                        $comp->where('name', 'LIKE', "%{$search}%");
-                    });
-            });
-        }
-
-        // Location Filter
-        if ($request->filled('location')) {
-            $baseQuery->where('location', 'LIKE', "%{$location}%");
-        }
-
-        // Category Filter
-        if ($request->filled('category_uuid')) {
-            $baseQuery->whereHas('category', function ($q) use ($categoryUuid) {
-                $q->where('uuid', $categoryUuid);
-            });
-        }
-
-        // Company Filter
-        if ($request->filled('company_uuid')) {
-            $baseQuery->whereHas('company', function ($q) use ($companyUuid) {
-                $q->where('uuid', $companyUuid);
-            });
-        }
-
-        // Job Type Filter
-        if ($request->filled('job_type')) {
-            $baseQuery->where('job_type', $jobType);
-        }
-
-        // Experience Filter
-        if ($request->filled('exp_min') && $request->filled('exp_max')) {
-            $baseQuery->where(function ($q) use ($expMin, $expMax) {
-                $q->whereBetween('experience', [$expMin, $expMax])
-                    ->orWhere('experience', 'LIKE', "%{$expMin}%")
-                    ->orWhere('experience', 'LIKE', "%{$expMax}%");
-            });
-        } elseif ($request->filled('exp_min')) {
-            $baseQuery->where('experience', '>=', $expMin);
-        } elseif ($request->filled('exp_max')) {
-            $baseQuery->where('experience', '<=', $expMax);
-        }
-
-        // Salary Filter
-        if ($request->filled('salary_min') && $request->filled('salary_max')) {
-            $baseQuery->whereBetween('salary', [$salaryMin, $salaryMax]);
-        } elseif ($request->filled('salary_min')) {
-            $baseQuery->where('salary', '>=', $salaryMin);
-        } elseif ($request->filled('salary_max')) {
-            $baseQuery->where('salary', '<=', $salaryMax);
-        }
-
-        // Applied Jobs & Saved Jobs Array
-        $appliedJobIds = [];
-        $savedJobUuids = [];
-        if ($user) {
-            $appliedJobIds = JobApplication::where('candidate_id', $user->id)
-                ->pluck('job_id')
-                ->toArray();
-
-            $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
-                ->pluck('job_uuid')
-                ->toArray();
-        }
-
-        // =========================================================================
-        // CASE A: FLAT PAGINATED VIEW
-        // =========================================================================
-        if ($viewType === 'flat' || ($request->filled('per_page') && !$request->filled('view_type'))) {
-            $jobs = (clone $baseQuery)->orderBy('id', 'desc')->paginate($perPage);
-
-            $jobs->getCollection()->transform(function ($job) use ($appliedJobIds, $savedJobUuids) {
-                $job->has_applied = in_array($job->id, $appliedJobIds);
-                $job->is_saved    = in_array($job->uuid, $savedJobUuids);
-                return $job;
-            });
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Jobs fetched successfully',
-                'data'    => $jobs
-            ], 200);
-        }
-
-        // =========================================================================
-        // CASE B: SECTIONED VIEW (Recommended, All, Categorized)
-        // =========================================================================
-
-        // 1. ALL JOBS
-        $allJobs = (clone $baseQuery)->orderBy('id', 'desc')->get()->map(function ($job) use ($appliedJobIds, $savedJobUuids) {
-            $job->has_applied = in_array($job->id, $appliedJobIds);
-            $job->is_saved    = in_array($job->uuid, $savedJobUuids);
-            return $job;
+    // 3. Keyword Search (Title, Skills, Description, Company)
+    if ($request->filled('search')) {
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'LIKE', "%{$search}%")
+              ->orWhere('skills', 'LIKE', "%{$search}%")
+              ->orWhere('description', 'LIKE', "%{$search}%")
+              ->orWhereHas('company', function ($comp) use ($search) {
+                  $comp->where('name', 'LIKE', "%{$search}%");
+              });
         });
-
-        // 2. RECOMMENDED JOBS
-        $recommendedJobs = collect();
-        if ($user) {
-            $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
-            $userCity   = $user->city ?? null;
-            $userExp    = $user->total_experience_years ?? null;
-
-            $skillSql = "0";
-            if (!empty($userSkills) && is_array($userSkills)) {
-                $skillCases = [];
-                foreach ($userSkills as $skill) {
-                    $escapedSkill = addslashes(strtolower($skill));
-                    $skillCases[] = "CASE WHEN LOWER(skills) LIKE '%{$escapedSkill}%' THEN 3 ELSE 0 END";
-                }
-                if (!empty($skillCases)) {
-                    $skillSql = "(" . implode(" + ", $skillCases) . ")";
-                }
-            }
-
-            $locationSql = "0";
-            if (!empty($userCity)) {
-                $escapedCity = addslashes(strtolower($userCity));
-                $locationSql = "CASE WHEN LOWER(location) LIKE '%{$escapedCity}%' THEN 5 ELSE 0 END";
-            }
-
-            $expSql = "0";
-            if (!empty($userExp)) {
-                $escapedExp = addslashes((string)$userExp);
-                $expSql = "CASE WHEN experience LIKE '%{$escapedExp}%' THEN 2 ELSE 0 END";
-            }
-
-            $recommendedJobs = (clone $baseQuery)
-                ->select('*')
-                ->selectRaw("({$skillSql} + {$locationSql} + {$expSql}) as match_score")
-                ->having('match_score', '>', 0)
-                ->orderByDesc('match_score')
-                ->orderByDesc('id')
-                ->take(10)
-                ->get()
-                ->map(function ($job) use ($appliedJobIds, $savedJobUuids) {
-                    $job->has_applied = in_array($job->id, $appliedJobIds);
-                    $job->is_saved    = in_array($job->uuid, $savedJobUuids);
-                    return $job;
-                });
-        }
-
-        // 3. CATEGORIZED JOBS
-        $categorizedJobs = Category::where('status', 'active')
-            ->with(['jobPosts' => function ($q) {
-                $q->where('status', 'active')
-                    ->with('company:id,uuid,name,logo,location')
-                    ->orderBy('id', 'desc');
-            }])
-            ->whereHas('jobPosts', function ($q) {
-                $q->where('status', 'active');
-            })
-            ->get()
-            ->map(function ($category) use ($appliedJobIds, $savedJobUuids) {
-                $category->job_posts = $category->jobPosts->map(function ($job) use ($appliedJobIds, $savedJobUuids) {
-                    $job->has_applied = in_array($job->id, $appliedJobIds);
-                    $job->is_saved    = in_array($job->uuid, $savedJobUuids);
-                    return $job;
-                });
-                unset($category->jobPosts);
-                return $category;
-            });
-
-        return response()->json([
-            'status'  => true,
-            'message' => 'Jobs sections fetched successfully',
-            'data'    => [
-                'recommended_jobs' => $recommendedJobs,
-                'all_jobs'         => $allJobs,
-                'categorized_jobs' => $categorizedJobs
-            ]
-        ], 200);
     }
 
+    // 4. Location Filter
+    if ($request->filled('location')) {
+        $query->where('location', 'LIKE', "%{$location}%");
+    }
+
+    // 5. Category Filter
+    if ($request->filled('category_uuid')) {
+        $query->whereHas('category', function ($q) use ($categoryUuid) {
+            $q->where('uuid', $categoryUuid);
+        });
+    }
+
+    // 6. Job Type Filter
+    if ($request->filled('job_type')) {
+        $query->where('job_type', $jobType);
+    }
+
+    // 7. Experience Filter
+    if ($request->filled('experience')) {
+        $query->where('experience', 'LIKE', "%{$experience}%");
+    }
+
+    // 8. Salary Filter
+    if ($request->filled('salary')) {
+        $query->where('salary', 'LIKE', "%{$salary}%");
+    }
+
+    // 9. Fetch Saved & Applied Status for Current User
+    $savedJobUuids = [];
+    $userApplications = collect();
+
+    if ($user) {
+        $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
+            ->pluck('job_uuid')
+            ->toArray();
+
+        $userApplications = JobApplication::where('candidate_id', $user->id)
+            ->latest()
+            ->get()
+            ->groupBy('job_id');
+    }
+
+    // 10. Fetch Results Without Pagination
+    $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
+        $applications = $userApplications->get($job->id);
+        $latestApplication = $applications ? $applications->first() : null;
+
+        $canApply = true;
+        $reapplyAt = null;
+        $status = null;
+
+        if ($latestApplication) {
+            $status = strtolower($latestApplication->status);
+
+            switch ($status) {
+                case 'pending':
+                case 'applied':
+                case 'selected':
+                case 'cancelled':
+                    $canApply = false;
+                    break;
+
+                case 'rejected':
+                    $reapplyAt = Carbon::parse($latestApplication->updated_at)->addDays(60);
+                    $canApply  = now()->gte($reapplyAt);
+                    break;
+            }
+        }
+
+        $jobArray = $job->toArray();
+        $jobArray['has_applied']        = !is_null($latestApplication);
+        $jobArray['is_saved']          = in_array($job->uuid, $savedJobUuids);
+        $jobArray['can_apply']         = $canApply;
+        $jobArray['application_status'] = $status;
+        $jobArray['reapply_at']         = $reapplyAt?->toISOString();
+
+        return $jobArray;
+    });
+
+    // 11. Final Response
+    return response()->json([
+        'status'     => true,
+        'message'    => 'Jobs searched successfully',
+        'total_jobs' => $jobs->count(),
+        'data'       => $jobs
+    ], 200);
+}
     /**
      * Get Jobs List (Tab-wise listing)
      */
