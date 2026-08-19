@@ -167,9 +167,32 @@ class JobController extends Controller
         }
 
         // 7. Experience Filter
-        if ($request->filled('experience')) {
-            $query->where('experience', 'LIKE', "%{$experience}%");
+if ($request->filled('experience')) {
+    $expInput = trim($request->input('experience'));
+
+    if (strpos($expInput, '-') !== false) {
+        $parts = explode('-', $expInput);
+
+        $reqMinExp = (float) preg_replace('/[^0-9.]/', '', $parts[0] ?? 0);
+        $reqMaxExp = (float) preg_replace('/[^0-9.]/', '', $parts[1] ?? 0);
+
+        // Job range match: Job ka min experience <= reqMax aur Job ka max experience >= reqMin (Range Overlap)
+        $query->where(function ($q) use ($reqMinExp, $reqMaxExp) {
+            $q->whereRaw("CAST(SUBSTRING_INDEX(experience, '-', 1) AS DECIMAL(10,2)) <= ?", [$reqMaxExp])
+              ->whereRaw("CAST(SUBSTRING_INDEX(TRIM(SUBSTRING_INDEX(experience, '-', -1)), ' ', 1) AS DECIMAL(10,2)) >= ?", [$reqMinExp]);
+        });
+
+    } else {
+        // Agar single value aati hai (e.g., "1 Year" ya "2")
+        $valExp = (float) preg_replace('/[^0-9.]/', '', $expInput);
+        if ($valExp >= 0) {
+            $query->where(function ($q) use ($valExp) {
+                $q->whereRaw("CAST(SUBSTRING_INDEX(experience, '-', 1) AS DECIMAL(10,2)) <= ?", [$valExp])
+                  ->whereRaw("CAST(SUBSTRING_INDEX(TRIM(SUBSTRING_INDEX(experience, '-', -1)), ' ', 1) AS DECIMAL(10,2)) >= ?", [$valExp]);
+            });
         }
+    }
+}
 
 // 8. Salary Range Match ("20-40" ya "20" format handle karega)
 if ($request->filled('salary')) {
