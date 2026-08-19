@@ -325,73 +325,202 @@ class JobController extends Controller
     /**
      * Get Jobs List (Tab-wise listing)
      */
-    public function getJobs(Request $request)
-    {
-        $user = $request->user();
-        $tab = $request->query('tab', 'recommended');
-        $categoryUuid = $request->query('category_uuid');
-        $search = $request->query('search');
+    // public function getJobs(Request $request)
+    // {
+    //     $user = $request->user();
+    //     $tab = $request->query('tab', 'recommended');
+    //     $categoryUuid = $request->query('category_uuid');
+    //     $search = $request->query('search');
 
-        $query = JobPost::with(['company', 'category'])->where('status', 'active');
+    //     $query = JobPost::with(['company', 'category'])->where('status', 'active');
 
-        if ($tab === 'recommended') {
-            $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
-            $userCity = $user->city;
+    //     if ($tab === 'recommended') {
+    //         $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+    //         $userCity = $user->city;
 
+    //         $query->where(function ($q) use ($userSkills, $userCity) {
+    //             if (!empty($userSkills)) {
+    //                 foreach ($userSkills as $skill) {
+    //                     $q->orWhereJsonContains('skills', $skill)
+    //                         ->orWhere('skills', 'LIKE', '%' . $skill . '%')
+    //                         ->orWhere('title', 'LIKE', '%' . $skill . '%');
+    //                 }
+    //             }
+    //             if (!empty($userCity)) {
+    //                 $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
+    //             }
+    //         });
+    //     } elseif ($tab === 'category' && $categoryUuid) {
+    //         $query->whereHas('category', function ($q) use ($categoryUuid) {
+    //             $q->where('uuid', $categoryUuid);
+    //         });
+    //     }
+
+    //     if (!empty($search)) {
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('title', 'LIKE', "%{$search}%")
+    //                 ->orWhere('location', 'LIKE', "%{$search}%")
+    //                 ->orWhereHas('company', function ($comp) use ($search) {
+    //                     $comp->where('name', 'LIKE', "%{$search}%");
+    //                 });
+    //         });
+    //     }
+
+    //     $appliedJobIds = JobApplication::where('candidate_id', $user->id)
+    //         ->pluck('job_id')
+    //         ->toArray();
+
+    //     $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
+    //         ->pluck('job_uuid')
+    //         ->toArray();
+
+    //     $perPage = $request->get('per_page', 10);
+    //     $jobs = $query->orderBy('id', 'desc')->paginate($perPage);
+
+    //     $jobs->getCollection()->transform(function ($job) use ($appliedJobIds, $savedJobUuids) {
+    //         $job->has_applied = in_array($job->id, $appliedJobIds);
+    //         $job->is_saved    = in_array($job->uuid, $savedJobUuids);
+    //         return $job;
+    //     });
+
+    //     return response()->json([
+    //         'status'     => true,
+    //         'message'    => 'Jobs fetched successfully',
+    //         'active_tab' => $tab,
+    //         'data'       => $jobs
+    //     ], 200);
+    // }
+
+
+public function getJobs(Request $request)
+{
+    $user = $request->user();
+    $tab  = $request->query('tab', 'recommended');
+
+    // 1. Base Query with Relations
+    $query = JobPost::with(['company', 'category'])->where('status', 'active');
+
+    // 2. Recommended Jobs Logic
+    if ($user) {
+        $userSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+        $userCity   = $user->city;
+
+        if (!empty($userSkills) || !empty($userCity)) {
             $query->where(function ($q) use ($userSkills, $userCity) {
                 if (!empty($userSkills)) {
                     foreach ($userSkills as $skill) {
                         $q->orWhereJsonContains('skills', $skill)
-                            ->orWhere('skills', 'LIKE', '%' . $skill . '%')
-                            ->orWhere('title', 'LIKE', '%' . $skill . '%');
+                          ->orWhere('skills', 'LIKE', '%' . $skill . '%')
+                          ->orWhere('title', 'LIKE', '%' . $skill . '%');
                     }
                 }
                 if (!empty($userCity)) {
                     $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
                 }
             });
-        } elseif ($tab === 'category' && $categoryUuid) {
-            $query->whereHas('category', function ($q) use ($categoryUuid) {
-                $q->where('uuid', $categoryUuid);
-            });
         }
+    }
 
-        if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'LIKE', "%{$search}%")
-                    ->orWhere('location', 'LIKE', "%{$search}%")
-                    ->orWhereHas('company', function ($comp) use ($search) {
-                        $comp->where('name', 'LIKE', "%{$search}%");
-                    });
-            });
-        }
+    // 3. Saved & Applied Jobs Data
+    $savedJobUuids = [];
+    $userApplications = collect();
 
-        $appliedJobIds = JobApplication::where('candidate_id', $user->id)
-            ->pluck('job_id')
-            ->toArray();
-
+    if ($user) {
         $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
             ->pluck('job_uuid')
             ->toArray();
 
-        $perPage = $request->get('per_page', 10);
-        $jobs = $query->orderBy('id', 'desc')->paginate($perPage);
-
-        $jobs->getCollection()->transform(function ($job) use ($appliedJobIds, $savedJobUuids) {
-            $job->has_applied = in_array($job->id, $appliedJobIds);
-            $job->is_saved    = in_array($job->uuid, $savedJobUuids);
-            return $job;
-        });
-
-        return response()->json([
-            'status'     => true,
-            'message'    => 'Jobs fetched successfully',
-            'active_tab' => $tab,
-            'data'       => $jobs
-        ], 200);
+        $userApplications = JobApplication::where('candidate_id', $user->id)
+            ->latest()
+            ->get()
+            ->groupBy('job_id');
     }
 
-    /**
+    // 4. Fetch Jobs Data
+    $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
+        $applications = $userApplications->get($job->id);
+        $latestApplication = $applications ? $applications->first() : null;
+
+        $canApply = true;
+        $reapplyAt = null;
+        $status = null;
+
+        if ($latestApplication) {
+            $status = strtolower($latestApplication->status);
+
+            switch ($status) {
+                case 'pending':
+                case 'applied':
+                case 'selected':
+                case 'cancelled':
+                    $canApply = false;
+                    break;
+
+                case 'rejected':
+                    $reapplyAt = Carbon::parse($latestApplication->updated_at)->addDays(60);
+                    $canApply  = now()->gte($reapplyAt);
+                    break;
+            }
+        }
+
+        $jobArray = $job->toArray();
+        $jobArray['has_applied']        = !is_null($latestApplication);
+        $jobArray['is_saved']          = in_array($job->uuid, $savedJobUuids);
+        $jobArray['can_apply']         = $canApply;
+        $jobArray['application_status'] = $status;
+        $jobArray['reapply_at']         = $reapplyAt?->toISOString();
+
+        return $jobArray;
+    });
+
+    // 5. Fetch DB Categories
+    $categoriesList = Category::whereIn('id', function ($q) {
+        $q->select('category_id')
+          ->from('job_posts')
+          ->where('status', 'active')
+          ->whereNotNull('category_id');
+    })->select('id', 'name', 'uuid')->get();
+
+    // // 6. Merge Default Categories ("Recommended Jobs" & "All Jobs")
+    // $defaultCategories = collect([
+    //     ['id' => 'recommended', 'name' => 'Recommended Jobs', 'uuid' => 'recommended'],
+    //     ['id' => 'all',         'name' => 'All Jobs',         'uuid' => 'all'],
+    // ]);
+
+    // $categoriesList = $defaultCategories->concat($dbCategories);
+
+    // 7. Filters Metadata for UI
+    $metaFilters = [
+        'categories'  => $categoriesList,
+
+        'locations'   => JobPost::where('status', 'active')
+            ->whereNotNull('location')
+            ->distinct()
+            ->pluck('location')
+            ->values(),
+
+        'job_types'   => JobPost::where('status', 'active')
+            ->whereNotNull('job_type')
+            ->distinct()
+            ->pluck('job_type')
+            ->values(),
+
+        'experiences' => JobPost::where('status', 'active')
+            ->whereNotNull('experience')
+            ->distinct()
+            ->pluck('experience')
+            ->values(),
+    ];
+
+    // 8. Response
+    return response()->json([
+        'status'     => true,
+        'message'    => 'Recommended jobs fetched successfully',
+        'active_tab' => $tab,
+        'filters'    => $metaFilters,
+        'data'       => $jobs
+    ], 200);
+} /**
      * Get Single Job Detail by UUID
      */
     public function getJobDetail(Request $request, $uuid)
