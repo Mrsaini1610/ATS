@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Throwable;
 
 class UserProfileController extends Controller
 {
     /**
-     * Fetch complete candidate profile with related records
+     * Fetch complete candidate profile
      */
     public function getProfile(Request $request)
     {
@@ -30,7 +31,7 @@ class UserProfileController extends Controller
     }
 
     /**
-     * Update Candidate Profile
+     * Update Candidate Profile & Picture
      */
     public function updateProfile(Request $request)
     {
@@ -73,30 +74,29 @@ class UserProfileController extends Controller
                 'state', 'pincode', 'latitude', 'longitude'
             ]);
 
-if ($request->hasFile('profile_picture')) {
-    // 1. Purani image delete karte waqt 'storage/' hata kar check karein
-    if ($user->profile_picture) {
-        // Agar database me 'storage/profiles/...' save hai toh 'storage/' remove karke delete karein
-        $oldPath = str_replace('storage/', '', $user->profile_picture);
-        if (Storage::disk('public')->exists($oldPath)) {
-            Storage::disk('public')->delete($oldPath);
-        }
-    }
+            if ($request->hasFile('profile_picture')) {
+                // 1. Purani file delete karne ke liye 'storage/' hata kar check karein
+                if ($user->profile_picture) {
+                    $oldDiskPath = str_replace('storage/', '', $user->profile_picture);
+                    if (Storage::disk('public')->exists($oldDiskPath)) {
+                        Storage::disk('public')->delete($oldDiskPath);
+                    }
+                }
 
-    $file = $request->file('profile_picture');
+                $file = $request->file('profile_picture');
 
-    // 2. File name format
-    $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-    $extension = $file->getClientOriginalExtension();
-    $cleanFileName = \Illuminate\Support\Str::slug($originalName);
-    $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
+                // 2. File name format: time()_filename.extension
+                $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension    = $file->getClientOriginalExtension();
+                $cleanFileName = Str::slug($originalName);
+                $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
 
-    // 3. Storage disk me direct 'profiles' me save karein
-    $file->storeAs('profiles', $finalFileName, 'public');
+                // 3. Storage disk me direct 'profiles' folder me store karein
+                $file->storeAs('profiles', $finalFileName, 'public');
 
-    // 4. Database ke liye 'storage/' prefix ke saath save karein
-    $data['profile_picture'] = 'storage/profiles/' . $finalFileName;
-}
+                // 4. Database ke liye 'storage/profiles/...' format set karein
+                $data['profile_picture'] = 'storage/profiles/' . $finalFileName;
+            }
 
             $user->update($data);
 
@@ -114,9 +114,3 @@ if ($request->hasFile('profile_picture')) {
         }
     }
 }
-
-
-
-
-
-
