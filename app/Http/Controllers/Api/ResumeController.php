@@ -61,7 +61,7 @@ class ResumeController extends Controller
             $user = $request->user();
             $file = $request->file('resume');
 
-            // Original name extract aur clean karein
+            // Original name clean karein
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
             $extension = $file->getClientOriginalExtension();
             $cleanFileName = Str::slug($originalName);
@@ -69,9 +69,11 @@ class ResumeController extends Controller
             // Unique file name with timestamp
             $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
 
-            // 'resumes' folder me save karein (storage/app/public/resumes)
+            // 1. Direct 'resumes' folder me save karein (storage/app/public/resumes)
             $file->storeAs('resumes', $finalFileName, 'public');
-            $filePath = 'resumes/' . $finalFileName;
+
+            // 2. Database ke liye 'storage/resumes/...' path banayein
+            $filePath = 'storage/resumes/' . $finalFileName;
 
             // Pehla resume automatically default banega
             $isDefault = $user->resumes()->where('is_delete', 0)->count() === 0;
@@ -141,9 +143,12 @@ class ResumeController extends Controller
             }
 
             if ($request->hasFile('resume')) {
-                // Purani file delete karein
-                if ($resume->file_path && Storage::disk('public')->exists($resume->file_path)) {
-                    Storage::disk('public')->delete($resume->file_path);
+                // 1. Purani file delete karein ('storage/' remove karke disk path match karein)
+                if ($resume->file_path) {
+                    $oldDiskPath = str_replace('storage/', '', $resume->file_path);
+                    if (Storage::disk('public')->exists($oldDiskPath)) {
+                        Storage::disk('public')->delete($oldDiskPath);
+                    }
                 }
 
                 $file = $request->file('resume');
@@ -152,9 +157,11 @@ class ResumeController extends Controller
                 $cleanFileName = Str::slug($originalName);
                 $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
 
+                // 2. Direct 'resumes' folder me save karein
                 $file->storeAs('resumes', $finalFileName, 'public');
 
-                $resume->file_path = 'resumes/' . $finalFileName;
+                // 3. Database ke liye path set karein
+                $resume->file_path = 'storage/resumes/' . $finalFileName;
                 $resume->file_type = strtolower($extension);
 
                 if (!$request->filled('title')) {

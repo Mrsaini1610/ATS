@@ -73,30 +73,30 @@ class UserProfileController extends Controller
                 'state', 'pincode', 'latitude', 'longitude'
             ]);
 
-            if ($request->hasFile('profile_picture')) {
-                // 1. Purani image delete karein agar exist karti hai
-                if ($user->profile_picture && Storage::disk('public')->exists($user->profile_picture)) {
-                    Storage::disk('public')->delete($user->profile_picture);
-                }
+if ($request->hasFile('profile_picture')) {
+    // 1. Purani image delete karte waqt 'storage/' hata kar check karein
+    if ($user->profile_picture) {
+        // Agar database me 'storage/profiles/...' save hai toh 'storage/' remove karke delete karein
+        $oldPath = str_replace('storage/', '', $user->profile_picture);
+        if (Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+    }
 
-                $file = $request->file('profile_picture');
+    $file = $request->file('profile_picture');
 
-                // 2. Original file name nikalein aur clean (safe) banayein
-                $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $extension = $file->getClientOriginalExtension();
+    // 2. File name format
+    $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+    $extension = $file->getClientOriginalExtension();
+    $cleanFileName = \Illuminate\Support\Str::slug($originalName);
+    $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
 
-                // Special characters aur spaces ko remove karein
-                $cleanFileName = \Illuminate\Support\Str::slug($originalName);
+    // 3. Storage disk me direct 'profiles' me save karein
+    $file->storeAs('profiles', $finalFileName, 'public');
 
-                // Final file name: time + user identifier + original name (e.g. 1724156000_suresh_my_photo.jpg)
-                $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
-
-                // 3. 'profiles' folder me store karein
-                $file->storeAs('profiles', $finalFileName, 'public');
-
-                // 4. Database ke liye relative path set karein
-                $data['profile_picture'] = 'profiles/' . $finalFileName;
-            }
+    // 4. Database ke liye 'storage/' prefix ke saath save karein
+    $data['profile_picture'] = 'storage/profiles/' . $finalFileName;
+}
 
             $user->update($data);
 
