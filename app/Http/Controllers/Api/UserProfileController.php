@@ -74,10 +74,28 @@ class UserProfileController extends Controller
             ]);
 
             if ($request->hasFile('profile_picture')) {
+                // 1. Purani image delete karein agar exist karti hai
                 if ($user->profile_picture && Storage::disk('public')->exists($user->profile_picture)) {
                     Storage::disk('public')->delete($user->profile_picture);
                 }
-                $data['profile_picture'] = $request->file('profile_picture')->store('profiles', 'public');
+
+                $file = $request->file('profile_picture');
+
+                // 2. Original file name nikalein aur clean (safe) banayein
+                $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension = $file->getClientOriginalExtension();
+
+                // Special characters aur spaces ko remove karein
+                $cleanFileName = \Illuminate\Support\Str::slug($originalName);
+
+                // Final file name: time + user identifier + original name (e.g. 1724156000_suresh_my_photo.jpg)
+                $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
+
+                // 3. 'profiles' folder me store karein
+                $file->storeAs('profiles', $finalFileName, 'public');
+
+                // 4. Database ke liye relative path set karein
+                $data['profile_picture'] = 'profiles/' . $finalFileName;
             }
 
             $user->update($data);

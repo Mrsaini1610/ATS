@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ResumeController extends Controller
@@ -22,13 +23,7 @@ class ResumeController extends Controller
             $resumes = $user->resumes()
                 ->where('is_delete', 0)
                 ->latest()
-                ->get()
-                ->map(function ($resume) {
-                    $resume->file_url = $resume->file_path
-                        ? asset('storage/' . $resume->file_path)
-                        : null;
-                    return $resume;
-                });
+                ->get();
 
             return response()->json([
                 'status'  => true,
@@ -66,16 +61,25 @@ class ResumeController extends Controller
             $user = $request->user();
             $file = $request->file('resume');
 
-            $folder = $user->uuid ?? $user->id;
-            $path = $file->store('resumes/' . $folder, 'public');
+            // Original name extract aur clean karein
+            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $extension = $file->getClientOriginalExtension();
+            $cleanFileName = Str::slug($originalName);
 
-            // Check active non-deleted resumes for default flag
+            // Unique file name with timestamp
+            $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
+
+            // 'resumes' folder me save karein (storage/app/public/resumes)
+            $file->storeAs('resumes', $finalFileName, 'public');
+            $filePath = 'resumes/' . $finalFileName;
+
+            // Pehla resume automatically default banega
             $isDefault = $user->resumes()->where('is_delete', 0)->count() === 0;
 
             $resume = $user->resumes()->create([
                 'title'      => $request->title ?? $file->getClientOriginalName(),
-                'file_path'  => $path,
-                'file_type'  => strtolower($file->getClientOriginalExtension()),
+                'file_path'  => $filePath,
+                'file_type'  => strtolower($extension),
                 'is_default' => $isDefault,
                 'is_delete'  => 0
             ]);
@@ -137,15 +141,21 @@ class ResumeController extends Controller
             }
 
             if ($request->hasFile('resume')) {
-                $file = $request->file('resume');
-
+                // Purani file delete karein
                 if ($resume->file_path && Storage::disk('public')->exists($resume->file_path)) {
                     Storage::disk('public')->delete($resume->file_path);
                 }
 
-                $folder = $user->uuid ?? $user->id;
-                $resume->file_path = $file->store('resumes/' . $folder, 'public');
-                $resume->file_type = strtolower($file->getClientOriginalExtension());
+                $file = $request->file('resume');
+                $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension = $file->getClientOriginalExtension();
+                $cleanFileName = Str::slug($originalName);
+                $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
+
+                $file->storeAs('resumes', $finalFileName, 'public');
+
+                $resume->file_path = 'resumes/' . $finalFileName;
+                $resume->file_type = strtolower($extension);
 
                 if (!$request->filled('title')) {
                     $resume->title = $file->getClientOriginalName();
@@ -231,12 +241,10 @@ class ResumeController extends Controller
             DB::transaction(function () use ($user, $resume) {
                 $wasDefault = $resume->is_default;
 
-                // Soft delete mark
                 $resume->is_delete = 1;
                 $resume->is_default = false;
                 $resume->save();
 
-                // Agar deleted resume default tha, toh next active resume ko default bana dein
                 if ($wasDefault) {
                     $nextResume = $user->resumes()
                         ->where('is_delete', 0)

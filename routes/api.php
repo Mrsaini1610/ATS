@@ -37,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/update', 'updateProfile');
         });
 
-        // Resume (/profile/resume/...)
+        // Resume (/profile...)
         Route::controller(ResumeController::class)->group(function () {
             Route::post('/resume', 'getResumes');
             Route::post('/resume-upload', 'uploadResume');
@@ -46,7 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/resume/{id}/set-default', 'setDefaultResume');
         });
 
-        // Education (/profile/education/...)
+        // Education (/profile/...)
         Route::controller(EducationController::class)->group(function () {
             Route::post('/education', 'getEducations');
             Route::post('/education-add', 'addEducation');
