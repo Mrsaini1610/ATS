@@ -73,27 +73,28 @@ class CompanyController extends Controller
                 return $job;
             });
 
-        // 5. Structure complete response data
+        // 5. Structure company data (jobs ko isse alag rakha gaya hai)
         $responseData = [
-            'id'          => $company->id,
-            'uuid'        => $company->uuid,
-            'name'        => $company->name,
-            'slug'        => $company->slug,
-            'logo'        => $company->logo ? asset('storage/companies/' . $company->logo) : null,
-            'website'     => $company->website,
-            'location'    => $company->location,
-            'description' => $company->description,
-            'status'      => $company->status,
-            'created_at'  => $company->created_at,
-            'updated_at'  => $company->updated_at,
+            'id'                => $company->id,
+            'uuid'              => $company->uuid,
+            'name'              => $company->name,
+            'slug'              => $company->slug,
+            'logo'              => $company->logo ? asset('storage/companies/' . $company->logo) : null,
+            'website'           => $company->website,
+            'location'          => $company->location,
+            'description'       => $company->description,
+            'status'            => $company->status,
+            'created_at'        => $company->created_at,
+            'updated_at'        => $company->updated_at,
             'total_active_jobs' => $companyJobs->count(),
-            'jobs'        => $companyJobs
         ];
 
+        // 6. Return response with 'jobs' outside 'data'
         return response()->json([
             'status'  => true,
             'message' => 'Company detail fetched successfully',
-            'data'    => $responseData
+            'data'    => $responseData,
+            'jobs'    => $companyJobs
         ], 200);
     }
 }
