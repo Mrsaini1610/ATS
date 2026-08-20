@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ExperienceController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\JobController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CategoryController;
 
 // ==========================================
 // Public Endpoints
@@ -88,6 +89,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // --------------------------------------
     Route::controller(CompanyController::class)->group(function () {
         Route::post('/getcompanies', 'getCompanyDetail');
+    });
+
+
+    // --------------------------------------
+    // Category Section Group (/categories/...)
+    // --------------------------------------
+    Route::controller(CategoryController::class)->group(function () {
+        Route::post('/categories', 'getCategories');   // All categories + search filter
+        Route::post('/category-filter', 'getCategoryByUuid');  // Single category by UUID (via body)
     });
 
 });

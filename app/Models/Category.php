@@ -9,17 +9,14 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $table = 'categories';
+    protected $fillable = [
+        'uuid',
+        'name',
+        'slug',
+        'status',
+    ];
 
-    protected $fillable = ['name', 'slug', 'description', 'status'];
-
-    public function jobPosts()
-    {
-        return $this->hasMany(JobPost::class, 'category_id');
-    }
-
-    public function subcategories()
-    {
-        return $this->hasMany(Subcategory::class, 'category_id');
-    }
+    protected $hidden = [
+        'id', // ID hide rakhne ke liye agar frontend par sirf uuid bhejni ho
+    ];
 }
