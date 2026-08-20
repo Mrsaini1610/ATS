@@ -8,29 +8,43 @@ use App\Models\JobPost;
 use App\Models\JobApplication;
 use App\Models\SavedJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class CompanyController extends Controller
 {
     /**
-     * Get Company Details along with its Active Jobs
+     * Get Company Details via POST request using UUID
      */
-    public function getCompanyDetail(Request $request, $uuid)
+    public function getCompanyDetail(Request $request)
     {
+        // 1. UUID validation
+        $validator = Validator::make($request->all(), [
+            'uuid' => 'required|string|exists:companies,uuid',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
         $user = $request->user();
 
-        // 1. Company fetch karein
-        $company = Company::where('uuid', $uuid)
+        // 2. Fetch company data
+        $company = Company::where('uuid', $request->uuid)
             ->where('status', 'active')
             ->first();
 
         if (!$company) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Company not found.'
+                'message' => 'Company not found or inactive.'
             ], 404);
         }
 
-        // 2. User ke applied aur saved jobs fetch karein
+        // 3. User ke applied aur saved jobs fetch karein
         $appliedJobIds = [];
         $savedJobUuids = [];
 
@@ -44,7 +58,7 @@ class CompanyController extends Controller
                 ->toArray();
         }
 
-        // 3. Is company ki saari active job posts (subCategory se uuid hata diya gaya hai)
+        // 4. Company active jobs fetch karein
         $companyJobs = JobPost::with([
                 'category:id,uuid,name',
                 'subCategory'
@@ -59,14 +73,27 @@ class CompanyController extends Controller
                 return $job;
             });
 
-        // 4. Company stats calculate karein
-        $company->total_active_jobs = $companyJobs->count();
-        $company->jobs = $companyJobs;
+        // 5. Structure complete response data
+        $responseData = [
+            'id'          => $company->id,
+            'uuid'        => $company->uuid,
+            'name'        => $company->name,
+            'slug'        => $company->slug,
+            'logo'        => $company->logo ? asset('storage/companies/' . $company->logo) : null,
+            'website'     => $company->website,
+            'location'    => $company->location,
+            'description' => $company->description,
+            'status'      => $company->status,
+            'created_at'  => $company->created_at,
+            'updated_at'  => $company->updated_at,
+            'total_active_jobs' => $companyJobs->count(),
+            'jobs'        => $companyJobs
+        ];
 
         return response()->json([
             'status'  => true,
             'message' => 'Company detail fetched successfully',
-            'data'    => $company
+            'data'    => $responseData
         ], 200);
     }
 }

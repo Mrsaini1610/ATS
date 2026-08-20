@@ -167,6 +167,7 @@ class JobController extends Controller
         }
 
         // 7. Experience Filter
+        
 if ($request->filled('experience')) {
     $expInput = trim($request->input('experience'));
 

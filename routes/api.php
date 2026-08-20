@@ -88,8 +88,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Company Section Group (/companies/...)
     // --------------------------------------
     Route::controller(CompanyController::class)->prefix('companies')->group(function () {
-        Route::get('/{uuid}', 'getCompanyDetail'); // GET /companies/{uuid}
+        Route::post('/detail', 'getCompanyDetail'); 
     });
 
-    
+
 });
