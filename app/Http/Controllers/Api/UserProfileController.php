@@ -32,7 +32,7 @@ class UserProfileController extends Controller
 
     /**
      * Update Candidate Profile & Picture
-     */
+     **/
     public function updateProfile(Request $request)
     {
         $user = $request->user();

@@ -47,48 +47,48 @@ class User extends Authenticatable
 
     public function getProfilePictureUrlAttribute()
     {
-        return $this->profile_picture ? asset( $this->profile_picture) : null;
+        return $this->profile_picture ? asset($this->profile_picture) : null;
     }
 
-    // Category Relation
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
 
-    // Educations with active records filter
     public function educations()
     {
         return $this->hasMany(UserEducation::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
-    // Experiences with active records filter
     public function experiences()
     {
         return $this->hasMany(UserExperience::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
-    // Latest Active Experience
     public function latestExperience()
     {
         return $this->hasOne(UserExperience::class, 'user_uuid', 'uuid')->where('is_delete', 0)->latestOfMany();
     }
 
-    // Resumes with active records filter
+    // All active resumes (Hard delete based)
     public function resumes()
     {
-        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid')->where('is_delete', 0);
+        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid');
     }
 
-    // Certificates with active records filter
+    // Current selected default resume
+    public function defaultResume()
+    {
+        return $this->hasOne(UserResume::class, 'user_uuid', 'uuid')->where('is_default', true);
+    }
+
     public function certificates()
     {
         return $this->hasMany(UserCertificate::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
-    // Saved Jobs Relation
+
     public function savedJobs()
     {
         return $this->hasMany(SavedJob::class, 'user_uuid', 'uuid');
     }
-
 }

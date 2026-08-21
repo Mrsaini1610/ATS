@@ -38,16 +38,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/update', 'updateProfile');
         });
 
-        // Resume (/profile...)
+        // Resume Section (All POST with body payloads)
         Route::controller(ResumeController::class)->group(function () {
             Route::post('/resume', 'getResumes');
             Route::post('/resume-upload', 'uploadResume');
-            Route::post('/resume-update/{id}', 'updateResume');
-            Route::post('/resume-delete/{id}', 'deleteResume');
-            Route::post('/resume/{id}/set-default', 'setDefaultResume');
+            Route::post('/resume-set-default', 'setDefaultResume'); // Body: { "uuid": "..." }
+            Route::post('/resume-delete', 'deleteResume');          // Body: { "uuid": "..." }
         });
 
-        // Education (/profile/...)
+        // Education
         Route::controller(EducationController::class)->group(function () {
             Route::post('/education', 'getEducations');
             Route::post('/education-add', 'addEducation');
@@ -55,7 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/education-delete/{id}', 'deleteEducation');
         });
 
-        // Experience (/profile/experience/...)
+        // Experience
         Route::controller(ExperienceController::class)->group(function () {
             Route::post('/experience', 'getExperiences');
             Route::post('/experience-add', 'addExperience');
@@ -63,7 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/experience-delete/{id}', 'deleteExperience');
         });
 
-        // Certificate (/profile/certificate/...)
+        // Certificate
         Route::controller(CertificateController::class)->group(function () {
             Route::post('/certificate', 'getCertificates');
             Route::post('/certificate-add', 'addCertificate');
@@ -78,26 +77,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::controller(JobController::class)->prefix('find-job')->group(function () {
         Route::post('/', 'getJobs');
         Route::post('/filter', 'filterJobs');
-        Route::get('/saved', 'getSavedJobs');
+        Route::post('/saved', 'getSavedJobs');
         Route::post('/save-toggle', 'toggleSaveJob');
-        Route::get('/{uuid}', 'getJobDetail');
+        Route::post('/detail/{uuid}', 'getJobDetail');
         Route::post('/apply', 'applyJob');
+        Route::post('/applied-jobs', 'getAppliedJobs');
     });
 
     // --------------------------------------
-    // Company Section Group (/companies/...)
+    // Company Section Group
     // --------------------------------------
     Route::controller(CompanyController::class)->group(function () {
         Route::post('/getcompanies', 'getCompanyDetail');
     });
 
-
     // --------------------------------------
-    // Category Section Group (/categories/...)
+    // Category Section Group
     // --------------------------------------
     Route::controller(CategoryController::class)->group(function () {
-        Route::post('/categories', 'getCategories');   // All categories + search filter
-        Route::post('/category-filter', 'getCategoryByUuid');  // Single category by UUID (via body)
+        Route::post('/categories', 'getCategories');
+        Route::post('/category-filter', 'getCategoryByUuid');
     });
 
 });

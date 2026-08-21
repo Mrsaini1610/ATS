@@ -40,4 +40,10 @@ class JobApplication extends Model
     {
         return $this->belongsTo(User::class, 'candidate_id');
     }
+
+    // Job Post relation
+    public function jobPost()
+    {
+        return $this->belongsTo(JobPost::class, 'job_id');
+    }
 }
