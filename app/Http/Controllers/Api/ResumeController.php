@@ -42,6 +42,9 @@ class ResumeController extends Controller
     /**
      * Upload candidate resume
      */
+/**
+     * Upload candidate resume and soft-delete previous resumes
+     */
     public function uploadResume(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -61,34 +64,38 @@ class ResumeController extends Controller
             $user = $request->user();
             $file = $request->file('resume');
 
-            // Original name clean karein
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
             $extension = $file->getClientOriginalExtension();
             $cleanFileName = Str::slug($originalName);
-
-            // Unique file name with timestamp
             $finalFileName = time() . '_' . $cleanFileName . '.' . $extension;
 
-            // 1. Direct 'resumes' folder me save karein (storage/app/public/resumes)
+            // 1. Storage me file save karein
             $file->storeAs('resumes', $finalFileName, 'public');
-
-            // 2. Database ke liye 'storage/resumes/...' path banayein
             $filePath = 'storage/resumes/' . $finalFileName;
 
-            // Pehla resume automatically default banega
-            $isDefault = $user->resumes()->where('is_delete', 0)->count() === 0;
+            // 2. Database transaction: purane soft-delete karein aur naya resume default banayein
+            $resume = DB::transaction(function () use ($user, $request, $file, $filePath, $extension) {
+                // Purane sabhi active resumes ko soft delete karein
+                $user->resumes()
+                    ->where('is_delete', 0)
+                    ->update([
+                        'is_delete'  => 1,
+                        'is_default' => false
+                    ]);
 
-            $resume = $user->resumes()->create([
-                'title'      => $request->title ?? $file->getClientOriginalName(),
-                'file_path'  => $filePath,
-                'file_type'  => strtolower($extension),
-                'is_default' => $isDefault,
-                'is_delete'  => 0
-            ]);
+                // Naya resume insert karein (is_default = 1 ke sath)
+                return $user->resumes()->create([
+                    'title'      => $request->title ?? $file->getClientOriginalName(),
+                    'file_path'  => $filePath,
+                    'file_type'  => strtolower($extension),
+                    'is_default' => 1,
+                    'is_delete'  => 0
+                ]);
+            });
 
             return response()->json([
                 'status'  => true,
-                'message' => 'Resume uploaded successfully',
+                'message' => 'Resume uploaded successfully and previous resumes archived',
                 'resume'  => $resume
             ], 201);
 
