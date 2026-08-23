@@ -10,7 +10,9 @@ use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\JobController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CityController;
 
+Route::get('/import-cities', [CityController::class, 'importCities']);
 // ==========================================
 // Public Endpoints
 // ==========================================
@@ -23,7 +25,7 @@ Route::controller(AuthController::class)->group(function () {
 // Protected Endpoints (Requires valid Bearer Token)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
-
+Route::post('/find-state-uuid', [CityController::class, 'getStateUuid']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
 
