@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Exception;
+use App\Models\State;
 
 class CityController extends Controller
 {
@@ -91,5 +92,15 @@ class CityController extends Controller
             ], 500);
         }
     }
+    public function getStateUuid(Request $request)
+{
+    // Fetch all records selecting only state names and UUIDs
+    $states = State::select('name', 'uuid')->get();
+
+    return response()->json([
+        'status' => true,
+        'data' => $states
+    ], 200);
+}
 
 }
