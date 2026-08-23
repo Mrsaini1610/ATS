@@ -26,7 +26,7 @@ Route::controller(AuthController::class)->group(function () {
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
 Route::post('/find-state', [CityController::class, 'getState']);
-route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
+Route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
 

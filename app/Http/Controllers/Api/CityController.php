@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Exception;
 use App\Models\State;
+use App\Models\City;
 
 class CityController extends Controller
 {
@@ -17,7 +18,7 @@ class CityController extends Controller
         set_time_limit(0);
 
         try {
-            // 1. Fetch uuid, id and state_code from states table
+            // 1. Fetch valid state codes and UUIDs
             $states = DB::table('states')
                 ->select('id', 'uuid', 'state_code')
                 ->whereNotNull('state_code')
@@ -52,8 +53,8 @@ class CityController extends Controller
 
                             if (!empty($cityName)) {
                                 $recordsToInsert[] = [
-                                    'uuid'       => (string) Str::uuid(), // City ka apna UUID
-                                    'state_uuid' => $state->uuid,          // Parent state ka UUID
+                                    'uuid'       => (string) Str::uuid(),
+                                    'state_uuid' => $state->uuid,
                                     'name'       => trim($cityName),
                                     'latitude'   => is_array($city) ? ($city['latitude'] ?? null) : null,
                                     'longitude'  => is_array($city) ? ($city['longitude'] ?? null) : null,
@@ -92,36 +93,37 @@ class CityController extends Controller
             ], 500);
         }
     }
+
     public function getState(Request $request)
-{
-    // Fetch all records selecting only state names and UUIDs
-    $states = State::select('name', 'uuid')->get();
+    {
+        $states = State::select('name', 'uuid')->get();
 
-    return response()->json([
-        'status' => true,
-        'data' => $states
-    ], 200);
-}
-public function getCitybyState(Request $request)
-{
-    $stateUuid = $request->input('state_uuid');
-
-    if (!$stateUuid) {
         return response()->json([
-            'status' => false,
-            'message' => 'State UUID is required.'
-        ], 400);
+            'status' => true,
+            'data'   => $states
+        ], 200);
     }
 
-    // Fetch cities based on the provided state UUID
-    $cities = DB::table('cities')
-        ->where('state_uuid', $stateUuid)
-        ->select('name', 'uuid')
-        ->get();
+    public function getCitybyState(Request $request)
+    {
+        $stateUuid = $request->input('state_uuid');
 
-    return response()->json([
-        'status' => true,
-        'data' => $cities
-    ], 200);    }
+        if (!$stateUuid) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'State UUID is required.'
+            ], 400);
+        }
 
+        $cities = DB::table('cities')
+            ->where('state_uuid', $stateUuid)
+            ->select('name', 'uuid')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data'   => $cities
+        ], 200);
+    }
 }
