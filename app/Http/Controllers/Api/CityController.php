@@ -92,7 +92,7 @@ class CityController extends Controller
             ], 500);
         }
     }
-    public function getStateUuid(Request $request)
+    public function getState(Request $request)
 {
     // Fetch all records selecting only state names and UUIDs
     $states = State::select('name', 'uuid')->get();

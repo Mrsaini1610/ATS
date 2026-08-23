@@ -25,7 +25,7 @@ Route::controller(AuthController::class)->group(function () {
 // Protected Endpoints (Requires valid Bearer Token)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
-Route::post('/find-state-uuid', [CityController::class, 'getStateUuid']);
+Route::post('/find-state', [CityController::class, 'getState']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
 
