@@ -102,5 +102,26 @@ class CityController extends Controller
         'data' => $states
     ], 200);
 }
+public function getCitybyState(Request $request)
+{
+    $stateUuid = $request->input('state_uuid');
+
+    if (!$stateUuid) {
+        return response()->json([
+            'status' => false,
+            'message' => 'State UUID is required.'
+        ], 400);
+    }
+
+    // Fetch cities based on the provided state UUID
+    $cities = DB::table('cities')
+        ->where('state_uuid', $stateUuid)
+        ->select('name', 'uuid')
+        ->get();
+
+    return response()->json([
+        'status' => true,
+        'data' => $cities
+    ], 200);    }
 
 }

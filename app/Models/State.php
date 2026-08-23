@@ -9,10 +9,11 @@ class State extends Model
 {
     use HasFactory;
 
-    // Define the table name if it differs from the default plural form
     protected $table = 'states';
 
-    // Specify the attributes that are mass assignable
+    // The table only uses created_at, not updated_at
+    const UPDATED_AT = null;
+
     protected $fillable = [
         'name',
         'country_code',
@@ -24,6 +25,9 @@ class State extends Model
         'uuid',
     ];
 
-    // Disable updated_at if your table only has created_at
-    public $timestamps = false; 
+    // Explicit type casts for numerical lat/long values
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+    ];
 }
