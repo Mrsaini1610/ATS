@@ -14,71 +14,71 @@ use App\Models\City;
 class CityController extends Controller
 {
 
-public function fetchAndSyncStates()
-    {
-        try {
-            // 1. Call API
-            $response = Http::timeout(30)->get('https://uat.apiclub.in/api/v1/states/IN');
+// public function fetchAndSyncStates()
+//     {
+//         try {
+//             // 1. Call API
+//             $response = Http::timeout(30)->get('https://uat.apiclub.in/api/v1/states/IN');
 
-            if (!$response->successful()) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Failed to retrieve data from API.',
-                    'error' => $response->body()
-                ], $response->status());
-            }
+//             if (!$response->successful()) {
+//                 return response()->json([
+//                     'status' => false,
+//                     'message' => 'Failed to retrieve data from API.',
+//                     'error' => $response->body()
+//                 ], $response->status());
+//             }
 
-            $apiData = $response->json();
+//             $apiData = $response->json();
 
-            // Adjust payload key depending on API response structure (e.g., $apiData['data'] or $apiData['response'])
-            $statesData = $apiData['response'] ?? $apiData['data'] ?? $apiData;
+//             // Adjust payload key depending on API response structure (e.g., $apiData['data'] or $apiData['response'])
+//             $statesData = $apiData['response'] ?? $apiData['data'] ?? $apiData;
 
-            if (empty($statesData) || !is_array($statesData)) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No state data found in API response.'
-                ], 404);
-            }
+//             if (empty($statesData) || !is_array($statesData)) {
+//                 return response()->json([
+//                     'status' => false,
+//                     'message' => 'No state data found in API response.'
+//                 ], 404);
+//             }
 
-            $insertData = [];
-            $now = now();
+//             $insertData = [];
+//             $now = now();
 
-            foreach ($statesData as $item) {
-    $insertData[] = [
-        'uuid'         => (string) Str::uuid(),
-        'name'         => $item['name'] ?? $item['state_name'] ?? null,
-        'country_code' => $item['country_code'] ?? 'IN',
-        'country_name' => $item['country_name'] ?? 'India',
-        'state_code'   => $item['state_code'] ?? $item['iso2'] ?? null,
-        'type'         => $item['type'] ?? null,
-        'latitude'     => $item['latitude'] ?? $item['lat'] ?? null,
-        'longitude'    => $item['longitude'] ?? $item['lng'] ?? null,
-        'created_at'   => $now,
-    ];
-}
+//             foreach ($statesData as $item) {
+//     $insertData[] = [
+//         'uuid'         => (string) Str::uuid(),
+//         'name'         => $item['name'] ?? $item['state_name'] ?? null,
+//         'country_code' => $item['country_code'] ?? 'IN',
+//         'country_name' => $item['country_name'] ?? 'India',
+//         'state_code'   => $item['state_code'] ?? $item['iso2'] ?? null,
+//         'type'         => $item['type'] ?? null,
+//         'latitude'     => $item['latitude'] ?? $item['lat'] ?? null,
+//         'longitude'    => $item['longitude'] ?? $item['lng'] ?? null,
+//         'created_at'   => $now,
+//     ];
+// }
 
-DB::transaction(function () use ($insertData) {
-    State::upsert(
-        $insertData,
-        ['state_code'], 
-        ['name', 'country_code', 'country_name', 'type', 'latitude', 'longitude'] // Removed updated_at
-    );
-});
+// DB::transaction(function () use ($insertData) {
+//     State::upsert(
+//         $insertData,
+//         ['state_code'], 
+//         ['name', 'country_code', 'country_name', 'type', 'latitude', 'longitude'] // Removed updated_at
+//     );
+// });
 
-            return response()->json([
-                'status'  => true,
-                'message' => 'States inserted/updated successfully.',
-                'count'   => count($insertData)
-            ], 200);
+//             return response()->json([
+//                 'status'  => true,
+//                 'message' => 'States inserted/updated successfully.',
+//                 'count'   => count($insertData)
+//             ], 200);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'An error occurred while saving states.',
-                'error'   => $e->getMessage()
-            ], 500);
-        }
-    }
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'status'  => false,
+//                 'message' => 'An error occurred while saving states.',
+//                 'error'   => $e->getMessage()
+//             ], 500);
+//         }
+//     }
 
     public function fetchAndSyncCities()
   {

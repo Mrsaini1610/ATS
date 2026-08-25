@@ -13,7 +13,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CityController;
 use App\Http\Controllers\Api\TownController;
 
-Route::get('/sync-towns', [TownController::class, 'syncTownsFromOverpass']);
+// Route::get('/sync-towns', [TownController::class, 'syncTownsFromOverpass']);
 
 Route::get('/import-cities', [CityController::class, 'importCities']);
 Route::get('/sync-states', [CityController::class, 'fetchAndSyncStates']);
