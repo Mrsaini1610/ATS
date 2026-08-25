@@ -11,13 +11,18 @@ use App\Http\Controllers\Api\JobController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CityController;
-use App\Http\Controllers\Api\TownController;
+// use App\Http\Controllers\Api\TownController;
 
 // Route::get('/sync-towns', [TownController::class, 'syncTownsFromOverpass']);
 
 Route::get('/import-cities', [CityController::class, 'importCities']);
 Route::get('/sync-states', [CityController::class, 'fetchAndSyncStates']);
 Route::get('/sync-cities', [CityController::class, 'fetchAndSyncCities']);
+
+Route::post('/find-towns-by-city', [CityController::class, 'getTownsByCity']);
+
+
+
 // ==========================================
 // Public Endpoints
 // ==========================================
