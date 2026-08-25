@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -15,7 +14,7 @@ class TownController extends Controller
         set_time_limit(0);
         ini_set('memory_limit', '1024M');
 
-        // Optional: Agar query parameter me city_uuid bhejein to sirf ek city sync hogi, warna all cities
+        // 1. Fetch Cities
         $cityQuery = DB::table('cities');
         if ($request->filled('city_uuid')) {
             $cityQuery->where('uuid', $request->city_uuid);
@@ -33,35 +32,71 @@ class TownController extends Controller
         $totalInsertedAllCities = 0;
         $citySummary = [];
 
+        // Backup Overpass Endpoints to prevent 429 / 504 errors
+        $overpassEndpoints = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+        ];
+
         foreach ($cities as $city) {
             $cityName = trim($city->name);
-            $cityNameEscaped = addslashes($cityName);
+            
+            // Clean city name for Overpass query
+            $cleanCityName = str_replace(['"', '\\'], ['\"', '\\\\'], $cityName);
 
-            // Dynamic Overpass Query for each city
-            $overpassQuery = '[out:json][timeout:120];area["name"="' . $cityNameEscaped . '"]->.searchArea;(node["place"~"city|town|suburb|neighbourhood|locality|quarter|subdistrict|village"](area.searchArea);way["place"~"city|town|suburb|neighbourhood|locality|quarter|subdistrict|village"](area.searchArea););out center tags;';
+            // Overpass QL Query
+            $overpassQuery = '[out:json][timeout:180];' .
+                'area["name"="' . $cleanCityName . '"]->.searchArea;' .
+                '(' .
+                    'node["place"~"city|town|suburb|neighbourhood|locality|quarter|subdistrict|village"](area.searchArea);' .
+                    'way["place"~"city|town|suburb|neighbourhood|locality|quarter|subdistrict|village"](area.searchArea);' .
+                ');out center tags;';
 
             try {
-                $response = Http::withoutVerifying()
-                    ->withHeaders([
-                        'User-Agent' => 'LaravelApp/1.0 (LocationSyncBot)',
-                        'Accept'     => 'application/json',
-                    ])
-                    ->asForm()
-                    ->timeout(120)
-                    ->post('https://overpass-api.de/api/interpreter', [
-                        'data' => $overpassQuery
-                    ]);
+                $response = null;
 
-                if (!$response->successful()) {
+                // Alternate Endpoint Fallback Loop
+                foreach ($overpassEndpoints as $endpoint) {
+                    $res = Http::withoutVerifying()
+                        ->withHeaders([
+                            'User-Agent' => 'LaravelApp/1.0 (LocationSyncBot)',
+                            'Accept'     => 'application/json',
+                        ])
+                        ->asForm()
+                        ->timeout(180)
+                        ->post($endpoint, ['data' => $overpassQuery]);
+
+                    if ($res->successful()) {
+                        $response = $res;
+                        break;
+                    }
+
+                    // Request fail hone par thoda pause le kar next mirror server try karein
+                    sleep(2);
+                }
+
+                if (!$response || !$response->successful()) {
                     $citySummary[] = [
                         'city'   => $cityName,
                         'status' => 'failed',
-                        'error'  => 'HTTP Status: ' . $response->status()
+                        'error'  => 'API servers timed out or limit reached (Status: ' . ($response ? $response->status() : 'No response') . ')'
                     ];
                     continue;
                 }
 
                 $elements = $response->json('elements') ?? [];
+                
+                if (empty($elements)) {
+                    $citySummary[] = [
+                        'city'     => $cityName,
+                        'status'   => 'success',
+                        'inserted' => 0,
+                        'message'  => 'No nodes/ways found for this area.'
+                    ];
+                    continue;
+                }
+
                 $recordsToInsert = [];
                 $now = now();
 
@@ -71,7 +106,7 @@ class TownController extends Controller
                         continue;
                     }
 
-                    $safeTownName = Str::limit($townName, 145, '');
+                    $safeTownName = Str::limit(trim($townName), 145, '');
                     $lat = $element['lat'] ?? ($element['center']['lat'] ?? null);
                     $lon = $element['lon'] ?? ($element['center']['lon'] ?? null);
 
@@ -86,25 +121,31 @@ class TownController extends Controller
                     ];
                 }
 
-                // Batch insert
+                // 2. Prevent Duplicate Insertion with Upsert / Unique Handling
+                $insertedCount = 0;
                 if (!empty($recordsToInsert)) {
-                    $chunks = array_chunk($recordsToInsert, 100);
+                    $chunks = array_chunk($recordsToInsert, 200);
                     foreach ($chunks as $chunk) {
-                        DB::table('towns')->insert($chunk);
+                        // DB Upsert (requires unique index on ['name', 'city_uuid'] in DB migration)
+                        DB::table('towns')->upsert(
+                            $chunk,
+                            ['name', 'city_uuid'], 
+                            ['latitude', 'longitude', 'updated_at']
+                        );
                     }
+                    $insertedCount = count($recordsToInsert);
                 }
 
-                $count = count($recordsToInsert);
-                $totalInsertedAllCities += $count;
+                $totalInsertedAllCities += $insertedCount;
 
                 $citySummary[] = [
                     'city'     => $cityName,
                     'status'   => 'success',
-                    'inserted' => $count
+                    'inserted' => $insertedCount
                 ];
 
-                // Overpass API Rate Limiting protection (1 second wait)
-                sleep(1);
+                // Rate limit safe pause
+                sleep(2);
 
             } catch (\Exception $e) {
                 $citySummary[] = [
@@ -117,7 +158,7 @@ class TownController extends Controller
 
         return response()->json([
             'status'         => 'success',
-            'message'        => 'Cities sync process complete!',
+            'message'        => 'Towns sync process completed successfully!',
             'total_inserted' => $totalInsertedAllCities,
             'details'        => $citySummary
         ], 200);

@@ -30,6 +30,10 @@ class City extends Model
     /**
      * Auto-generate UUID on creation if not provided.
      */
+    public function state()
+    {
+        return $this->belongsTo(State::class, 'state_uuid', 'uuid');
+    }
     protected static function boot()
     {
         parent::boot();

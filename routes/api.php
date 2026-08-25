@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\TownController;
 Route::get('/sync-towns', [TownController::class, 'syncTownsFromOverpass']);
 
 Route::get('/import-cities', [CityController::class, 'importCities']);
+Route::get('/sync-states', [CityController::class, 'fetchAndSyncStates']);
+Route::get('/sync-cities', [CityController::class, 'fetchAndSyncCities']);
 // ==========================================
 // Public Endpoints
 // ==========================================
