@@ -21,6 +21,7 @@ Route::get('/sync-cities', [CityController::class, 'fetchAndSyncCities']);
 
 Route::post('/find-towns-by-city', [CityController::class, 'getTownsByCity']);
 
+Route::post('/profile/city-areas', [CityController::class, 'getCityAreas']);
 
 
 // ==========================================
@@ -39,7 +40,7 @@ Route::post('/find-state', [CityController::class, 'getState']);
 Route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
-
+Route::post('/user/update-location', [CityController::class, 'updateLocation']);
     // --------------------------------------
     // Profile Section Group (/profile/...)
     // --------------------------------------

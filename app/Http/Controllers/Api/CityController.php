@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Services\GeocodingService;
 use Exception;
 use App\Models\State;
 use App\Models\City;
@@ -422,4 +423,128 @@ OVERPASS;
         ], 500);
     }
 }
+
+
+public function updateLocation(Request $request, GeocodingService $geocodingService)
+{
+    // 1. Request Validation (No UUID required in body)
+    $validated = $request->validate([
+        'latitude'  => ['required', 'numeric', 'between:-90,90'],
+        'longitude' => ['required', 'numeric', 'between:-180,180'],
+    ], [
+        'latitude.required'  => 'Latitude is required.',
+        'longitude.required' => 'Longitude is required.',
+    ]);
+
+    $lat = (float) $validated['latitude'];
+    $lng = (float) $validated['longitude'];
+
+    // 2. Auth token se logged-in user get karein
+    $user = $request->user();
+
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated user.',
+        ], 401);
+    }
+
+    // 3. Geocoding Service Call
+    $geoResult = $geocodingService->reverseGeocodeResult($lat, $lng);
+
+    // 4. Fallback Parser
+    $parsedLocation = $this->parseAddressComponents($geoResult);
+
+    $locationDetails = [
+        'latitude'          => round($lat, 6),
+        'longitude'         => round($lng, 6),
+        'formatted_address' => $geoResult['formatted_address'] ?? $parsedLocation['formatted_address'] ?? null,
+        'area'              => $geoResult['area'] ?? $parsedLocation['area'] ?? null,
+        'city'              => $geoResult['city'] ?? $parsedLocation['city'] ?? null,
+        'state'             => $geoResult['state'] ?? $parsedLocation['state'] ?? null,
+        'country'           => $geoResult['country'] ?? $parsedLocation['country'] ?? null,
+        'pincode'           => $geoResult['pincode'] ?? $parsedLocation['pincode'] ?? null,
+    ];
+
+    // 5. Database update for the authenticated user
+    $user->forceFill([
+        'latitude'        => $locationDetails['latitude'],
+        'longitude'       => $locationDetails['longitude'],
+        // 'current_address' => $locationDetails['formatted_address'],
+    ])->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Location updated successfully.',
+        'data'    => $locationDetails,
+    ]);
+}
+
+/**
+ * Helper to parse address from raw Google components or formatted string fallback.
+ */
+private function parseAddressComponents(array $geoResult): array
+{
+    $components = [
+        'formatted_address' => $geoResult['formatted_address'] ?? null,
+        'area' => null,
+        'city' => null,
+        'state' => null,
+        'country' => null,
+        'pincode' => null,
+    ];
+
+    // Case A: Google raw 'address_components' array present in geoResult
+    if (!empty($geoResult['address_components']) && is_array($geoResult['address_components'])) {
+        foreach ($geoResult['address_components'] as $component) {
+            $types = $component['types'] ?? [];
+
+            if (in_array('sublocality', $types) || in_array('sublocality_level_1', $types) || in_array('neighborhood', $types)) {
+                $components['area'] = $component['long_name'];
+            }
+            if (in_array('locality', $types)) {
+                $components['city'] = $component['long_name'];
+            }
+            if (in_array('administrative_area_level_1', $types)) {
+                $components['state'] = $component['long_name'];
+            }
+            if (in_array('country', $types)) {
+                $components['country'] = $component['long_name'];
+            }
+            if (in_array('postal_code', $types)) {
+                $components['pincode'] = $component['long_name'];
+            }
+        }
+
+        return $components;
+    }
+
+    // Case B: Fallback regex parsing using 'formatted_address' string
+    if (!empty($components['formatted_address'])) {
+        $parts = array_map('trim', explode(',', $components['formatted_address']));
+        $count = count($parts);
+
+        // Extract Pincode (6 digits for India)
+        if (preg_match('/\b\d{6}\b/', $components['formatted_address'], $matches)) {
+            $components['pincode'] = $matches[0];
+        }
+
+        // Standard Indian Address pattern matching: "Street, Area, City, State Pincode, Country"
+        if ($count >= 4) {
+            $components['country'] = $parts[$count - 1] ?? null;
+            
+            // State (extracting name without pincode digits)
+            $statePart = $parts[$count - 2] ?? '';
+            $components['state'] = trim(preg_replace('/\b\d{6}\b/', '', $statePart));
+            
+            $components['city'] = $parts[$count - 3] ?? null;
+            $components['area'] = $parts[$count - 4] ?? null;
+        }
+    }
+
+    return $components;
+}
+
+
+
 }
