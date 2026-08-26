@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\SavedJob;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
