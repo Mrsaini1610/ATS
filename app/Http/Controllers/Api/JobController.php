@@ -16,118 +16,114 @@ use Throwable;
 
 class JobController extends Controller
 {
-    /**
-     * Get Home Screen Data (Prioritized by Default Selected Resume)
-     */
+    
     public function getHomeData(Request $request)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        // 1. Fetch Selected Active Resume (fallback to latest)
-        $activeResume = $user ? ($user->defaultResume ?? $user->resumes()->latest()->first()) : null;
+    // 1. Fetch Selected Active Resume (fallback to latest)
+    $activeResume = $user ? ($user->defaultResume ?? $user->resumes()->latest()->first()) : null;
 
-        // 2. UNIQUE LOCATIONS
-        $jobLocations = JobPost::where('status', 'active')
-            ->whereNotNull('location')
-            ->where('location', '!=', '')
-            ->distinct()
-            ->pluck('location')
-            ->values();
+    // 2. ALL CITIES LOCATIONS (Updated: Fetching all cities from 'cities' table)
+    $jobLocations = DB::table('cities')
+        ->select('uuid', 'name', 'latitude', 'longitude')
+        ->orderBy('name', 'asc')
+        ->get();
 
-        // 3. RECOMMENDED JOBS (Weighted Scoring with Active Resume)
-        $userSkills  = is_array($user?->skills) ? $user->skills : json_decode($user?->skills ?? '[]', true);
-        $userCity    = $user?->city ?? null;
-        $userExp     = $user?->total_experience_years ?? null;
-        $userAge     = !empty($user?->dob) ? Carbon::parse($user->dob)->age : null;
-        $resumeTitle = $activeResume ? strtolower(trim($activeResume->title)) : null;
+    // 3. RECOMMENDED JOBS (Weighted Scoring with Active Resume)
+    $userSkills  = is_array($user?->skills) ? $user->skills : json_decode($user?->skills ?? '[]', true);
+    $userCity    = $user?->city ?? null;
+    $userExp     = $user?->total_experience_years ?? null;
+    $userAge     = !empty($user?->dob) ? Carbon::parse($user->dob)->age : null;
+    $resumeTitle = $activeResume ? strtolower(trim($activeResume->title)) : null;
 
-        // Resume Title / Skill Match (Highest Priority +6)
-        $resumeSql = "0";
-        if (!empty($resumeTitle)) {
-            $escapedTitle = addslashes($resumeTitle);
-            $resumeSql = "CASE WHEN LOWER(title) LIKE '%{$escapedTitle}%' OR LOWER(skills) LIKE '%{$escapedTitle}%' THEN 6 ELSE 0 END";
-        }
-
-        $skillSql = "0";
-        if (!empty($userSkills) && is_array($userSkills)) {
-            $skillCases = [];
-            foreach ($userSkills as $skill) {
-                $escapedSkill = addslashes(strtolower($skill));
-                $skillCases[] = "CASE WHEN LOWER(skills) LIKE '%{$escapedSkill}%' THEN 3 ELSE 0 END";
-            }
-            if (!empty($skillCases)) {
-                $skillSql = "(" . implode(" + ", $skillCases) . ")";
-            }
-        }
-
-        $locationSql = "0";
-        if (!empty($userCity)) {
-            $escapedCity = addslashes(strtolower($userCity));
-            $locationSql = "CASE WHEN LOWER(location) LIKE '%{$escapedCity}%' THEN 5 ELSE 0 END";
-        }
-
-        $expSql = "0";
-        if (!empty($userExp)) {
-            $escapedExp = addslashes((string)$userExp);
-            $expSql = "CASE WHEN experience LIKE '%{$escapedExp}%' THEN 2 ELSE 0 END";
-        }
-
-        $ageSql = "0";
-        if (!is_null($userAge)) {
-            $ageSql = "CASE WHEN (min_age IS NULL OR min_age <= {$userAge}) AND (max_age IS NULL OR max_age >= {$userAge}) THEN 2 ELSE 0 END";
-        }
-
-        $recommendedJobs = JobPost::with(['company', 'category'])
-            ->where('status', 'active')
-            ->select('*')
-            ->selectRaw("({$resumeSql} + {$skillSql} + {$locationSql} + {$expSql} + {$ageSql}) as match_score")
-            ->orderByDesc('match_score')
-            ->orderByDesc('id')
-            ->get();
-
-        // 4. CATEGORIES WITH JOB COUNT
-        $categories = Category::where('status', 'active')
-            ->withCount(['jobPosts' => function ($query) {
-                $query->where('status', 'active');
-            }])
-            ->orderBy('job_posts_count', 'desc')
-            ->get();
-
-        // 5. TOP COMPANIES
-        $topCompanies = Company::withCount(['jobPosts' => function ($query) {
-                $query->where('status', 'active');
-            }])
-            ->having('job_posts_count', '>', 0)
-            ->orderBy('job_posts_count', 'desc')
-            ->take(10)
-            ->get();
-
-        // 6. TRENDING SKILLS
-        $trendingSkills = JobPost::where('status', 'active')
-            ->whereNotNull('skills')
-            ->get()
-            ->pluck('skills')
-            ->flatten()
-            ->filter()
-            ->countBy()
-            ->sortDesc()
-            ->take(10)
-            ->keys()
-            ->values();
-
-        return response()->json([
-            'status'        => true,
-            'message'       => 'Home data fetched successfully',
-            'active_resume' => $activeResume,
-            'data'          => [
-                'locations'        => $jobLocations,
-                'recommended_jobs' => $recommendedJobs,
-                'categories'       => $categories,
-                'top_companies'    => $topCompanies,
-                'trending_skills'  => $trendingSkills
-            ],
-        ], 200);
+    // Resume Title / Skill Match (Highest Priority +6)
+    $resumeSql = "0";
+    if (!empty($resumeTitle)) {
+        $escapedTitle = addslashes($resumeTitle);
+        $resumeSql = "CASE WHEN LOWER(title) LIKE '%{$escapedTitle}%' OR LOWER(skills) LIKE '%{$escapedTitle}%' THEN 6 ELSE 0 END";
     }
+
+    $skillSql = "0";
+    if (!empty($userSkills) && is_array($userSkills)) {
+        $skillCases = [];
+        foreach ($userSkills as $skill) {
+            $escapedSkill = addslashes(strtolower($skill));
+            $skillCases[] = "CASE WHEN LOWER(skills) LIKE '%{$escapedSkill}%' THEN 3 ELSE 0 END";
+        }
+        if (!empty($skillCases)) {
+            $skillSql = "(" . implode(" + ", $skillCases) . ")";
+        }
+    }
+
+    $locationSql = "0";
+    if (!empty($userCity)) {
+        $escapedCity = addslashes(strtolower($userCity));
+        $locationSql = "CASE WHEN LOWER(location) LIKE '%{$escapedCity}%' THEN 5 ELSE 0 END";
+    }
+
+    $expSql = "0";
+    if (!empty($userExp)) {
+        $escapedExp = addslashes((string)$userExp);
+        $expSql = "CASE WHEN experience LIKE '%{$escapedExp}%' THEN 2 ELSE 0 END";
+    }
+
+    $ageSql = "0";
+    if (!is_null($userAge)) {
+        $ageSql = "CASE WHEN (min_age IS NULL OR min_age <= {$userAge}) AND (max_age IS NULL OR max_age >= {$userAge}) THEN 2 ELSE 0 END";
+    }
+
+    $recommendedJobs = JobPost::with(['company', 'category'])
+        ->where('status', 'active')
+        ->select('*')
+        ->selectRaw("({$resumeSql} + {$skillSql} + {$locationSql} + {$expSql} + {$ageSql}) as match_score")
+        ->orderByDesc('match_score')
+        ->orderByDesc('id')
+        ->get();
+
+    // 4. CATEGORIES WITH JOB COUNT
+    $categories = Category::where('status', 'active')
+        ->withCount(['jobPosts' => function ($query) {
+            $query->where('status', 'active');
+        }])
+        ->orderBy('job_posts_count', 'desc')
+        ->get();
+
+    // 5. TOP COMPANIES
+    $topCompanies = Company::withCount(['jobPosts' => function ($query) {
+            $query->where('status', 'active');
+        }])
+        ->having('job_posts_count', '>', 0)
+        ->orderBy('job_posts_count', 'desc')
+        ->take(10)
+        ->get();
+
+    // 6. TRENDING SKILLS
+    $trendingSkills = JobPost::where('status', 'active')
+        ->whereNotNull('skills')
+        ->get()
+        ->pluck('skills')
+        ->flatten()
+        ->filter()
+        ->countBy()
+        ->sortDesc()
+        ->take(10)
+        ->keys()
+        ->values();
+
+    return response()->json([
+        'status'        => true,
+        'message'       => 'Home data fetched successfully',
+        'active_resume' => $activeResume,
+        'data'          => [
+            'locations'        => $jobLocations,
+            'recommended_jobs' => $recommendedJobs,
+            'categories'       => $categories,
+            'top_companies'    => $topCompanies,
+            'trending_skills'  => $trendingSkills
+        ],
+    ], 200);
+}
 
     /**
      * Search & Filter Jobs (Supports both Sectioned View and Paginated View)

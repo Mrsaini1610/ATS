@@ -8,28 +8,113 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Throwable;
+use App\Services\GeocodingService;
 
 class UserProfileController extends Controller
 {
-    /**
-     * Fetch complete candidate profile
-     */
-    public function getProfile(Request $request)
-    {
-        $user = $request->user()->load([
-            'educations',
-            'experiences',
-            'resumes',
-            'certificates'
-        ]);
+ 
 
-        return response()->json([
-            'status'  => true,
-            'message' => 'Profile fetched successfully',
-            'data'    => $user
-        ], 200);
+public function getProfile(Request $request, GeocodingService $geocodingService)
+{
+    // 1. Authenticated User with Relations
+    $user = $request->user()->load([
+        'educations',
+        'experiences',
+        'resumes',
+        'certificates'
+    ]);
+
+    // 2. Extract Latitude & Longitude
+    $lat = $user->latitude;
+    $lng = $user->longitude;
+
+    $currentCity = null;
+    $currentArea = null;
+
+    // 3. Fetch City & Area if coordinates are available
+    if (!empty($lat) && !empty($lng)) {
+        $geoResult = $geocodingService->reverseGeocodeResult((float)$lat, (float)$lng);
+        $parsedLocation = $this->parseAddressComponents($geoResult);
+
+        $currentCity = $geoResult['city'] ?? $parsedLocation['city'] ?? null;
+        $currentArea = $geoResult['area'] ?? $parsedLocation['area'] ?? null;
     }
 
+    // 4. Convert User Model to Array and Append Custom Location Fields
+    $userData = $user->toArray();
+    $userData['current_city'] = $currentCity;
+    $userData['current_area'] = $currentArea;
+
+    return response()->json([
+        'status'  => true,
+        'message' => 'Profile fetched successfully',
+        'data'    => $userData
+    ], 200);
+}
+/**
+ * Helper to parse address from raw Google components or formatted string fallback.
+ */
+private function parseAddressComponents(array $geoResult): array
+{
+    $components = [
+        'formatted_address' => $geoResult['formatted_address'] ?? null,
+        'area' => null,
+        'city' => null,
+        'state' => null,
+        'country' => null,
+        'pincode' => null,
+    ];
+
+    // Case A: Google raw 'address_components' array present in geoResult
+    if (!empty($geoResult['address_components']) && is_array($geoResult['address_components'])) {
+        foreach ($geoResult['address_components'] as $component) {
+            $types = $component['types'] ?? [];
+
+            if (in_array('sublocality', $types) || in_array('sublocality_level_1', $types) || in_array('neighborhood', $types)) {
+                $components['area'] = $component['long_name'];
+            }
+            if (in_array('locality', $types)) {
+                $components['city'] = $component['long_name'];
+            }
+            if (in_array('administrative_area_level_1', $types)) {
+                $components['state'] = $component['long_name'];
+            }
+            if (in_array('country', $types)) {
+                $components['country'] = $component['long_name'];
+            }
+            if (in_array('postal_code', $types)) {
+                $components['pincode'] = $component['long_name'];
+            }
+        }
+
+        return $components;
+    }
+
+    // Case B: Fallback regex parsing using 'formatted_address' string
+    if (!empty($components['formatted_address'])) {
+        $parts = array_map('trim', explode(',', $components['formatted_address']));
+        $count = count($parts);
+
+        // Extract Pincode (6 digits for India)
+        if (preg_match('/\b\d{6}\b/', $components['formatted_address'], $matches)) {
+            $components['pincode'] = $matches[0];
+        }
+
+        // Standard Indian Address pattern matching: "Street, Area, City, State Pincode, Country"
+        if ($count >= 4) {
+            $components['country'] = $parts[$count - 1] ?? null;
+            
+            // State (extracting name without pincode digits)
+            $statePart = $parts[$count - 2] ?? '';
+            $components['state'] = trim(preg_replace('/\b\d{6}\b/', '', $statePart));
+            
+            $components['city'] = $parts[$count - 3] ?? null;
+            $components['area'] = $parts[$count - 4] ?? null;
+        }
+    }
+
+    return $components;
+}
     /**
      * Update Candidate Profile & Picture
      **/
