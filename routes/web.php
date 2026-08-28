@@ -13,7 +13,7 @@ use App\Http\Controllers\Candidate\JobController;
 use App\Http\Controllers\Candidate\PageController;
 use App\Http\Controllers\Auth\CandidateAuthController;
 use App\Http\Controllers\Candidate\ProfileController;
-
+use App\Http\Controllers\Candidate\LocationController;
 
 // Candidate / Public 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -25,6 +25,12 @@ Route::get('/about', [PageController::class, 'about'])->name('about');
 Route::get('/contact', [PageController::class, 'contact'])->name('contact.show');
 Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
 Route::get('/apps',[PageController::class,'apps'])->name('app');
+
+
+Route::get('/location/states', [LocationController::class, 'getState']);
+Route::get('/location/cities', [LocationController::class, 'getCitybyState']);
+Route::get('/location/towns', [LocationController::class, 'getTownsByCity']);
+Route::post('/location/update', [LocationController::class, 'updateLocation']);
 
 
 
