@@ -30,47 +30,28 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-
-
-        $user = null;
-        $guard = null;
-
-        if (Auth::guard('superadmin')->check()) {
-            $user = Auth::guard('superadmin')->user();
-            $guard = 'superadmin';
-        } elseif (Auth::guard('admin')->check()) {
-            $user = Auth::guard('admin')->user();
-            $guard = 'admin';
-        } elseif (Auth::guard('member')->check()) {
-            $user = Auth::guard('member')->user();
-            $guard = 'member';
-        } elseif (Auth::guard('callingteam')->check()) {
-            $user = Auth::guard('callingteam')->user();
-            $guard = 'callingteam';
-        } elseif (Auth::check()) {
-    $user = Auth::user();
-    $guard = 'web';
-}
+        $adminUser = null;
+        if (Auth::guard('admin')->check()) {
+            $adminUser = Auth::guard('admin')->user();
+        }
 
         return array_merge(parent::share($request), [
-            'messages' => flash()->render('array'),
-
             'auth' => [
-                'user' => $user,
-                'guard' => $guard,
+                'user' => $request->user(),
+                'admin' => $adminUser ? [
+                    'id'            => $adminUser->id,
+                    'uuid'          => $adminUser->uuid,
+                    'name'          => $adminUser->name,
+                    'email'         => $adminUser->email,
+                    'role'          => $adminUser->role,
+                    'profile_image' => $adminUser->profile_image,
+                ] : null,
             ],
+            'csrf_token' => csrf_token(),
             'flash' => [
-                'success' => $request->session()->get('success'),
-                // 'error' => $request->session()->get('errors')
-                //     ? null
-                //     : $request->session()->get('error'),
-                // 'warning' => $request->session()->get('warning'),
-                // 'info' => $request->session()->get('info'),
+                'success' => fn () => $request->session()->get('success'),
+                'error'   => fn () => $request->session()->get('error'),
             ],
-
-            // 'errors' => $request->session()->get('errors')
-            //     ? $request->session()->get('errors')->getBag('default')->getMessages()
-            //     : (object)[],
         ]);
     }
 }

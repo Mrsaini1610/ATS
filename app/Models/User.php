@@ -45,6 +45,14 @@ class User extends Authenticatable
         });
     }
 
+    /**
+     * Route model binding using UUID
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function getProfilePictureUrlAttribute()
     {
         return $this->profile_picture ? asset($this->profile_picture) : null;
@@ -70,13 +78,11 @@ class User extends Authenticatable
         return $this->hasOne(UserExperience::class, 'user_uuid', 'uuid')->where('is_delete', 0)->latestOfMany();
     }
 
-    // All active resumes (Hard delete based)
     public function resumes()
     {
         return $this->hasMany(UserResume::class, 'user_uuid', 'uuid');
     }
 
-    // Current selected default resume
     public function defaultResume()
     {
         return $this->hasOne(UserResume::class, 'user_uuid', 'uuid')->where('is_default', true);

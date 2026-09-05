@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Subcategory;
+use Illuminate\Support\Str;
 
 class JobPost extends Model
 {
@@ -42,8 +42,21 @@ class JobPost extends Model
         'resubmitted_at'        => 'datetime',
     ];
 
-    // Relationships
-    public function company()
+    protected static function booted()
+    {
+        static::creating(function ($job) {
+            if (empty($job->uuid)) {
+                $job->uuid = (string) Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
+    public function companyRelation()
     {
         return $this->belongsTo(Company::class, 'company_id', 'id');
     }
@@ -53,13 +66,13 @@ class JobPost extends Model
         return $this->belongsTo(Category::class, 'category_id', 'id');
     }
 
-    public function subCategory()
-    {
-        return $this->belongsTo(Subcategory::class, 'sub_category_id');
-    }
-
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+    // Assigned Member / Approver relationship
+    public function assignedMember()
+    {
+        return $this->belongsTo(Admin::class, 'approved_by', 'id');
     }
 }

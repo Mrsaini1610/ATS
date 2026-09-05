@@ -25,6 +25,10 @@ class Company extends Model
         'status',
     ];
 
+    protected $hidden = [
+        'id',
+    ];
+
     protected static function booted()
     {
         static::creating(function ($model) {
@@ -35,6 +39,20 @@ class Company extends Model
                 $model->slug = Str::slug($model->name);
             }
         });
+
+        static::updating(function ($model) {
+            if ($model->isDirty('name') && empty($model->slug)) {
+                $model->slug = Str::slug($model->name);
+            }
+        });
+    }
+
+    /**
+     * Route model binding ke liye uuid use karein
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
     }
 
     /**

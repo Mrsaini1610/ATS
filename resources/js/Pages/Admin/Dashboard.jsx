@@ -1,827 +1,357 @@
-import { Head, router } from "@inertiajs/react";
-import { useState } from "react";
-import AuthenticatedLayout from "./Layouts/AuthenticatedLayout";
-import ConfirmDialog from "@/Components/ConfirmDialog";
-import ResumePreviewModal from "@/Components/ResumePreviewModal";
-import { useAlerts } from "@/Components/Alerts";
-// import ActivityLogSectionAdmin from "@/Components/ActivityLogSectionAdmin";
-// import AdminPasswordLogSection from "@/Components/AdminPasswordLogSection";
-// import AdminCalendar from "@/Components/AdminCalendar";
+import React from "react";
+import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import { Head, Link, usePage } from "@inertiajs/react";
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell,
-    Tooltip,
-    Legend,
-} from "recharts";
+  Briefcase,
+  Users,
+  CheckCircle2,
+  TrendingUp,
+  Building2,
+  ChevronRight,
+  AlertTriangle,
+  Calendar,
+  ClipboardList,
+} from "lucide-react";
+
+function StatCard({ icon: Icon, label, value, sub, color, href }) {
+  const content = (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        {href && <ChevronRight className="w-4 h-4 text-gray-400" />}
+      </div>
+      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
+      <p className="text-sm font-medium text-gray-600 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+
+  return href ? <Link href={href}>{content}</Link> : content;
+}
 
 export default function Dashboard({
-    stats,
-    recentTasks,
-    auth,
-    initialFilters,
-    activityLogs,
-    members,
-    passwordLogs,
-    checkCheckoutToday,
-    checkCheckoutList,
-    jobStats,
+  stats = {},
+  recentApplications = [],
+  pendingJobsList = [],
+  tasks = [],
 }) {
-    const isAdmin = auth.guard == "admin";
-    const [loading, setLoading] = useState(false);
-    const [recentApplications, setRecentApplications] = useState(
-        Array.isArray(jobStats?.recentApplications) ? jobStats.recentApplications : []
-    );
-    const [confirmAppDecisionOpen, setConfirmAppDecisionOpen] = useState(false);
-    const [decisionApp, setDecisionApp] = useState(null);
-    const [decisionAction, setDecisionAction] = useState(null);
-    const [resumePreviewOpen, setResumePreviewOpen] = useState(false);
-    const [resumePreviewUrl, setResumePreviewUrl] = useState(null);
-    const [resumePreviewFallbackUrl, setResumePreviewFallbackUrl] = useState(null);
+  const { auth } = usePage().props;
+  const admin = auth?.admin;
 
-    const { successAlert, errorAlert } = useAlerts();
+  // Role extraction (super_admin, admin, team_member)
+  const role = admin?.role || "team_member";
+  const isSuperAdmin = role === "super_admin";
+  const isAdmin = role === "admin";
+  const isTeamMember = role === "team_member";
+  const canManagePlatform = isSuperAdmin || isAdmin;
 
-    const openDecision = (app, action) => {
-        setDecisionApp(app);
-        setDecisionAction(action);
-        setConfirmAppDecisionOpen(true);
-    };
+  // Safe Stats Fallbacks
+  const pendingJobs = stats.pendingJobs ?? 0;
+  const activeJobs = stats.activeJobs ?? 0;
+  const totalUsers = stats.totalUsers ?? 0;
+  const totalCompanies = stats.totalCompanies ?? 0;
+  const totalApps = stats.totalApps ?? 0;
+  const shortlisted = stats.shortlisted ?? 0;
+  const scheduledInterviews = stats.scheduledInterviews ?? 0;
+  const pendingTasks = stats.pendingTasks ?? 0;
+  const hired = stats.hired ?? 0;
 
-    const confirmDecision = async () => {
-        if (!decisionApp || !decisionAction) return;
-        try {
-            const response = await fetch(
-                route("admin.api.applications.decision", decisionApp.id),
-                {
-                    method: "PATCH",
-                    headers: {
-                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content,
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ action: decisionAction }),
-                }
-            );
-            const data = await response.json().catch(() => null);
-            if (!response.ok || !data?.success) {
-                errorAlert(data?.message || "Failed to update application.");
-                return;
-            }
+  const statusColor = {
+    applied: "bg-gray-100 text-gray-600",
+    reviewed: "bg-blue-50 text-blue-600",
+    shortlisted: "bg-yellow-50 text-yellow-600",
+    interview_scheduled: "bg-purple-50 text-purple-600",
+    hired: "bg-green-50 text-green-700",
+    rejected: "bg-red-50 text-red-600",
+    not_interested: "bg-gray-100 text-gray-500",
+  };
 
-            setRecentApplications((prev) =>
-                prev.map((a) => (a.id === decisionApp.id ? { ...a, status: data.data.status } : a))
-            );
-            successAlert("Application updated successfully!");
-        } catch (e) {
-            errorAlert("Failed to update application.");
-        } finally {
-            setConfirmAppDecisionOpen(false);
-            setDecisionApp(null);
-            setDecisionAction(null);
-        }
-    };
+  const taskPriorityColor = {
+    high: "text-red-600 bg-red-50",
+    medium: "text-yellow-600 bg-yellow-50",
+    low: "text-green-600 bg-green-50",
+  };
 
-    const [updatingStatusId, setUpdatingStatusId] = useState(null);
+  return (
+    <>
+      <Head title={`${role.replace("_", " ").toUpperCase()} Dashboard - WorkIndia`} />
 
-    const handleStatusChangeDirectly = async (app, newStatus) => {
-        if (app.status === newStatus) return;
-        setUpdatingStatusId(app.id);
-        try {
-            const res = await fetch(
-                route("admin.api.job.applicants.status", app.id),
-                {
-                    method: "PATCH",
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content,
-                    },
-                    body: JSON.stringify({ status: newStatus }),
-                }
-            );
-            const data = await res.json().catch(() => null);
-            if (!res.ok || !data?.success) {
-                console.log(data);
-                errorAlert(data?.message || "Failed to update status.");
-                return;
-            }
+      <div className="p-6 space-y-6">
+        {/* Welcome Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-extrabold text-gray-900">
+              Welcome back, {admin?.name ? admin.name.split(" ")[0] : "User"}! 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {isTeamMember
+                ? "Here are your calling queue and candidate follow-ups for today."
+                : "Here's what's happening on WorkIndia today."}
+            </p>
+          </div>
+          <div className="text-right hidden sm:block">
+            <p className="text-xs font-semibold text-gray-600">🇮🇳 WorkIndia Technologies</p>
+            <p className="text-xs text-gray-400 mt-0.5">August 2026</p>
+          </div>
+        </div>
 
-            setRecentApplications((prev) =>
-                prev.map((a) => (a.id === app.id ? { ...a, status: newStatus } : a))
-            );
-            successAlert("Status updated successfully!");
-        } catch (e) {
-            console.log(e);
-            errorAlert("Failed to update status.");
-        } finally {
-            setUpdatingStatusId(null);
-        }
-    };
+        {/* Stats Grid - Role based conditions */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {canManagePlatform && (
+            <>
+              <StatCard
+                icon={AlertTriangle}
+                label="Pending Jobs"
+                value={pendingJobs}
+                sub="Awaiting review"
+                color="bg-yellow-500"
+                href="/admin/jobs"
+              />
+              <StatCard
+                icon={Briefcase}
+                label="Active Jobs"
+                value={activeJobs}
+                sub="Live on platform"
+                color="bg-blue-600"
+                href="/admin/jobs"
+              />
+              <StatCard
+                icon={Users}
+                label="Total Users"
+                value={totalUsers}
+                sub="Registered candidates"
+                color="bg-indigo-600"
+                href="/admin/users"
+              />
+              <StatCard
+                icon={Building2}
+                label="Companies"
+                value={totalCompanies}
+                sub="Active employers"
+                color="bg-teal-600"
+                href="/admin/companies"
+              />
+            </>
+          )}
 
-    const statusOptions = [
-        { value: "applied", label: "Applied" },
-        { value: "viewed", label: "Viewed" },
-        { value: "shortlisted", label: "Shortlisted" },
-        { value: "assigned_to_calling_member", label: "Assigned To Calling Member" },
-        { value: "calling_in_progress", label: "Calling In Progress" },
-        { value: "calling_approved", label: "Calling Approved" },
-        { value: "calling_rejected", label: "Calling Rejected" },
-        { value: "admin_review", label: "Admin Review" },
-        { value: "offer_letter_generated", label: "Offer Letter Generated" },
-        { value: "waiting_list", label: "Waiting List" },
-        { value: "hired", label: "Hired" },
-        { value: "not_selected", label: "Not Selected" },
-        { value: "rejected", label: "Rejected" },
-    ];
+          <StatCard
+            icon={ClipboardList}
+            label="Applications"
+            value={totalApps}
+            sub={`${shortlisted} shortlisted`}
+            color="bg-purple-600"
+            href="/admin/applications"
+          />
+          <StatCard
+            icon={Calendar}
+            label="Interviews Scheduled"
+            value={scheduledInterviews}
+            sub="Upcoming"
+            color="bg-orange-500"
+            href="/admin/interviews"
+          />
+          <StatCard
+            icon={CheckCircle2}
+            label="Hired"
+            value={hired}
+            sub="This month"
+            color="bg-green-600"
+            href="/admin/applications"
+          />
 
-    const isPreviewableResume = (url) => {
-        const u = String(url || "").toLowerCase();
-        return u.endsWith(".pdf") || u.endsWith(".html") || u.includes("generated-resumes");
-    };
+          {canManagePlatform && (
+            <StatCard
+              icon={TrendingUp}
+              label="Active Tasks"
+              value={pendingTasks}
+              sub="In progress"
+              color="bg-pink-600"
+              href="/admin/tasks"
+            />
+          )}
+        </div>
 
-    const openResumePreview = (url, applicationId) => {
-        const resolved = url
-            ? (String(url).startsWith("/") || /^https?:\/\//i.test(String(url))
-                  ? String(url)
-                  : `/${url}`)
-            : null;
-        const fallbackUrl = applicationId
-            ? route("admin.api.job.applicants.resume-preview", applicationId)
-            : null;
-
-        if (resolved && !isPreviewableResume(resolved)) {
-            window.open(resolved, "_blank");
-            return;
-        }
-
-        setResumePreviewUrl(resolved);
-        setResumePreviewFallbackUrl(fallbackUrl);
-        setResumePreviewOpen(true);
-    };
-    const [filters, setFilters] = useState({
-        year: initialFilters?.year || new Date().getFullYear(),
-        month: initialFilters?.month || new Date().getMonth() + 1,
-        member_id: initialFilters?.member_id || null,
-    });
-
-    // Generate year options (current year and previous 5 years)
-    const yearOptions = Array.from({ length: 6 }, (_, i) => {
-        const year = new Date().getFullYear() - i;
-        return { value: year, label: year.toString() };
-    });
-
-    const monthOptions = [
-        { value: 1, label: "January" },
-        { value: 2, label: "February" },
-        { value: 3, label: "March" },
-        { value: 4, label: "April" },
-        { value: 5, label: "May" },
-        { value: 6, label: "June" },
-        { value: 7, label: "July" },
-        { value: 8, label: "August" },
-        { value: 9, label: "September" },
-        { value: 10, label: "October" },
-        { value: 11, label: "November" },
-        { value: 12, label: "December" },
-    ];
-
-    const memberOptions = [
-        { value: "", label: "All Members" },
-        ...(members || []).map(member => ({
-            value: member.id,
-            label: member.name
-        }))
-    ];
-
-    const handleFilterChange = async (newFilters) => {
-        setLoading(true);
-        try {
-            await router.get(
-                route("admin.dashboard"),
-                {
-                    year: newFilters.year,
-                    month: newFilters.month,
-                    member_id: newFilters.member_id
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    only: ["stats", "recentTasks", "initialFilters", "activityLogs"],
-                }
-            );
-        } catch (error) {
-            console.error("Filter change error:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const updateFilters = (type, value) => {
-        const newFilters = {
-            ...filters,
-            [type]: type === "year" || type === "month" || type === "member_id"
-                ? (value === "" ? null : parseInt(value))
-                : value,
-        };
-        setFilters(newFilters);
-        handleFilterChange(newFilters);
-    };
-
-    // Commented out tasks data
-    // const tasksData = [
-    //     { name: "Completed", value: stats.completedTasks },
-    //     { name: "Pending", value: stats.pendingTasks },
-    //     { name: "In Progress", value: stats.inProgressTasks },
-    //     { name: "Overdue", value: stats.overdueTasks },
-    // ];
-
-    const COLORS = ["#0088FE", "#FFBB28", "#00C49F", "#FF5733"];
-    const BAR_COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"];
-
-    return (
-        <AuthenticatedLayout>
-            <Head title="Dashboard" />
-            <div className="mt-[75px]">
-                <div className="min-h-screen py-[40px] px-[15px]">
-                    {/* Member Count Card Only */}
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-8">
-                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Total Members
-                                    </h3>
-                                    <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
-                                        {stats?.totalMembers || 0}
-                                    </h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        Active members in the system
-                                    </p>
-                                </div>
-                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
-                                    <svg
-                                        className="h-8 w-8 text-[#5146E6]"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                                        />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+        {/* Middle Tables Grid */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Pending Approvals: Only Super Admin & Admin */}
+          {canManagePlatform && pendingJobsList.length > 0 && (
+            <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500" /> Pending Approvals
+                </h3>
+                <Link href="/admin/jobs" className="text-xs text-blue-600 hover:underline">
+                  View all
+                </Link>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {pendingJobsList.map((job) => (
+                  <div key={job.id} className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{job.title}</p>
+                      <p className="text-xs text-gray-500">
+                        {job.company} · {job.location}
+                      </p>
                     </div>
-
-                    <div className="cards border borderbx rounded-lg p-4 shadow-sm mt-[30px]">
-                        <div className="mb-[20px] py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-white">
-                                    Recent Job Applications
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Applications for your job posts
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => router.visit(route("admin.job.applications.index"))}
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-                            >
-                                View All
-                            </button>
-                        </div>
-
-                        {Array.isArray(recentApplications) && recentApplications.length > 0 ? (
-                            <div className="overflow-x-auto tablebxbg p-[15px] rounded-[15px]">
-                                <table className="min-w-full text-black rounded-2xl dark:text-white">
-                                    <thead>
-                                        <tr className="whitespace-nowrap text-left">
-                                            <th className="p-3">Candidate</th>
-                                            <th className="p-3">Email</th>
-                                            <th className="p-3">Job</th>
-                                            <th className="p-3">Status</th>
-                                            <th className="p-3">Action</th>
-                                            <th className="p-3">Applied</th>
-                                            <th className="p-3">Resume</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {recentApplications.map((app) => (
-                                            <tr key={app.id} className="hover:bg-gray-100 dark:hover:bg-[#0a0e25]">
-                                                <td className="p-3">{app.candidate_name || "-"}</td>
-                                                <td className="p-3">{app.candidate_email || "-"}</td>
-                                                <td className="p-3">{app.job?.title || "-"}</td>
-                                                <td className="p-3">
-                                                    {updatingStatusId === app.id ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                                                            <span className="text-xs text-gray-500">Updating...</span>
-                                                        </div>
-                                                    ) : (
-                                                        <select
-                                                            value={app.status}
-                                                            onChange={(e) => handleStatusChangeDirectly(app, e.target.value)}
-                                                            className={`w-full px-2 py-1.5 text-xs font-medium rounded-full border cursor-pointer outline-none ${
-                                                                app.status === 'applied' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                                                                app.status === 'viewed' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                                                                app.status === 'shortlisted' ? 'bg-green-100 text-green-800 border-green-300' :
-                                                                app.status === 'assigned_to_calling_member' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
-                                                                app.status === 'calling_in_progress' ? 'bg-sky-100 text-sky-800 border-sky-300' :
-                                                                app.status === 'calling_approved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                                                                app.status === 'calling_rejected' ? 'bg-red-100 text-red-800 border-red-300' :
-                                                                app.status === 'admin_review' ? 'bg-violet-100 text-violet-800 border-violet-300' :
-                                                                app.status === 'offer_letter_generated' ? 'bg-teal-100 text-teal-800 border-teal-300' :
-                                                                app.status === 'waiting_list' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                                                                app.status === 'hired' ? 'bg-purple-100 text-purple-800 border-purple-300' :
-                                                                app.status === 'not_selected' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                                                app.status === 'rejected' ? 'bg-red-100 text-red-800 border-red-300' :
-                                                                'bg-gray-100 text-gray-800 border-gray-300'
-                                                            }`}
-                                                        >
-                                                            {statusOptions.map(opt => (
-                                                                <option key={opt.value} value={opt.value}>
-                                                                    {opt.label}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    )}
-                                                </td>
-                                                <td className="p-3">
-                                                    {app.status === "applied" || app.status === "viewed" ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openDecision(app, "approve")}
-                                                                className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
-                                                            >
-                                                                Approve
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openDecision(app, "reject")}
-                                                                className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
-                                                            >
-                                                                Reject
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-3">
-                                                    {app.created_at ? new Date(app.created_at).toLocaleString("en-US") : "-"}
-                                                </td>
-                                                <td className="p-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            openResumePreview(
-                                                                app.resume_url,
-                                                                app.id
-                                                            )
-                                                        }
-                                                        className="text-blue-600 hover:underline font-medium"
-                                                    >
-                                                        {app.resume_url ? "Preview" : "Generated Preview"}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                No recent job applications.
-                            </div>
-                        )}
-                    </div>
-
-                    <ConfirmDialog
-                        isOpen={confirmAppDecisionOpen}
-                        onClose={() => {
-                            setConfirmAppDecisionOpen(false);
-                            setDecisionApp(null);
-                            setDecisionAction(null);
-                        }}
-                        onConfirm={confirmDecision}
-                        message={
-                            decisionApp
-                                ? `${decisionAction === "approve" ? "Approve" : "Reject"} application of "${decisionApp.candidate_name}" for "${decisionApp.job?.title || "Job"}"?`
-                                : "Are you sure?"
-                        }
-                        confirmText={
-                            decisionAction === "approve"
-                                ? "Yes, Approve"
-                                : "Yes, Reject"
-                        }
-                        cancelText="Cancel"
-                        modalSpinnerMessage="Processing Please Wait...."
-                    />
-
-                    <ResumePreviewModal
-                        isOpen={resumePreviewOpen}
-                        sourceUrl={resumePreviewUrl}
-                        fallbackUrl={resumePreviewFallbackUrl}
-                        onClose={() => {
-                            setResumePreviewOpen(false);
-                            setResumePreviewUrl(null);
-                            setResumePreviewFallbackUrl(null);
-                        }}
-                    />
-
-                    {/* Commented out all other sections */}
-                    {/*
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                        <a href={route("admin.task.dashboard", {
-                            member_id: initialFilters?.member_id,
-                        })}>
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Total Tasks
-                                </h3>
-                                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
-                                    {stats.totalTasks}
-                                </h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {
-                                        monthOptions.find(
-                                            (m) => m.value === filters.month
-                                        )?.label
-                                    }{" "}
-                                    {filters.year}
-                                </p>
-                            </div>
-                        </a>
-                        <a href={route("admin.task.tasklist", {
-                            member_id: initialFilters?.member_id, status: "pending"
-                        })}>
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Total Department Pending Tasks Instances
-                                </h3>
-                                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
-                                    {stats.pendingTasks}
-                                </h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {
-                                        monthOptions.find(
-                                            (m) => m.value === filters.month
-                                        )?.label
-                                    }{" "}
-                                    {filters.year}
-                                </p>
-                            </div>
-                        </a>
-                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Total Department Completed Tasks Instances
-                            </h3>
-                            <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
-                                {stats.completedTasks}
-                            </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {
-                                    monthOptions.find(
-                                        (m) => m.value === filters.month
-                                    )?.label
-                                }{" "}
-                                {filters.year}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                        <div className="flex flex-col gap-[5px] sm:flex-row items-center mb-6 pb-[15px] border-b-[1px] border-b-[#5146E64D]">
-                            <div className="w-full sm:w-auto text-lg font-semibold text-second-color">
-                                Filters:
-                            </div>
-                            <select
-                                value={filters.year}
-                                onChange={(e) =>
-                                    updateFilters("year", e.target.value)
-                                }
-                                className="w-full sm:w-auto sm:min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
-                                disabled={loading}
-                            >
-                                {yearOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={filters.month}
-                                onChange={(e) =>
-                                    updateFilters("month", e.target.value)
-                                }
-                                className="w-full sm:w-auto sm:min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
-                                disabled={loading}
-                            >
-                                {monthOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {isAdmin && (
-                                <select
-                                    value={filters.member_id || ""}
-                                    onChange={(e) => updateFilters("member_id", e.target.value)}
-                                    className="w-full sm:w-auto min-w-[180px] text-sm selectbg border rounded-md px-3 py-2"
-                                    disabled={loading}
-                                >
-                                    {memberOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                            {loading && (
-                                <svg
-                                    className="animate-spin h-5 w-5 text-gray-500"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                </svg>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                                    Tasks Instances Overview
-                                </h3>
-                                <div className="h-80">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={tasksData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={70}
-                                                outerRadius={90}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                                label={({ name, percent }) =>
-                                                    `${name}: ${(
-                                                        percent * 100
-                                                    ).toFixed(0)}%`
-                                                }
-                                            >
-                                                {tasksData.map((entry, index) => (
-                                                    <Cell
-                                                        key={`cell-${index}`}
-                                                        fill={
-                                                            COLORS[
-                                                                index %
-                                                                    COLORS.length
-                                                            ]
-                                                        }
-                                                    />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor: "#1e293b",
-                                                    borderColor: "#334155",
-                                                    borderRadius: "0.5rem",
-                                                }}
-                                            />
-                                            <Legend />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {isAdmin &&
-                                stats.tasksByDepartment &&
-                                stats.tasksByDepartment.length > 0 && (
-                                    <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                                            Tasks Instances by Department
-                                        </h3>
-                                        <div className="h-80">
-                                            <ResponsiveContainer
-                                                width="100%"
-                                                height="100%"
-                                            >
-                                                <BarChart
-                                                    data={stats.tasksByDepartment}
-                                                    margin={{
-                                                        top: 20,
-                                                        right: 30,
-                                                        left: 20,
-                                                        bottom: 5,
-                                                    }}
-                                                    layout="vertical"
-                                                >
-                                                    <XAxis
-                                                        type="number"
-                                                        tick={{
-                                                            fill: "#6b7280",
-                                                            stroke: "transparent",
-                                                        }}
-                                                        axisLine={{
-                                                            stroke: "#6b7280",
-                                                            strokeWidth: 0.5,
-                                                        }}
-                                                    />
-                                                    <YAxis
-                                                        dataKey="name"
-                                                        type="category"
-                                                        width={120}
-                                                        tick={{
-                                                            fill: "#6b7280",
-                                                            stroke: "transparent",
-                                                            fontSize: 12,
-                                                        }}
-                                                        axisLine={{
-                                                            stroke: "#6b7280",
-                                                            strokeWidth: 0.5,
-                                                        }}
-                                                    />
-                                                    <Tooltip
-                                                        contentStyle={{
-                                                            backgroundColor:
-                                                                "#1e293b",
-                                                            borderColor: "#334155",
-                                                            borderRadius: "0.5rem",
-                                                            color: "#f3f4f6",
-                                                        }}
-                                                        itemStyle={{
-                                                            color: "#f3f4f6",
-                                                        }}
-                                                        labelStyle={{
-                                                            color: "#f3f4f6",
-                                                            fontWeight: "bold",
-                                                        }}
-                                                    />
-                                                    <Legend
-                                                        wrapperStyle={{
-                                                            color: "#6b7280",
-                                                            paddingTop: "20px",
-                                                        }}
-                                                    />
-                                                    <Bar
-                                                        dataKey="value"
-                                                        name="Tasks"
-                                                        radius={[0, 4, 4, 0]}
-                                                        label={{
-                                                            position: "right",
-                                                            fill: "#6b7280",
-                                                            fontSize: 12,
-                                                            formatter: (value) =>
-                                                                value > 0
-                                                                    ? value
-                                                                    : "",
-                                                        }}
-                                                    >
-                                                        {stats.tasksByDepartment.map(
-                                                            (entry, index) => (
-                                                                <Cell
-                                                                    key={`cell-${index}`}
-                                                                    fill={
-                                                                        BAR_COLORS[
-                                                                            index %
-                                                                                BAR_COLORS.length
-                                                                        ]
-                                                                    }
-                                                                    strokeWidth={1}
-                                                                />
-                                                            )
-                                                        )}
-                                                    </Bar>
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                                            Showing task distribution across{" "}
-                                            {stats.tasksByDepartment.length}{" "}
-                                            departments for{" "}
-                                            {
-                                                monthOptions.find(
-                                                    (m) => m.value === filters.month
-                                                )?.label
-                                            }{" "}
-                                            {filters.year}
-                                        </div>
-                                    </div>
-                                )}
-                        </div>
-                    </div>
-
-                    <div className="cards border borderbx rounded-lg p-4 shadow-sm mt-[30px]">
-                        <div className="mb-[20px] py-4 border-b border-gray-200 dark:border-gray-700">
-                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-                                Recent Tasks
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                Showing tasks from{" "}
-                                {
-                                    monthOptions.find(
-                                        (m) => m.value === filters.month
-                                    )?.label
-                                }{" "}
-                                {filters.year}
-                            </p>
-                        </div>
-                        <div className="overflow-x-auto tablebxbg p-[15px] rounded-[15px]">
-                            <table className="min-w-full text-black rounded-2xl dark:text-white">
-                                <thead className="">
-                                    <tr className="whitespace-nowrap text-left">
-                                        <th className="p-3">Task</th>
-                                        {isAdmin && (
-                                            <th className="p-3">Assigned To</th>
-                                        )}
-                                        <th className="p-3">Due Date</th>
-                                        <th className="p-3 text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="">
-                                    {recentTasks.map((task) => (
-                                        <tr
-                                            key={task.id}
-                                            className="hover:bg-gray-100 dark:hover:bg-[#0a0e25]"
-                                        >
-                                            <td className="p-3">
-                                                {task.title}
-                                            </td>
-                                            {isAdmin && (
-                                                <td className="p-3">
-                                                    {task.assigned_to_name ||
-                                                        "Unassigned"}
-                                                </td>
-                                            )}
-                                            <td className="p-3">
-                                                {new Date(
-                                                    task.due_date
-                                                ).toLocaleDateString()}
-                                            </td>
-                                            <td align="center" className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span
-                                                    className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                        task.status ==
-                                                        "completed"
-                                                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                                            : task.status ==
-                                                              "in_progress"
-                                                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                                                            : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                                    }`}
-                                                >
-                                                    {task.status
-                                                        .split("_")
-                                                        .map(
-                                                            (word) =>
-                                                                word
-                                                                    .charAt(0)
-                                                                    .toUpperCase() +
-                                                                word.slice(1)
-                                                        )
-                                                        .join(" ")}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <AdminCalendar />
-                    {activityLogs && (
-                        <ActivityLogSectionAdmin activityLogs={activityLogs} />
-                    )}
-                    <AdminPasswordLogSection passwordLogs={passwordLogs} auth={auth} />
-                    */}
-                </div>
+                    <Link
+                      href="/admin/jobs"
+                      className="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg hover:bg-blue-100 shrink-0 font-medium"
+                    >
+                      Review
+                    </Link>
+                  </div>
+                ))}
+              </div>
             </div>
-        </AuthenticatedLayout>
-    );
+          )}
+
+          {/* Recent Applications Table */}
+          <div
+            className={`${
+              canManagePlatform && pendingJobsList.length > 0 ? "lg:col-span-2" : "lg:col-span-3"
+            } bg-white rounded-2xl border border-gray-100 overflow-hidden`}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-sm">Recent Applications</h3>
+              <Link href="/admin/applications" className="text-xs text-blue-600 hover:underline">
+                View all
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Candidate</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500">Job</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {recentApplications.length === 0 ? (
+                    <tr>
+                      <td colSpan="3" className="text-center py-6 text-xs text-gray-400">
+                        No recent records available.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentApplications.map((app) => (
+                      <tr key={app.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-gray-900">{app.userName}</p>
+                          <p className="text-xs text-gray-500">{app.userCity}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="text-gray-800 truncate max-w-[140px] font-medium">{app.jobTitle}</p>
+                          <p className="text-xs text-gray-500">{app.company}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span
+                            className={`text-xs px-2.5 py-1 rounded-full font-semibold capitalize ${
+                              statusColor[app.status] || "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {(app.status || "").replace(/_/g, " ")}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Tasks Section */}
+        {tasks.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-sm">
+                {isTeamMember ? "My Tasks" : "Active Tasks"}
+              </h3>
+              <Link href="/admin/tasks" className="text-xs text-blue-600 hover:underline">
+                View all
+              </Link>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {tasks.map((task) => (
+                <div key={task.id} className="flex items-center gap-4 px-5 py-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-semibold text-gray-900">{task.title}</p>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          taskPriorityColor[task.priority] || "text-gray-600 bg-gray-50"
+                        }`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {!isTeamMember && task.assignedToName && `Assigned to: ${task.assignedToName} · `}
+                      Due {task.dueDate}
+                    </p>
+                  </div>
+
+                  {task.targetCount && (
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-gray-900">
+                        {task.completedCount}/{task.targetCount}
+                      </p>
+                      <div className="w-20 bg-gray-100 rounded-full h-1.5 mt-1">
+                        <div
+                          className="h-1.5 bg-blue-600 rounded-full"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              ((task.completedCount || 0) / task.targetCount) * 100
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <span
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize shrink-0 ${
+                      task.status === "done"
+                        ? "bg-green-50 text-green-600"
+                        : task.status === "in_progress"
+                        ? "bg-blue-50 text-blue-600"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {(task.status || "").replace("_", " ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick links */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { href: "/admin/applications", icon: ClipboardList, label: "Review Applications", color: "bg-purple-50 text-purple-700 hover:bg-purple-100" },
+            { href: "/admin/interviews", icon: Calendar, label: "Schedule Interview", color: "bg-orange-50 text-orange-700 hover:bg-orange-100" },
+            { href: "/admin/users", icon: Users, label: "Add New User", color: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
+            { href: "/admin/jobs", icon: Briefcase, label: "Moderate Jobs", color: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" },
+          ].map((q) => (
+            <Link
+              key={q.label}
+              href={q.href}
+              className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-colors ${q.color}`}
+            >
+              <q.icon className="w-4 h-4 shrink-0" />
+              {q.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </>
+  );
 }
+
+Dashboard.layout = (page) => <SidebarLayout>{page}</SidebarLayout>;

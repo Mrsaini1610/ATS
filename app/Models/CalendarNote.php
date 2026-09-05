@@ -1,29 +1,15 @@
 <?php
 
-namespace App\Models;
+namespace App\Http\Controllers\Admin;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class CalendarNote extends Model
+class BulkMessageController extends Controller
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'member_id',
-        'date',
-        'note',
-        'is_private',
-        'role',
-    ];
-
-    protected $casts = [
-        'date'       => 'date',
-        'is_private' => 'boolean',
-    ];
-
-    public function member()
+    public function index(Request $request): Response
     {
-        return $this->belongsTo(Member::class);
-    }
-}
+        // Yahan table columns ke mutabiq select fields update karein
+        $users = User::select('id', 'first_name as name', 'city', 'phone', 'email', 'experience', 'status')
+            ->latest()
+            ->get();
+
+        // Agar aapke table me 'name' single column hi hai, toh check karein ki table ka naam 'users' hi hai ya kuch aur.
+        // Agar table me columns 'name', 'email', 'phone' hain hi nahi, toh pehle migration check karein.
