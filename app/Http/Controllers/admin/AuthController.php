@@ -52,7 +52,10 @@ class AuthController extends Controller
             ]);
         }
 
+        // Authenticate guard and persist session
         Auth::guard('admin')->login($admin, $request->boolean('remember'));
+        $request->session()->put('admin_logged_in_id', $admin->id);
+        $request->session()->save();
         $request->session()->regenerate();
 
         // Determine destination route based on role
@@ -63,17 +66,16 @@ class AuthController extends Controller
             $redirectUrl = route('admin.member.dashboard');
         }
 
-        // Inertia::location use karne se browser fresh reload ke sath redirect hoga (419 error khatam)
         return Inertia::location($redirectUrl);
     }
 
     public function logout(Request $request)
     {
         Auth::guard('admin')->logout();
+        $request->session()->forget('admin_logged_in_id');
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Hard redirect on logout to clear client-side Inertia token memory
         return Inertia::location(route('admin.login'));
     }
 }

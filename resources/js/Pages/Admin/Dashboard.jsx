@@ -22,9 +22,9 @@ function StatCard({ icon: Icon, label, value, sub, color, href }) {
         </div>
         {href && <ChevronRight className="w-4 h-4 text-gray-400" />}
       </div>
-      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
-      <p className="text-sm font-medium text-gray-600 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+      <p className="text-2xl font-black text-gray-900">{value}</p>
+      <p className="text-sm font-bold text-gray-700 mt-0.5">{label}</p>
+      {sub && <p className="text-xs font-semibold text-gray-400 mt-1">{sub}</p>}
     </div>
   );
 
@@ -59,41 +59,41 @@ export default function Dashboard({
   const hired = stats.hired ?? 0;
 
   const statusColor = {
-    applied: "bg-gray-100 text-gray-600",
-    reviewed: "bg-blue-50 text-blue-600",
-    shortlisted: "bg-yellow-50 text-yellow-600",
-    interview_scheduled: "bg-purple-50 text-purple-600",
-    hired: "bg-green-50 text-green-700",
-    rejected: "bg-red-50 text-red-600",
-    not_interested: "bg-gray-100 text-gray-500",
+    applied: "bg-gray-100 text-gray-700 font-bold",
+    reviewed: "bg-blue-50 text-blue-700 font-bold",
+    shortlisted: "bg-yellow-50 text-yellow-700 font-bold",
+    interview_scheduled: "bg-purple-50 text-purple-700 font-bold",
+    hired: "bg-green-50 text-green-800 font-bold",
+    rejected: "bg-red-50 text-red-700 font-bold",
+    not_interested: "bg-gray-100 text-gray-600 font-bold",
   };
 
   const taskPriorityColor = {
-    high: "text-red-600 bg-red-50",
-    medium: "text-yellow-600 bg-yellow-50",
-    low: "text-green-600 bg-green-50",
+    high: "text-red-700 bg-red-50 font-bold",
+    medium: "text-yellow-700 bg-yellow-50 font-bold",
+    low: "text-green-700 bg-green-50 font-bold",
   };
 
   return (
     <>
-      <Head title={`${role.replace("_", " ").toUpperCase()} Dashboard - WorkIndia`} />
+      <Head title={`${role.replace("_", " ").toUpperCase()} Dashboard - ATS`} />
 
       <div className="p-6 space-y-6">
         {/* Welcome Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">
+            <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
               Welcome back, {admin?.name ? admin.name.split(" ")[0] : "User"}! 👋
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm font-semibold text-gray-500 mt-0.5">
               {isTeamMember
                 ? "Here are your calling queue and candidate follow-ups for today."
-                : "Here's what's happening on WorkIndia today."}
+                : "Here's what's happening on ATS Recruitment Platform today."}
             </p>
           </div>
           <div className="text-right hidden sm:block">
-            <p className="text-xs font-semibold text-gray-600">🇮🇳 WorkIndia Technologies</p>
-            <p className="text-xs text-gray-400 mt-0.5">August 2026</p>
+            <p className="text-xs font-bold text-gray-500">🇮🇳 ATS Technologies</p>
+            <p className="text-xs font-semibold text-gray-400 mt-0.5">August 2026</p>
           </div>
         </div>
 
@@ -176,33 +176,39 @@ export default function Dashboard({
         {/* Middle Tables Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Pending Approvals: Only Super Admin & Admin */}
-          {canManagePlatform && pendingJobsList.length > 0 && (
-            <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          {canManagePlatform && (
+            <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-yellow-500" /> Pending Approvals
                 </h3>
-                <Link href="/admin/jobs" className="text-xs text-blue-600 hover:underline">
+                <Link href="/admin/jobs" className="text-xs font-bold text-blue-600 hover:underline">
                   View all
                 </Link>
               </div>
               <div className="divide-y divide-gray-100">
-                {pendingJobsList.map((job) => (
-                  <div key={job.id} className="flex items-center gap-3 px-5 py-3.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{job.title}</p>
-                      <p className="text-xs text-gray-500">
-                        {job.company} · {job.location}
-                      </p>
+                {pendingJobsList.length === 0 ? (
+                  <p className="text-center py-6 text-xs font-medium text-gray-400">
+                    No pending approvals.
+                  </p>
+                ) : (
+                  pendingJobsList.map((job) => (
+                    <div key={job.id} className="flex items-center gap-3 px-5 py-3.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{job.title}</p>
+                        <p className="text-xs font-medium text-gray-500">
+                          {job.company} · {job.location}
+                        </p>
+                      </div>
+                      <Link
+                        href="/admin/jobs"
+                        className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg hover:bg-blue-100 shrink-0"
+                      >
+                        Review
+                      </Link>
                     </div>
-                    <Link
-                      href="/admin/jobs"
-                      className="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg hover:bg-blue-100 shrink-0 font-medium"
-                    >
-                      Review
-                    </Link>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -210,12 +216,12 @@ export default function Dashboard({
           {/* Recent Applications Table */}
           <div
             className={`${
-              canManagePlatform && pendingJobsList.length > 0 ? "lg:col-span-2" : "lg:col-span-3"
-            } bg-white rounded-2xl border border-gray-100 overflow-hidden`}
+              canManagePlatform ? "lg:col-span-2" : "lg:col-span-3"
+            } bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm`}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900 text-sm">Recent Applications</h3>
-              <Link href="/admin/applications" className="text-xs text-blue-600 hover:underline">
+              <h3 className="font-black text-gray-900 text-sm">Recent Applications</h3>
+              <Link href="/admin/applications" className="text-xs font-bold text-blue-600 hover:underline">
                 View all
               </Link>
             </div>
@@ -223,15 +229,15 @@ export default function Dashboard({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Candidate</th>
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500">Job</th>
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-bold text-gray-600">Candidate</th>
+                    <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Job</th>
+                    <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {recentApplications.length === 0 ? (
                     <tr>
-                      <td colSpan="3" className="text-center py-6 text-xs text-gray-400">
+                      <td colSpan="3" className="text-center py-6 text-xs font-medium text-gray-400">
                         No recent records available.
                       </td>
                     </tr>
@@ -239,17 +245,17 @@ export default function Dashboard({
                     recentApplications.map((app) => (
                       <tr key={app.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-5 py-3">
-                          <p className="font-medium text-gray-900">{app.userName}</p>
-                          <p className="text-xs text-gray-500">{app.userCity}</p>
+                          <p className="font-bold text-gray-900">{app.userName}</p>
+                          <p className="text-xs font-medium text-gray-500">{app.userCity}</p>
                         </td>
                         <td className="px-3 py-3">
-                          <p className="text-gray-800 truncate max-w-[140px] font-medium">{app.jobTitle}</p>
-                          <p className="text-xs text-gray-500">{app.company}</p>
+                          <p className="text-gray-800 font-bold truncate max-w-[140px]">{app.jobTitle}</p>
+                          <p className="text-xs font-medium text-gray-500">{app.company}</p>
                         </td>
                         <td className="px-3 py-3">
                           <span
-                            className={`text-xs px-2.5 py-1 rounded-full font-semibold capitalize ${
-                              statusColor[app.status] || "bg-gray-100 text-gray-600"
+                            className={`text-xs px-2.5 py-1 rounded-full capitalize ${
+                              statusColor[app.status] || "bg-gray-100 text-gray-600 font-bold"
                             }`}
                           >
                             {(app.status || "").replace(/_/g, " ")}
@@ -266,12 +272,12 @@ export default function Dashboard({
 
         {/* Tasks Section */}
         {tasks.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900 text-sm">
+              <h3 className="font-black text-gray-900 text-sm">
                 {isTeamMember ? "My Tasks" : "Active Tasks"}
               </h3>
-              <Link href="/admin/tasks" className="text-xs text-blue-600 hover:underline">
+              <Link href="/admin/tasks" className="text-xs font-bold text-blue-600 hover:underline">
                 View all
               </Link>
             </div>
@@ -280,16 +286,16 @@ export default function Dashboard({
                 <div key={task.id} className="flex items-center gap-4 px-5 py-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-gray-900">{task.title}</p>
+                      <p className="text-sm font-bold text-gray-900">{task.title}</p>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          taskPriorityColor[task.priority] || "text-gray-600 bg-gray-50"
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          taskPriorityColor[task.priority] || "text-gray-700 bg-gray-50 font-bold"
                         }`}
                       >
                         {task.priority}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs font-medium text-gray-500">
                       {!isTeamMember && task.assignedToName && `Assigned to: ${task.assignedToName} · `}
                       Due {task.dueDate}
                     </p>
@@ -297,7 +303,7 @@ export default function Dashboard({
 
                   {task.targetCount && (
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-gray-900">
+                      <p className="text-xs font-black text-gray-900">
                         {task.completedCount}/{task.targetCount}
                       </p>
                       <div className="w-20 bg-gray-100 rounded-full h-1.5 mt-1">
@@ -315,12 +321,12 @@ export default function Dashboard({
                   )}
 
                   <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize shrink-0 ${
+                    className={`text-xs px-2.5 py-1 rounded-full capitalize shrink-0 font-bold ${
                       task.status === "done"
-                        ? "bg-green-50 text-green-600"
+                        ? "bg-green-50 text-green-700"
                         : task.status === "in_progress"
-                        ? "bg-blue-50 text-blue-600"
-                        : "bg-gray-100 text-gray-500"
+                        ? "bg-blue-50 text-blue-700"
+                        : "bg-gray-100 text-gray-600"
                     }`}
                   >
                     {(task.status || "").replace("_", " ")}
@@ -342,7 +348,7 @@ export default function Dashboard({
             <Link
               key={q.label}
               href={q.href}
-              className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-colors ${q.color}`}
+              className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl text-sm font-bold transition-colors ${q.color}`}
             >
               <q.icon className="w-4 h-4 shrink-0" />
               {q.label}

@@ -18,6 +18,7 @@ class UserController extends Controller
     public function index(Request $request): Response
     {
         $users = User::query()
+            ->withCount('jobApplications') // <--- Yahan applications count attach kiya hai
             ->latest()
             ->get()
             ->map(function ($user) {
@@ -31,7 +32,7 @@ class UserController extends Controller
                     'experience'   => $user->total_experience_years ? "{$user->total_experience_years} Years" : 'Fresher',
                     'status'       => $user->is_online ? 'active' : 'inactive',
                     'registeredAt' => $user->created_at ? $user->created_at->format('d M Y') : null,
-                    'appliedCount' => 0, // Applications module integrate hone par dynamic count attach hoga
+                    'appliedCount' => $user->job_applications_count ?? 0, // <--- Dynamic count yahan pass hoga
                 ];
             });
 
@@ -64,7 +65,7 @@ class UserController extends Controller
             'bio'                    => $validated['jobTitle'] ?? null,
             'total_experience_years' => preg_replace('/[^0-9]/', '', $validated['experience'] ?? '0') ?: null,
             'is_online'              => true,
-            'password'               => Hash::make('Password@123'), // Default candidate login password
+            'password'               => Hash::make('Password@123'),
         ]);
 
         return redirect()->back()->with('success', 'Candidate successfully registered.');

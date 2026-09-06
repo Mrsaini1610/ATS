@@ -51,4 +51,8 @@ class Interview extends Model
     {
         return 'uuid';
     }
+    public function application()
+    {
+        return $this->belongsTo(JobApplication::class, 'application_id', 'id');
+    }
 }

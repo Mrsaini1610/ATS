@@ -13,6 +13,7 @@ class InterviewController extends Controller
     public function index(Request $request): Response
     {
         $interviews = Interview::query()
+            ->with('application')
             ->latest('interview_date')
             ->get()
             ->map(function ($iv) {
@@ -99,4 +100,5 @@ class InterviewController extends Controller
 
         return redirect()->back()->with('success', 'Interview remark saved.');
     }
+    
 }

@@ -40,6 +40,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
     priority: "medium",
     dueDate: "",
     area: "",
+    targetCount: "",
     notes: "",
   });
 
@@ -163,6 +164,23 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Priority *
+                    </label>
+                    <select
+                      value={data.priority}
+                      onChange={(e) => setData("priority", e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 capitalize"
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Due Date
                     </label>
                     <input
@@ -172,17 +190,30 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Area / Zone
+                    </label>
+                    <input
+                      type="text"
+                      value={data.area}
+                      onChange={(e) => setData("area", e.target.value)}
+                      placeholder="e.g. Jaipur"
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Area / Zone
+                    Target Count
                   </label>
                   <input
-                    type="text"
-                    value={data.area}
-                    onChange={(e) => setData("area", e.target.value)}
-                    placeholder="e.g. Jaipur"
+                    type="number"
+                    value={data.targetCount}
+                    onChange={(e) => setData("targetCount", e.target.value)}
+                    placeholder="e.g. 50 calls / 10 reviews"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -228,7 +259,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
               {isTeamMember ? "My Assigned Tasks" : "Task Management"}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {filtered.length} tasks in database ·{" "}
+              {filtered.length} tasks ·{" "}
               {tasks.filter((t) => t.status === "in_progress").length} in progress
             </p>
           </div>
@@ -339,6 +370,11 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
                         {task.area}
+                      </span>
+                    )}
+                    {task.targetCount && (
+                      <span className="flex items-center gap-1 font-bold text-blue-600">
+                        Target: {task.completedCount ?? 0} / {task.targetCount}
                       </span>
                     )}
                   </div>

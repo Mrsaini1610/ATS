@@ -12,19 +12,13 @@ class Category extends Model
     use HasFactory;
 
     protected $fillable = [
-        'uuid',
-        'name',
-        'slug',
-        'status',
+        'uuid', 'name', 'slug', 'icon', 'status'
     ];
 
     protected $hidden = [
         'id',
     ];
 
-    /**
-     * Boot function to auto-generate UUID on create
-     */
     protected static function booted()
     {
         static::creating(function ($category) {
@@ -43,19 +37,19 @@ class Category extends Model
         });
     }
 
-    /**
-     * Use UUID instead of ID for route-model binding
-     */
     public function getRouteKeyName(): string
     {
         return 'uuid';
     }
 
-    /**
-     * Get job posts relation
-     */
     public function jobPosts(): HasMany
     {
         return $this->hasMany(JobPost::class, 'category_id', 'id');
+    }
+
+    // YEH RELATION ADD KARNA THA:
+    public function subcategories(): HasMany
+    {
+        return $this->hasMany(Subcategory::class, 'category_id', 'id');
     }
 }

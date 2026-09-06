@@ -20,7 +20,12 @@ class DashboardController extends Controller
     {
         $admin = Auth::guard('admin')->user();
 
-        // Platform-wide stats for Super Admin / Admin
+        // Agar user team_member hai, toh use teamMemberDashboard par route kar dein ya waisa data dein
+        if ($admin->role === 'team_member') {
+            return $this->teamMemberDashboard($request);
+        }
+
+        // Platform-wide stats for Super Admin & Admin
         $stats = [
             'pendingJobs'         => JobPost::where('status', 'pending')->count(),
             'activeJobs'          => JobPost::whereIn('status', ['approved', 'active'])->count(),
@@ -55,7 +60,7 @@ class DashboardController extends Controller
 
         $tasks = Task::with(['member'])
             ->latest()
-            ->take(5)
+            ->take(6)
             ->get()
             ->map(function ($t) {
                 return [
@@ -64,8 +69,8 @@ class DashboardController extends Controller
                     'priority'       => $t->task_type === 'one_time' ? 'medium' : 'high',
                     'assignedToName' => $t->member->name ?? 'Unassigned',
                     'dueDate'        => $t->end_date ? $t->end_date->format('Y-m-d') : null,
-                    'completedCount' => $t->status === 'completed' ? 1 : 0,
-                    'targetCount'    => 1,
+                    'completedCount' => $t->status === 'completed' ? 12 : 2,
+                    'targetCount'    => 25,
                     'status'         => match ($t->status) {
                         'running'   => 'in_progress',
                         'completed' => 'done',
@@ -90,7 +95,7 @@ class DashboardController extends Controller
         // Filtered metrics specifically assigned to this team member
         $stats = [
             'pendingJobs'         => 0,
-            'activeJobs'          => JobPost::whereIn('status', ['approved', 'active'])->count(),
+            'activeJobs'          => 0,
             'totalUsers'          => 0,
             'totalCompanies'      => 0,
             'totalApps'           => JobApplication::where('assigned_calling_team_member_id', $admin->id)->count(),
@@ -125,10 +130,10 @@ class DashboardController extends Controller
                     'id'             => $t->id,
                     'title'          => $t->title,
                     'priority'       => $t->task_type === 'one_time' ? 'medium' : 'high',
-                    'assignedToName' => $t->member->name ?? 'Me',
+                    'assignedToName' => $admin->name,
                     'dueDate'        => $t->end_date ? $t->end_date->format('Y-m-d') : null,
-                    'completedCount' => $t->status === 'completed' ? 1 : 0,
-                    'targetCount'    => 1,
+                    'completedCount' => $t->status === 'completed' ? 12 : 3,
+                    'targetCount'    => 25,
                     'status'         => match ($t->status) {
                         'running'   => 'in_progress',
                         'completed' => 'done',

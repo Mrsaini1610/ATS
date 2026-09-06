@@ -232,7 +232,7 @@ export default function Users({ users = [] }) {
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Candidates</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {users.length} registered candidate profiles in database
+              {users.length} registered candidate profiles
             </p>
           </div>
 

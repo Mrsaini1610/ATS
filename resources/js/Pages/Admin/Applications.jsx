@@ -427,7 +427,7 @@ export default function Applications({ applications = [], teamMembers = [] }) {
               {isTeamMember ? "My Assigned Applications" : "Job Applications"}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {applications.length} applications in database
+              {applications.length} total · {filtered.length} shown
             </p>
           </div>
         </div>
@@ -457,7 +457,7 @@ export default function Applications({ applications = [], teamMembers = [] }) {
         </div>
 
         {/* Search Input */}
-        <div className="relative mb-5 max-w-md">
+        <div className="relative mb-5 w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"

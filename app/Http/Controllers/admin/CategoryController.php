@@ -13,18 +13,27 @@ class CategoryController extends Controller
 {
     public function index(Request $request): Response
     {
-        // Safe fetch without relation dependency
-        $categories = Category::latest()
+        $categories = Category::with('subcategories')
+            ->withCount(['jobPosts', 'subcategories'])
+            ->latest()
             ->get()
             ->map(function ($cat) {
                 return [
-                    'id'         => $cat->id,
-                    'uuid'       => $cat->uuid ?? (string) $cat->id,
-                    'name'       => $cat->name,
-                    'slug'       => $cat->slug,
-                    'status'     => $cat->status ?? 'active',
-                    'jobCount'   => 0,
-                    'created_at' => $cat->created_at ? $cat->created_at->format('d M Y') : null,
+                    'id'            => $cat->id,
+                    'uuid'          => $cat->uuid ?? (string) $cat->id,
+                    'name'          => $cat->name,
+                    'slug'          => $cat->slug,
+                    'icon'          => $cat->icon ?? '📁', // <--- Icon yahan properly map kar diya gaya hai
+                    'status'        => $cat->status ?? 'active',
+                    'job_count'     => $cat->job_posts_count ?? 0,
+                    'subcategories' => $cat->subcategories->map(function ($sub) {
+                        return [
+                            'uuid'      => $sub->uuid ?? (string) $sub->id,
+                            'name'      => $sub->name,
+                            'job_count' => 0,
+                        ];
+                    }),
+                    'created_at'    => $cat->created_at ? $cat->created_at->format('d M Y') : null,
                 ];
             });
 
@@ -37,6 +46,7 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name'   => 'required|string|max:255',
+            'icon'   => 'nullable|string|max:50',
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
@@ -50,6 +60,7 @@ class CategoryController extends Controller
             'uuid'   => (string) Str::uuid(),
             'name'   => $validated['name'],
             'slug'   => $slug,
+            'icon'   => $validated['icon'] ?? '📁',
             'status' => $validated['status'] ?? 'active',
         ]);
 
@@ -60,12 +71,14 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name'   => 'required|string|max:255',
+            'icon'   => 'nullable|string|max:50',
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
         $category->update([
             'name'   => $validated['name'],
             'slug'   => Str::slug($validated['name']),
+            'icon'   => $validated['icon'] ?? $category->icon,
             'status' => $validated['status'] ?? $category->status,
         ]);
 

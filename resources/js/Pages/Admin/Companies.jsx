@@ -314,7 +314,7 @@ export default function Companies({ companies = [] }) {
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Companies</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {companies.length} companies registered in database
+              {companies.length} companies registered
             </p>
           </div>
 
@@ -330,7 +330,7 @@ export default function Companies({ companies = [] }) {
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-5 max-w-md">
+        <div className="relative mb-5 w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"

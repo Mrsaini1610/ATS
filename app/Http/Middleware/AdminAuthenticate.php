@@ -13,13 +13,23 @@ class AdminAuthenticate
     {
         // 1. Check if admin guard is logged in
         if (! Auth::guard('admin')->check()) {
-            return redirect()->route('admin.login');
+            // Agar guard check false hai lekin session me ID hai, toh turant login restore karein
+            if (session()->has('admin_logged_in_id')) {
+                $admin = \App\Models\Admin::find(session('admin_logged_in_id'));
+                if ($admin && $admin->status) {
+                    Auth::guard('admin')->login($admin);
+                } else {
+                    return redirect()->route('admin.login');
+                }
+            } else {
+                return redirect()->route('admin.login');
+            }
         }
 
         $admin = Auth::guard('admin')->user();
 
         // 2. Account active status check
-        if (! $admin->status) {
+        if (! $admin || ! $admin->status) {
             Auth::guard('admin')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -31,11 +41,10 @@ class AdminAuthenticate
 
         // 3. Role check (agar middleware me role pass kiya ho)
         if (! empty($roles) && ! in_array($admin->role, $roles)) {
-            // Agar role match nahi hota toh candidate page par nahi, balki uske sahi dashboard par bhejein
             if ($admin->role === 'super_admin') {
                 return redirect()->route('admin.super.dashboard');
-            } elseif ($admin->role === 'calling_team') {
-                return redirect()->route('admin.calling.dashboard');
+            } elseif ($admin->role === 'team_member') {
+                return redirect()->route('admin.member.dashboard');
             }
             return redirect()->route('admin.dashboard');
         }

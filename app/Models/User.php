@@ -97,4 +97,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(SavedJob::class, 'user_uuid', 'uuid');
     }
+    public function jobApplications()
+    {
+        return $this->hasMany(JobApplication::class, 'candidate_id', 'id');
+    }
 }

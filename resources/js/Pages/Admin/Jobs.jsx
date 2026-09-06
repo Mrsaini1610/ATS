@@ -39,7 +39,6 @@ function StatusBadge({ status }) {
 function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing }) {
   const [selected, setSelected] = useState(job.assigned_team_member_uuid || "");
   
-  // Updated filter to check for 'team_member' or fallback to active staff
   const activeMembers = teamMembers.filter((m) => m.role === "team_member" || m.role === "admin");
 
   return (
@@ -297,7 +296,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           )}
         </div>
 
-        <div className="relative mb-5 max-w-md">
+        <div className="relative mb-5 w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             value={search}
@@ -348,11 +347,6 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                           {job.applicants ?? 0} applicants
                         </span>
                         <span className="font-medium text-gray-700">{job.salary}</span>
-                        {job.work_mode && (
-                          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">
-                            {job.work_mode}
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -392,8 +386,9 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   )}
 
                   <p className="text-xs text-gray-400 mt-2">
-                    Posted {job.posted_at} · {job.type} · {job.exp} · {job.openings} opening
-                    {job.openings > 1 ? "s" : ""}
+                    Posted {job.posted_at} · {job.type} 
+                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`} 
+                    · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
                   </p>
                 </div>
               ))
@@ -424,7 +419,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
                     {selectedJob.type}
                   </span>
-                  {selectedJob.work_mode && (
+                  {selectedJob.work_mode && selectedJob.work_mode !== selectedJob.type && (
                     <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
                       {selectedJob.work_mode}
                     </span>
