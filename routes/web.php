@@ -112,6 +112,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // 2. Job Posts & Moderation
         Route::get('/jobs', [AdminJobController::class, 'index'])->name('jobs.index');
         Route::get('/jobs/create', [AdminJobController::class, 'create'])->name('jobs.create');
+        Route::post('/jobs', [AdminJobController::class, 'store'])->name('jobs.store'); // Agar store method bhi hai
         Route::post('/jobs/{uuid}/update-status', [AdminJobController::class, 'updateStatus'])->name('jobs.update-status');
         Route::post('/jobs/{uuid}/assign-team', [AdminJobController::class, 'assignTeam'])->name('jobs.assign-team');
 

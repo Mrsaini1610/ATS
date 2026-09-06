@@ -37,8 +37,7 @@ function StatusBadge({ status }) {
 
 /* ── Assign Team Member Modal ── */
 function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing }) {
-  const [selected, setSelected] = useState(job.assigned_team_member_uuid || "");
-  
+  const [selected, setSelected] = useState(job?.assigned_team_member_uuid || "");
   const activeMembers = teamMembers.filter((m) => m.role === "team_member" || m.role === "admin");
 
   return (
@@ -46,18 +45,14 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-100">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Assign Job to Team Member</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
-          >
+          <button type="button" onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-6">
           <div className="bg-blue-50 rounded-xl p-3 mb-4 text-sm">
-            <p className="font-semibold text-gray-900">{job.title}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{job.company} · {job.location}</p>
+            <p className="font-semibold text-gray-900">{job?.title}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{job?.company} · {job?.location}</p>
             <p className="text-xs text-blue-600 mt-1">All future applications will be routed to the selected member.</p>
           </div>
           <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -68,9 +63,7 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
                 selected === "" ? "border-blue-500 bg-blue-50/50" : "border-gray-100 hover:border-gray-200"
               }`}
             >
-              <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
-                —
-              </div>
+              <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">—</div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">No Assignment</p>
                 <p className="text-xs text-gray-400">Admin will handle applications directly</p>
@@ -100,11 +93,7 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
           </div>
 
           <div className="flex gap-3 mt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium"
-            >
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium">
               Cancel
             </button>
             <button
@@ -143,9 +132,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
       {
         preserveScroll: true,
         onSuccess: () => {
-          setSelectedJob((prev) =>
-            prev?.uuid === uuid ? { ...prev, status, remark: remarkReason } : prev
-          );
+          setSelectedJob((prev) => (prev?.uuid === uuid ? { ...prev, status, remark: remarkReason } : prev));
           setRemarkModal(null);
           setRemark("");
         },
@@ -179,26 +166,23 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
     );
   };
 
-  const filtered = jobs.filter((j) => {
+  const filtered = Array.isArray(jobs) ? jobs.filter((j) => {
     const q = search.toLowerCase();
-    const matchQuery =
-      !search ||
-      (j.title || "").toLowerCase().includes(q) ||
-      (j.company || "").toLowerCase().includes(q);
+    const matchQuery = !search || (j.title || "").toLowerCase().includes(q) || (j.company || "").toLowerCase().includes(q);
     const matchStatus = statusFilter === "all" || j.status === statusFilter;
     return matchQuery && matchStatus;
-  });
+  }) : [];
 
-  const counts = { all: jobs.length };
+  const counts = { all: Array.isArray(jobs) ? jobs.length : 0 };
   Object.keys(STATUS_CONFIG).forEach((s) => {
-    counts[s] = jobs.filter((j) => j.status === s).length;
+    counts[s] = Array.isArray(jobs) ? jobs.filter((j) => j.status === s).length : 0;
   });
 
   return (
     <>
       <Head title="Job Posts & Moderation - ATS Admin" />
 
-      <div className="p-6">
+      <div className="p-6 pb-32">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
@@ -209,10 +193,10 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
             <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100">
               <h3 className="font-bold text-gray-900 mb-1">
-                {remarkModal.newStatus === "rejected" ? "Reject Job Post" : "Put on Hold"}
+                {remarkModal.newStatus === "rejected" ? "Reject Job Post" : remarkModal.newStatus === "hold" ? "Put on Hold" : "Update Status"}
               </h3>
               <p className="text-xs text-gray-500 mb-4">
-                Reason for <strong>{remarkModal.job.title}</strong>
+                Reason for <strong>{remarkModal.job?.title}</strong>
               </p>
               <textarea
                 value={remark}
@@ -238,9 +222,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   disabled={isProcessing}
                   onClick={() => updateStatus(remarkModal.job.uuid, remarkModal.newStatus, remark)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white shadow-md cursor-pointer disabled:opacity-60 ${
-                    remarkModal.newStatus === "rejected"
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-orange-500 hover:bg-orange-600"
+                    remarkModal.newStatus === "rejected" ? "bg-red-600 hover:bg-red-700" : "bg-orange-500 hover:bg-orange-600"
                   }`}
                 >
                   {isProcessing ? "Updating..." : "Confirm"}
@@ -278,22 +260,18 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
-          {[["all", "All"], ...Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label])].map(
-            ([key, label]) => (
-              <button
-                type="button"
-                key={key}
-                onClick={() => setStatusFilter(key)}
-                className={`shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                  statusFilter === key
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {label} <span className="ml-1 opacity-60">({counts[key] || 0})</span>
-              </button>
-            )
-          )}
+          {[["all", "All"], ...Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label])].map(([key, label]) => (
+            <button
+              type="button"
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={`shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                statusFilter === key ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {label} <span className="ml-1 opacity-60">({counts[key] || 0})</span>
+            </button>
+          ))}
         </div>
 
         <div className="relative mb-5 w-full">
@@ -306,7 +284,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           />
         </div>
 
-        <div className="flex gap-5">
+        <div className="flex gap-5 items-start">
           <div className={`flex-1 ${selectedJob ? "hidden lg:block" : ""} space-y-3`}>
             {filtered.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
@@ -319,18 +297,14 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   key={job.uuid}
                   onClick={() => setSelectedJob(job)}
                   className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all ${
-                    selectedJob?.uuid === job.uuid
-                      ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20"
-                      : "border-gray-100 hover:border-blue-200"
+                    selectedJob?.uuid === job.uuid ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" : "border-gray-100 hover:border-blue-200"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h3 className="font-bold text-gray-900">{job.title}</h3>
-                        {job.is_hot && (
-                          <Flame className="w-3.5 h-3.5 text-orange-500" title="Hot Job" />
-                        )}
+                        {job.is_hot && <Flame className="w-3.5 h-3.5 text-orange-500" title="Hot Job" />}
                         <StatusBadge status={job.status} />
                       </div>
                       <div className="flex flex-wrap gap-3 text-xs text-gray-500">
@@ -347,6 +321,9 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                           {job.applicants ?? 0} applicants
                         </span>
                         <span className="font-medium text-gray-700">{job.salary}</span>
+                        {job.work_mode && job.work_mode !== job.type && (
+                          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{job.work_mode}</span>
+                        )}
                       </div>
                     </div>
 
@@ -386,8 +363,8 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   )}
 
                   <p className="text-xs text-gray-400 mt-2">
-                    Posted {job.posted_at} · {job.type} 
-                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`} 
+                    Posted {job.posted_at} · {job.type}
+                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
                     · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
                   </p>
                 </div>
@@ -396,18 +373,16 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           </div>
 
           {selectedJob && (
-            <div className="flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-120px)] sticky top-20 shadow-xs">
+            <div className="flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs mb-12">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-gray-900 truncate max-w-[200px]">
-                    {selectedJob.title}
-                  </h3>
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <h3 className="font-bold text-gray-900 break-words">{selectedJob.title}</h3>
                   {selectedJob.is_hot && <Flame className="w-4 h-4 text-orange-500 shrink-0" />}
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedJob(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -450,9 +425,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
 
                 <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/40">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                      Team Assignment
-                    </p>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Team Assignment</p>
                     {canManage && (
                       <button
                         type="button"
@@ -474,27 +447,73 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                           .toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {selectedJob.assigned_team_member_name}
-                        </p>
+                        <p className="text-sm font-semibold text-gray-900">{selectedJob.assigned_team_member_name}</p>
                         <p className="text-xs text-gray-400">Manages all applications for this job</p>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">
-                      Not assigned · Admin handles applications directly
-                    </p>
+                    <p className="text-sm text-gray-400">Not assigned · Admin handles applications directly</p>
                   )}
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Description
-                  </p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
                   <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
                     {selectedJob.desc}
                   </p>
                 </div>
+
+                {selectedJob.responsibilities && selectedJob.responsibilities.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Responsibilities</p>
+                    <ul className="space-y-1">
+                      {selectedJob.responsibilities.map((r, i) => (
+                        <li key={i} className="text-sm text-gray-600 flex gap-2">
+                          <span className="text-blue-400">•</span>{r}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedJob.requirements && selectedJob.requirements.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Requirements</p>
+                    <ul className="space-y-1">
+                      {selectedJob.requirements.map((r, i) => (
+                        <li key={i} className="text-sm text-gray-600 flex gap-2">
+                          <span className="text-green-400">✓</span>{r}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Benefits</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedJob.benefits.map((b, i) => (
+                        <span key={i} className="text-xs bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-xl">
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedJob.skills && selectedJob.skills.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Skills</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedJob.skills.map((s) => (
+                        <span key={s} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {selectedJob.remark && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
@@ -517,6 +536,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   )}
                   {selectedJob.status !== "rejected" && (
                     <button
+                      title="Reject"
                       type="button"
                       onClick={() => {
                         setRemarkModal({ job: selectedJob, newStatus: "rejected" });
@@ -529,6 +549,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   )}
                   {selectedJob.status !== "hold" && (
                     <button
+                      title="Hold"
                       type="button"
                       onClick={() => {
                         setRemarkModal({ job: selectedJob, newStatus: "hold" });
@@ -541,6 +562,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                   )}
                   {selectedJob.status === "deactivated" ? (
                     <button
+                      title="Activate"
                       type="button"
                       onClick={() => updateStatus(selectedJob.uuid, "active")}
                       className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-blue-400 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 cursor-pointer transition"
@@ -549,6 +571,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                     </button>
                   ) : (
                     <button
+                      title="Deactivate"
                       type="button"
                       onClick={() => updateStatus(selectedJob.uuid, "deactivated")}
                       className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-gray-300 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 cursor-pointer transition"

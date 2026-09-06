@@ -2,63 +2,22 @@ import React, { useState } from "react";
 import { useForm, Head, Link } from "@inertiajs/react";
 import { Briefcase, Mail, Lock, Eye, EyeOff, AlertCircle, Shield } from "lucide-react";
 
-const ROLE_CONFIG = [
-  {
-    role: "super_admin",
-    label: "Super Admin",
-    email: "superadmin@ats.com",
-    pass: "Superadmin@123",
-    activeColor: "bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-900/40",
-    inactiveColor: "bg-purple-950/40 text-purple-300 border-purple-800/50 hover:bg-purple-900/40",
-  },
-  {
-    role: "admin",
-    label: "Admin",
-    email: "admin@ats.com",
-    pass: "Admin@123",
-    activeColor: "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-900/40",
-    inactiveColor: "bg-blue-950/40 text-blue-300 border-blue-800/50 hover:bg-blue-900/40",
-  },
-  {
-    role: "team_member", 
-    label: "Team Member", 
-    email: "team@ats.com", 
-    pass: "Password@123",
-    activeColor: "bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-900/40",
-    inactiveColor: "bg-emerald-950/40 text-emerald-300 border-emerald-800/50 hover:bg-emerald-900/40",
-  },
-];
-
 export default function AdminLogin() {
   const [showPass, setShowPass] = useState(false);
-  const [selectedRole, setSelectedRole] = useState("super_admin");
 
   const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
-    login: ROLE_CONFIG[0].email,
-    password: ROLE_CONFIG[0].pass,
-    target_role: "super_admin",
+    login: "",
+    password: "",
     remember: false,
   });
 
-  const handleRoleSelect = (cfg) => {
-    setSelectedRole(cfg.role);
-    setData((prev) => ({
-      ...prev,
-      target_role: cfg.role,
-      login: cfg.email,
-      password: cfg.pass,
-    }));
-    clearErrors();
-  };
-
-const handleSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     clearErrors();
 
     post(route("admin.login.submit"), {
       onFinish: () => reset("password"),
       onError: (errors) => {
-        // Agar 419 Page Expired error aaye toh page refresh karke fresh token load kar lein
         if (errors.status === 419) {
           window.location.reload();
         }
@@ -66,12 +25,9 @@ const handleSubmit = (e) => {
     });
   };
 
-  const currentRoleLabel =
-    ROLE_CONFIG.find((r) => r.role === selectedRole)?.label || "Super Admin";
-
   return (
     <>
-      <Head title={`${currentRoleLabel} Sign In - ATS`} />
+      <Head title="Sign In - ATS Admin" />
 
       <div className="min-h-screen bg-gray-950 flex">
         {/* Left branding panel */}
@@ -108,7 +64,7 @@ const handleSubmit = (e) => {
 
               <div className="space-y-3">
                 {[
-                  { icon: Shield, title: "Role-Based Guard", desc: "Super Admin, Admin &  Team Member isolation" },
+                  { icon: Shield, title: "Role-Based Guard", desc: "Super Admin, Admin & Team Member isolation" },
                   { icon: Briefcase, title: "Job Moderation", desc: "Approve, reject, hold job posts" },
                   { icon: Shield, title: "Candidate Tracking", desc: "Track every candidate stage live" },
                 ].map((f) => (
@@ -125,10 +81,10 @@ const handleSubmit = (e) => {
 
             <div className="mt-10 p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-sm">
               <p className="text-[11px] font-bold text-blue-200 uppercase tracking-widest mb-1.5">
-                Active Portal Mode
+                Secure Portal
               </p>
               <p className="text-xs text-white">
-                Only authenticated <strong className="underline decoration-blue-400">{currentRoleLabel}</strong> credentials can log in under this selection.
+                Enter your authorized credentials to access your designated workspace.
               </p>
             </div>
           </div>
@@ -149,40 +105,16 @@ const handleSubmit = (e) => {
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-2xl font-extrabold text-white">ATS Sign In</h2>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-900/60 text-blue-300 border border-blue-800/80 uppercase">
-                  {selectedRole.replace("_", " ")}
-                </span>
-              </div>
+              <h2 className="text-2xl font-extrabold text-white mb-2">ATS Sign In</h2>
               <p className="text-gray-400 text-xs mb-6">
-                Choose your role first, then enter your credentials.
+                Enter your administrative email or username and password.
               </p>
-
-              {/* Role Selection Buttons */}
-              <div className="flex gap-2 mb-6">
-                {ROLE_CONFIG.map((c) => {
-                  const isSelected = selectedRole === c.role;
-                  return (
-                    <button
-                      key={c.role}
-                      type="button"
-                      onClick={() => handleRoleSelect(c)}
-                      className={`flex-1 text-xs py-2 px-2 rounded-xl border font-bold transition-all cursor-pointer select-none ${
-                        isSelected ? c.activeColor : c.inactiveColor
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  );
-                })}
-              </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Email / Username Field */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 mb-1.5" htmlFor="login">
-                    {currentRoleLabel} Email or Username
+                    Email or Username
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -192,7 +124,7 @@ const handleSubmit = (e) => {
                       name="login"
                       value={data.login}
                       onChange={(e) => setData("login", e.target.value)}
-                      placeholder="username or user@ats.in"
+                      placeholder="username or email@ats.com"
                       className={`w-full pl-10 pr-4 py-3 bg-gray-800 border text-white rounded-xl text-sm placeholder-gray-600 outline-none transition focus:ring-2 ${
                         errors.login
                           ? "border-red-500 focus:ring-red-500/30"
@@ -255,7 +187,7 @@ const handleSubmit = (e) => {
                   disabled={processing}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-900/40 cursor-pointer active:scale-[0.99]"
                 >
-                  {processing ? "Verifying..." : `Sign In as ${currentRoleLabel}`}
+                  {processing ? "Verifying..." : "Sign In"}
                 </button>
               </form>
 

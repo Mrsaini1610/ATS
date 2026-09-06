@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\JobPost;
 use App\Models\Admin;
+use App\Models\Category;
+use App\Models\Company;
+use App\Models\Skill;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -68,7 +71,71 @@ class AdminJobController extends Controller
 
     public function create()
     {
-        return Inertia::render('Admin/Jobs/Create');
+        $categories = Category::with('subcategories')
+            ->where('status', 'active')
+            ->get()
+            ->map(fn($c) => [
+                'id'            => $c->id,
+                'name'          => $c->name,
+                'icon'          => $c->icon ?? '📁',
+                'subcategories' => $c->subcategories->map(fn($s) => ['id' => $s->id, 'name' => $s->name])
+            ]);
+
+        $companies = Company::where('status', 1)->select('id', 'name')->get();
+        
+        $skills = Skill::where('status', 1)->select('id', 'name')->get()->map(fn($s) => [
+            'id' => $s->id,
+            'name' => $s->name,
+            'demand' => 'high'
+        ]);
+
+        $teamMembers = Admin::select('id', 'name', 'role')->get()->map(fn($m) => [
+            'id' => $m->id,
+            'name' => $m->name,
+            'role' => $m->role,
+            'activeTask' => str_replace('_', ' ', ucwords($m->role, '_'))
+        ]);
+
+        return Inertia::render('Admin/CreateJob', [
+            'categories'  => $categories,
+            'companies'   => $companies,
+            'skills'      => $skills,
+            'teamMembers' => $teamMembers,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'        => 'required|string|max:255',
+            'company'      => 'required|string|max:255',
+            'category'     => 'required|string|max:255',
+            'location'     => 'required|string|max:255',
+            'desc'         => 'required|string',
+            'salaryMin'    => 'required|numeric',
+            'salaryMax'    => 'required|numeric',
+        ]);
+
+        JobPost::create([
+            'title'                => $validated['title'],
+            'company'              => $validated['company'],
+            'location'             => $validated['location'],
+            'description'          => $validated['desc'],
+            'min_lpa'              => $validated['salaryMin'],
+            'max_lpa'              => $validated['salaryMax'],
+            'job_type'             => $request->input('type', 'Full-time'),
+            'experience'           => $request->input('exp', '2-3 Years'),
+            'openings'             => $request->input('openings', 1),
+            'badge'                => $request->input('isHot') ? 'hot' : 'standard',
+            'skills'               => $request->input('skills', []),
+            'key_responsibilities' => array_values(array_filter($request->input('responsibilities', []))),
+            'qualifications'       => array_values(array_filter($request->input('requirements', []))),
+            'perks'                => $request->input('benefits', []),
+            'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
+            'created_by'           => auth('admin')->id(),
+        ]);
+
+        return redirect()->route('admin.jobs.index')->with('success', 'Job post successfully created.');
     }
 
     public function updateStatus(Request $request, $uuid)

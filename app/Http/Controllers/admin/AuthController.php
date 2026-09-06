@@ -19,14 +19,13 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'login'       => 'required|string',
-            'password'    => 'required|string',
-            'target_role' => 'required|in:super_admin,admin,team_member',
+            'login'    => 'required|string',
+            'password' => 'required|string',
         ]);
 
         $loginInput = $request->input('login');
-        $targetRole = $request->input('target_role');
 
+        // Database se user ko email ya username ke zariye find karein
         $admin = Admin::where('email', $loginInput)
             ->orWhere('username', $loginInput)
             ->first();
@@ -37,15 +36,7 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($admin->role !== $targetRole) {
-            $readableTarget = str_replace('_', ' ', ucwords($targetRole, '_'));
-            $readableUserRole = str_replace('_', ' ', ucwords($admin->role, '_'));
-
-            return back()->withErrors([
-                'error' => "Access Denied: Yeh account '{$readableUserRole}' hai. Aapne '{$readableTarget}' tab select kiya hai.",
-            ]);
-        }
-
+        // Account status check karein (active hai ya nahi)
         if (! $admin->status) {
             return back()->withErrors([
                 'error' => 'Aapka account currently deactivated ya suspended hai.',
@@ -58,7 +49,7 @@ class AuthController extends Controller
         $request->session()->save();
         $request->session()->regenerate();
 
-        // Determine destination route based on role
+        // Database role ke mutabiq redirection URL set karein
         $redirectUrl = route('admin.dashboard');
         if ($admin->role === 'super_admin') {
             $redirectUrl = route('admin.super.dashboard');

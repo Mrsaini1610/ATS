@@ -34,6 +34,8 @@ class JobPost extends Model
         'applicants'            => 'integer',
         'skills'                => 'array',
         'perks'                 => 'array',
+        'key_responsibilities'  => 'array', // <--- Yeh add karein
+        'qualifications'        => 'array', // <--- Yeh add karein
         'assets'                => 'array',
         'application_questions' => 'array',
         'approval_logs'         => 'array',
