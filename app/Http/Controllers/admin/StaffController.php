@@ -13,13 +13,10 @@ use Inertia\Response;
 
 class StaffController extends Controller
 {
-    /**
-     * List all Staff Members (Admins & Team Members)
-     */
     public function index(Request $request): Response
     {
         $query = Admin::query()
-            ->where('id', '!=', Auth::guard('admin')->id()) // Exclude logged in Super Admin
+            ->where('id', '!=', Auth::guard('admin')->id())
             ->latest();
 
         if ($request->filled('search')) {
@@ -32,25 +29,21 @@ class StaffController extends Controller
             });
         }
 
-        if ($request->filled('role')) {
-            $query->where('role', $request->input('role'));
-        }
-
         $staff = $query->paginate(10)->withQueryString();
 
-        // Transform pagination items for frontend compatibility
         $staff->getCollection()->transform(function ($member) {
             return [
-                'id'        => $member->id,
-                'uuid'      => (string) $member->id,
-                'name'      => $member->name,
-                'username'  => $member->username,
-                'email'     => $member->email,
-                'phone'     => $member->phone ?? '—',
-                'role'      => $member->role,
-                'roleLabel' => str_replace('_', ' ', ucwords($member->role, '_')),
-                'active'    => (bool) $member->status,
-                'createdAt' => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
+                'id'          => $member->id,
+                'uuid'        => (string) $member->id,
+                'name'        => $member->name,
+                'username'    => $member->username,
+                'email'       => $member->email,
+                'phone'       => $member->phone ?? '—',
+                'role'        => $member->role,
+                'roleLabel'   => str_replace('_', ' ', ucwords($member->role, '_')),
+                'active'      => (bool) $member->status,
+                'permissions' => $member->permissions ?? [],
+                'createdAt'   => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
             ];
         });
 
@@ -60,18 +53,16 @@ class StaffController extends Controller
         ]);
     }
 
-    /**
-     * Store new Staff Member
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:admins,username',
-            'email'    => 'required|email|max:255|unique:admins,email',
-            'phone'    => 'nullable|string|max:20',
-            'password' => 'required|string|min:6',
-            'role'     => ['required', Rule::in(['admin', 'team_member', 'super_admin'])],
+            'name'        => 'required|string|max:255',
+            'username'    => 'required|string|max:255|unique:admins,username',
+            'email'       => 'required|email|max:255|unique:admins,email',
+            'phone'       => 'nullable|string|max:20',
+            'password'    => 'required|string|min:6',
+            'role'        => ['required', Rule::in(['admin', 'team_member', 'super_admin'])],
+            'permissions' => 'nullable|array',
         ]);
 
         Admin::create([
@@ -81,6 +72,7 @@ class StaffController extends Controller
             'phone'                => $validated['phone'] ?? null,
             'password'             => Hash::make($validated['password']),
             'role'                 => $validated['role'],
+            'permissions'          => $validated['permissions'] ?? [],
             'status'               => true,
             'created_by'           => Auth::guard('admin')->id(),
             'must_change_password' => false,
@@ -89,9 +81,36 @@ class StaffController extends Controller
         return redirect()->back()->with('success', 'Staff member successfully created.');
     }
 
-    /**
-     * Toggle Active/Inactive Status
-     */
+    public function update(Request $request, Admin $admin)
+    {
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'username'    => ['required', 'string', 'max:255', Rule::unique('admins', 'username')->ignore($admin->id)],
+            'email'       => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($admin->id)],
+            'phone'       => 'nullable|string|max:20',
+            'password'    => 'nullable|string|min:6',
+            'role'        => ['required', Rule::in(['admin', 'team_member', 'super_admin'])],
+            'permissions' => 'nullable|array',
+        ]);
+
+        $updateData = [
+            'name'        => $validated['name'],
+            'username'    => $validated['username'],
+            'email'       => $validated['email'],
+            'phone'       => $validated['phone'] ?? null,
+            'role'        => $validated['role'],
+            'permissions' => $validated['permissions'] ?? [],
+        ];
+
+        if (!empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
+        }
+
+        $admin->update($updateData);
+
+        return redirect()->back()->with('success', 'Staff member successfully updated.');
+    }
+
     public function toggleStatus(Admin $admin)
     {
         if ($admin->role === 'super_admin') {
@@ -105,9 +124,6 @@ class StaffController extends Controller
         return back()->with('success', 'Staff status updated.');
     }
 
-    /**
-     * Delete Staff Member
-     */
     public function destroy(Admin $admin)
     {
         if ($admin->role === 'super_admin') {

@@ -46,17 +46,7 @@ const PERMISSION_GROUPS = [
   },
 ];
 
-const blankMember = {
-  name: "",
-  username: "",
-  email: "",
-  phone: "",
-  password: "",
-  role: "team_member",
-  permissions: [],
-};
-
-function MemberCard({ member, onToggle, onDelete, canEdit }) {
+function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
   const [showPerms, setShowPerms] = useState(false);
   const ROLE_COLOR = {
     super_admin: "bg-purple-100 text-purple-700",
@@ -113,10 +103,25 @@ function MemberCard({ member, onToggle, onDelete, canEdit }) {
       </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <span className="text-xs text-gray-400">Username: @{member.username}</span>
+        <button
+          type="button"
+          onClick={() => setShowPerms(!showPerms)}
+          className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
+        >
+          <Shield className="w-3 h-3" />
+          {(member.permissions || []).length} permissions
+        </button>
         <div className="flex gap-1.5">
           {canEdit && member.role !== "super_admin" && (
             <>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
+                title="Edit Member"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
               <button
                 type="button"
                 onClick={onToggle}
@@ -140,6 +145,18 @@ function MemberCard({ member, onToggle, onDelete, canEdit }) {
           )}
         </div>
       </div>
+
+      {showPerms && member.permissions && member.permissions.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex flex-wrap gap-1.5">
+            {member.permissions.map((p) => (
+              <span key={p} className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg">
+                {p.replace(/_/g, " ")}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -149,35 +166,73 @@ export default function Team({ members = [] }) {
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modal, setModal] = useState(null); // { mode: "add" | "edit", data: {...} }
 
-  const { data, setData, post, delete: destroy, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, put, processing, reset, errors, clearErrors } = useForm({
     name: "",
     username: "",
     email: "",
     phone: "",
     password: "",
     role: "team_member",
+    permissions: [],
   });
 
   const openAddModal = () => {
     clearErrors();
-    reset();
-    setModalOpen(true);
+    reset({
+      name: "",
+      username: "",
+      email: "",
+      phone: "",
+      password: "",
+      role: "team_member",
+      permissions: [],
+    });
+    setModal({ mode: "add" });
   };
 
-  const closeAddModal = () => {
-    setModalOpen(false);
+  const openEditModal = (member) => {
+    clearErrors();
+    setData({
+      name: member.name || "",
+      username: member.username || "",
+      email: member.email || "",
+      phone: member.phone === "—" ? "" : member.phone || "",
+      password: "",
+      role: member.role || "team_member",
+      permissions: member.permissions || [],
+    });
+    setModal({ mode: "edit", data: member });
+  };
+
+  const closeModal = () => {
+    setModal(null);
     reset();
     clearErrors();
   };
 
+  const togglePerm = (perm) => {
+    const current = data.permissions || [];
+    const updated = current.includes(perm)
+      ? current.filter((p) => p !== perm)
+      : [...current, perm];
+    setData("permissions", updated);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    post(route("admin.super.staff.store"), {
-      preserveScroll: true,
-      onSuccess: () => closeAddModal(),
-    });
+    if (modal.mode === "add") {
+      post(route("admin.super.staff.store"), {
+        preserveScroll: true,
+        onSuccess: () => closeModal(),
+      });
+    } else {
+      put(route("admin.super.staff.update", modal.data.id), {
+        preserveScroll: true,
+        onSuccess: () => closeModal(),
+      });
+    }
   };
 
   const toggleActive = (id) => {
@@ -204,112 +259,147 @@ export default function Team({ members = [] }) {
           </div>
         )}
 
-        {/* Add Member Modal */}
-        {modalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
-              <div className="flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-gray-900">Add New Team Member</h3>
+        {/* Member Modal (Add / Edit) - Exact layout matching image */}
+        {modal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-gray-900">
+                  {modal.mode === "add" ? "Add Team Member" : "Edit Team Member"}
+                </h3>
                 <button
                   type="button"
-                  onClick={closeAddModal}
-                  className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  onClick={closeModal}
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    value={data.name}
-                    onChange={(e) => setData("name", e.target.value)}
-                    placeholder="e.g. Rohit Sharma"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    autoFocus
-                  />
-                  {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-                </div>
-
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Username *</label>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name *</label>
                     <input
                       type="text"
-                      value={data.username}
-                      onChange={(e) => setData("username", e.target.value)}
-                      placeholder="rohit_ats"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      value={data.name}
+                      onChange={(e) => setData("name", e.target.value)}
+                      placeholder="e.g. Rohit Sharma"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      autoFocus
                     />
-                    {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
+                    {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Role *</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      value={data.email}
+                      onChange={(e) => setData("email", e.target.value)}
+                      placeholder="rohit@workindia.in"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
+                    <input
+                      type="text"
+                      value={data.phone}
+                      onChange={(e) => setData("phone", e.target.value)}
+                      placeholder="+91 91234 56789"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Role</label>
                     <select
                       value={data.role}
                       onChange={(e) => setData("role", e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value="team_member">Team Member</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address *</label>
-                  <input
-                    type="email"
-                    value={data.email}
-                    onChange={(e) => setData("email", e.target.value)}
-                    placeholder="rohit@ats.com"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Username *</label>
                     <input
                       type="text"
-                      value={data.phone}
-                      onChange={(e) => setData("phone", e.target.value)}
-                      placeholder="+91 98765..."
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      value={data.username}
+                      onChange={(e) => setData("username", e.target.value)}
+                      placeholder="rohit_ats"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
+                    {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Password *</label>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      Password {modal.mode === "edit" ? "(Leave blank to keep current)" : "*"}
+                    </label>
                     <input
                       type="password"
                       value={data.password}
                       onChange={(e) => setData("password", e.target.value)}
                       placeholder="••••••••"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-3 border-t border-gray-100">
+                {/* Permissions Section */}
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Shield className="w-3.5 h-3.5" /> ASSIGN PERMISSIONS
+                  </p>
+                  <div className="space-y-4">
+                    {PERMISSION_GROUPS.map((group) => (
+                      <div key={group.label}>
+                        <p className="text-xs font-semibold text-gray-700 mb-2">{group.label}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {group.perms.map((perm) => {
+                            const checked = (data.permissions || []).includes(perm);
+                            return (
+                              <button
+                                key={perm}
+                                type="button"
+                                onClick={() => togglePerm(perm)}
+                                className={`text-xs px-3 py-1.5 rounded-xl font-medium border transition-all cursor-pointer ${
+                                  checked
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                                }`}
+                              >
+                                {perm.replace(/_/g, " ")}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-5">
                   <button
                     type="button"
-                    onClick={closeAddModal}
-                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium"
+                    onClick={closeModal}
+                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={processing}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/30"
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-200"
                   >
-                    {processing ? "Saving..." : "Save Member"}
+                    {processing ? "Saving..." : "Save"}
                   </button>
                 </div>
               </form>
@@ -320,8 +410,8 @@ export default function Team({ members = [] }) {
         {/* Top Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Team Structure</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-extrabold text-gray-900">Team</h1>
+            <p className="text-sm text-gray-500">
               {admins.length} admins · {teamMembers.length} team members
             </p>
           </div>
@@ -329,7 +419,7 @@ export default function Team({ members = [] }) {
             <button
               type="button"
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 shadow-md shadow-blue-200 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Member
             </button>
@@ -340,13 +430,14 @@ export default function Team({ members = [] }) {
         {admins.length > 0 && (
           <div className="mb-6">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5 text-blue-600" /> Admins
+              <Users className="w-3.5 h-3.5" /> ADMINS
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
               {admins.map((m) => (
                 <MemberCard
                   key={m.id}
                   member={m}
+                  onEdit={() => openEditModal(m)}
                   onToggle={() => toggleActive(m.id)}
                   onDelete={() => deleteMember(m.id, m.name)}
                   canEdit={isSuperAdmin}
@@ -359,13 +450,14 @@ export default function Team({ members = [] }) {
         {/* Team Members Section */}
         <div>
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <UserCog className="w-3.5 h-3.5 text-emerald-600" /> Team Members
+            <UserCog className="w-3.5 h-3.5" /> TEAM MEMBERS
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
             {teamMembers.map((m) => (
               <MemberCard
                 key={m.id}
                 member={m}
+                onEdit={() => openEditModal(m)}
                 onToggle={() => toggleActive(m.id)}
                 onDelete={() => deleteMember(m.id, m.name)}
                 canEdit={isSuperAdmin}

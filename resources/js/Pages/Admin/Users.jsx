@@ -230,9 +230,9 @@ export default function Users({ users = [] }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Candidates</h1>
+            <h1 className="text-xl font-extrabold text-gray-900">Users</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {users.length} registered candidate profiles
+              {users.length} registered candidates
             </p>
           </div>
 
@@ -242,7 +242,7 @@ export default function Users({ users = [] }) {
               onClick={openAddModal}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" /> Add Candidate
+              <UserPlus className="w-4 h-4" /> Add User
             </button>
           )}
         </div>
@@ -255,7 +255,7 @@ export default function Users({ users = [] }) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search candidate by name, phone, city, or title..."
+              placeholder="Search by name, phone, city..."
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -333,7 +333,7 @@ export default function Users({ users = [] }) {
                       Joined {user.registeredAt}
                     </span>
                     <span className="text-xs font-semibold text-blue-600">
-                      {user.appliedCount} applied
+                      {user.appliedCount ?? 0} applied
                     </span>
                   </div>
                 </div>
@@ -341,7 +341,7 @@ export default function Users({ users = [] }) {
 
               {filtered.length === 0 && (
                 <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
-                  No candidates found in database
+                  No users found
                 </div>
               )}
             </div>
@@ -351,7 +351,7 @@ export default function Users({ users = [] }) {
           {selectedUser && (
             <div className="w-72 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-sm">Candidate Details</h3>
+                <h3 className="font-bold text-gray-900 text-sm">User Details</h3>
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
@@ -370,9 +370,9 @@ export default function Users({ users = [] }) {
                       .join("")
                       .slice(0, 2)}
                   </div>
-                  <p className="font-bold text-gray-900 text-base">{selectedUser.name}</p>
+                  <p className="font-bold text-gray-900">{selectedUser.name}</p>
                   <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize inline-block mt-1 ${
+                    className={`text-xs px-2.5 py-1 rounded-full font-semibold inline-block mt-1 ${
                       selectedUser.status === "active"
                         ? "bg-green-50 text-green-700"
                         : "bg-gray-100 text-gray-500"
@@ -382,18 +382,19 @@ export default function Users({ users = [] }) {
                   </span>
                 </div>
 
-                <div className="space-y-2.5 text-xs">
+                <div className="space-y-2.5">
                   {[
                     { label: "Phone", val: selectedUser.phone },
                     { label: "Email", val: selectedUser.email || "—" },
                     { label: "City", val: selectedUser.city || "—" },
-                    { label: "Profile", val: selectedUser.jobTitle || "—" },
+                    { label: "Job Title", val: selectedUser.jobTitle || "—" },
                     { label: "Experience", val: selectedUser.experience || "—" },
-                    { label: "Joined Date", val: selectedUser.registeredAt },
+                    { label: "Applied Jobs", val: `${selectedUser.appliedCount ?? 0} jobs` },
+                    { label: "Joined", val: selectedUser.registeredAt },
                   ].map((r) => (
-                    <div key={r.label} className="flex justify-between gap-2 border-b border-gray-50 pb-1.5">
-                      <p className="text-gray-400 font-medium shrink-0">{r.label}</p>
-                      <p className="font-semibold text-gray-900 text-right">{r.val}</p>
+                    <div key={r.label} className="flex justify-between gap-2">
+                      <p className="text-xs text-gray-400 font-medium shrink-0">{r.label}</p>
+                      <p className="text-xs font-semibold text-gray-900 text-right">{r.val}</p>
                     </div>
                   ))}
                 </div>
@@ -404,13 +405,13 @@ export default function Users({ users = [] }) {
                   <button
                     type="button"
                     onClick={() => handleToggleStatus(selectedUser.uuid)}
-                    className={`w-full py-2.5 rounded-xl text-xs font-bold cursor-pointer transition ${
+                    className={`w-full py-2.5 rounded-xl text-sm font-bold cursor-pointer transition ${
                       selectedUser.status === "active"
-                        ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                        : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                        ? "bg-red-50 text-red-600 hover:bg-red-100"
+                        : "bg-green-50 text-green-700 hover:bg-green-100"
                     }`}
                   >
-                    {selectedUser.status === "active" ? "Deactivate Candidate" : "Activate Candidate"}
+                    {selectedUser.status === "active" ? "Deactivate User" : "Activate User"}
                   </button>
                 </div>
               )}

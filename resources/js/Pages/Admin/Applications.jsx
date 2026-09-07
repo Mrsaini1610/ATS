@@ -580,7 +580,7 @@ export default function Applications({ applications = [], teamMembers = [] }) {
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-5">
+              <div className="overflow-y-auto flex-1 p-5 space-y-5 pb-10">
                 <div>
                   <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg mb-3 shadow-md shadow-blue-600/30">
                     {(selectedApp.userName || "U").slice(0, 2).toUpperCase()}

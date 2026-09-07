@@ -58,6 +58,12 @@ export default function Dashboard({
   const pendingTasks = stats.pendingTasks ?? 0;
   const hired = stats.hired ?? 0;
 
+  // Dynamic current month and year
+  const currentMonthYear = new Date().toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
   const statusColor = {
     applied: "bg-gray-100 text-gray-700 font-bold",
     reviewed: "bg-blue-50 text-blue-700 font-bold",
@@ -93,7 +99,7 @@ export default function Dashboard({
           </div>
           <div className="text-right hidden sm:block">
             <p className="text-xs font-bold text-gray-500">🇮🇳 ATS Technologies</p>
-            <p className="text-xs font-semibold text-gray-400 mt-0.5">August 2026</p>
+            <p className="text-xs font-semibold text-gray-400 mt-0.5">{currentMonthYear}</p>
           </div>
         </div>
 

@@ -22,16 +22,16 @@ import {
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase, roles: ["super_admin", "admin"] },
+  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase },
   { href: "/admin/applications", label: "Applications", icon: ClipboardList },
-  { href: "/admin/users", label: "Users", icon: Users, roles: ["super_admin", "admin"] },
+  { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/interviews", label: "Interviews", icon: Calendar },
-  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, roles: ["super_admin", "admin", "team_member"] },
+  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList },
   { href: "/admin/team", label: "Staff & Team", icon: UserCog, roles: ["super_admin"] },
   { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, roles: ["super_admin", "admin"] },
-  { href: "/admin/companies", label: "Companies", icon: Building2, roles: ["super_admin", "admin"] },
-  { href: "/admin/categories", label: "Categories", icon: Tags, roles: ["super_admin", "admin"] },
-  { href: "/admin/skills", label: "Skills", icon: Zap, roles: ["super_admin", "admin"] },
+  { href: "/admin/companies", label: "Companies", icon: Building2 },
+  { href: "/admin/categories", label: "Categories", icon: Tags },
+  { href: "/admin/skills", label: "Skills", icon: Zap },
   { href: "/admin/permissions", label: "Permissions", icon: Shield, roles: ["super_admin"] },
 ];
 
