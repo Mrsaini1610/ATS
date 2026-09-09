@@ -107,13 +107,13 @@ class AdminJobController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title'        => 'required|string|max:255',
-            'company'      => 'required|string|max:255',
-            'category'     => 'required|string|max:255',
-            'location'     => 'required|string|max:255',
-            'desc'         => 'required|string',
-            'salaryMin'    => 'required|numeric',
-            'salaryMax'    => 'required|numeric',
+            'title'       => 'required|string|max:255',
+            'company'     => 'required|string|max:255',
+            'category'    => 'required|string|max:255',
+            'location'    => 'required|string|max:255',
+            'desc'        => 'required|string',
+            'salaryMin'   => 'required|numeric',
+            'salaryMax'   => 'required|numeric',
         ]);
 
         JobPost::create([
@@ -124,6 +124,9 @@ class AdminJobController extends Controller
             'min_lpa'              => $validated['salaryMin'],
             'max_lpa'              => $validated['salaryMax'],
             'job_type'             => $request->input('type', 'Full-time'),
+            'salary_type'          => $request->input('salaryType', 'yearly'), // <--- Added
+            'working_days'         => $request->input('workingDays', 'Mon - Sat'), // <--- Added
+            'shift_timing'         => $request->input('shiftTiming', '10:00 AM - 7:00 PM'), // <--- Added
             'experience'           => $request->input('exp', '2-3 Years'),
             'openings'             => $request->input('openings', 1),
             'badge'                => $request->input('isHot') ? 'hot' : 'standard',

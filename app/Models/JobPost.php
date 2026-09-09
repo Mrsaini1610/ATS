@@ -15,7 +15,7 @@ class JobPost extends Model
     protected $fillable = [
         'uuid', 'company_id', 'category_id', 'sub_category_id', 'title',
         'company', 'company_about', 'company_size', 'description', 'location',
-        'latitude', 'longitude', 'job_type', 'badge', 'openings', 'experience',
+        'latitude', 'longitude', 'job_type', 'working_days', 'shift_timing', 'badge', 'openings', 'experience',
         'min_age', 'max_age', 'min_lpa', 'max_lpa', 'salary_type', 'skills', 'perks',
         'key_responsibilities', 'qualifications', 'assets', 'application_questions',
         'last_date', 'company_image', 'contact_person', 'contact_phone',

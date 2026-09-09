@@ -68,6 +68,9 @@ export default function CreateJob({
     location: "",
     workMode: "On-site",
     type: "Full-time",
+    salaryType: "yearly", // Added
+    workingDays: "Mon - Sat", // Added
+    shiftTiming: "10:00 AM - 7:00 PM", // Added
     exp: "2-3 Years",
     salaryMin: "",
     salaryMax: "",
@@ -322,11 +325,50 @@ export default function CreateJob({
           </div>
 
           {/* ── Compensation & Requirements ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs">
+<div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs">
             <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2 text-base">
               <IndianRupee className="w-4 h-4 text-blue-600" /> Compensation & Requirements
             </h2>
             <div className="grid sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Salary Type</label>
+                <select
+                  value={data.salaryType}
+                  onChange={(e) => setData("salaryType", e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="yearly">Yearly (LPA)</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="hourly">Hourly</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Working Days</label>
+                <select
+                  value={data.workingDays}
+                  onChange={(e) => setData("workingDays", e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="Mon - Sat">Mon - Sat</option>
+                  <option value="Mon - Fri">Mon - Fri</option>
+                  <option value="6 Days Working">6 Days Working</option>
+                  <option value="5 Days Working">5 Days Working</option>
+                  <option value="Rotational Shifts">Rotational Shifts</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Shift Timing</label>
+                <input
+                  type="text"
+                  value={data.shiftTiming}
+                  onChange={(e) => setData("shiftTiming", e.target.value)}
+                  placeholder="e.g. 10:00 AM - 7:00 PM"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Min Salary (LPA) *</label>
                 <div className="relative">

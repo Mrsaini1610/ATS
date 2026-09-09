@@ -17,6 +17,9 @@ class CompanyController extends Controller
     public function index(Request $request): Response
     {
         $companies = Company::query()
+            ->withCount(['jobPosts' => function ($query) {
+                $query->whereIn('status', ['active', 'approved']);
+            }])
             ->latest()
             ->get()
             ->map(function ($comp) {
@@ -29,7 +32,7 @@ class CompanyController extends Controller
                     'location'    => $comp->location,
                     'description' => $comp->description,
                     'status'      => $comp->status,
-                    'jobs'        => 0, // Jab job_posts link hogi tab withCount se bind hoga
+                    'jobs'        => $comp->job_posts_count ?? 0, // <--- Yahan 0 ki jagah actual database count aayega
                     'createdAt'   => $comp->created_at ? $comp->created_at->format('d M Y') : null,
                 ];
             });

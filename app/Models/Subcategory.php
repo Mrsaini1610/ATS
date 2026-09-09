@@ -20,9 +20,6 @@ class Subcategory extends Model
         'status',
     ];
 
-    /**
-     * Boot function to automatically generate UUID on creation
-     */
     protected static function booted()
     {
         static::creating(function ($subcategory) {
@@ -37,8 +34,9 @@ class Subcategory extends Model
         return $this->belongsTo(Category::class, 'category_id');
     }
 
+    // YEH RELATION CHECK KAR LEIN (foreign key 'sub_category_id' honi chahiye)
     public function jobPosts()
     {
-        return $this->hasMany(JobPost::class, 'sub_category_id');
+        return $this->hasMany(JobPost::class, 'sub_category_id', 'id');
     }
 }

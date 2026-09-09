@@ -89,7 +89,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
     <>
       <Head title="Task Management - ATS Admin" />
 
-      <div className="p-6">
+      <div className="p-6 pb-25">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}

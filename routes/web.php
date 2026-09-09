@@ -156,12 +156,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/companies/{company}/toggle-status', [CompanyController::class, 'toggleStatus'])->name('companies.toggle-status');
         Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
 
-        // 9. Categories
+        // 9. Categories & Subcategories
         Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
         Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
         Route::post('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        Route::post('/categories/{category}/subcategories', [CategoryController::class, 'storeSubcategory'])->name('categories.subcategories.store');
+        Route::delete('/categories/{category}/subcategories/{subCategory}', [CategoryController::class, 'destroySubcategory'])->name('categories.subcategories.destroy');
 
         // 10. Skills
         Route::get('/skills', [SkillController::class, 'index'])->name('skills.index');
