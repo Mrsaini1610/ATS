@@ -15,7 +15,7 @@ class AdminJobController extends Controller
 {
     public function index()
     {
-        $jobs = JobPost::with(['assignedMember:id,name', 'category:id,name'])
+        $jobs = JobPost::with(['assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
             ->latest()
             ->get()
             ->map(function ($job) {
@@ -27,7 +27,7 @@ class AdminJobController extends Controller
                     'id'                        => $job->id,
                     'uuid'                      => $job->uuid,
                     'title'                     => $job->title,
-                    'company'                   => $job->company ?? 'N/A',
+                    'company'                   => $job->companyRelation?->name ?? $job->company ?? 'N/A',
                     'location'                  => $job->location ?? 'Remote',
                     'salary'                    => $salary,
                     'status'                    => $job->status ?? 'pending',
@@ -42,6 +42,7 @@ class AdminJobController extends Controller
                     'desc'                      => $job->description ?? '',
                     'remark'                    => $job->rejection_reason,
                     'skills'                    => is_array($job->skills) ? $job->skills : [],
+                    'languages'                 => is_array($job->languages) ? $job->languages : [],
                     'responsibilities'          => is_array($job->key_responsibilities) ? $job->key_responsibilities : [],
                     'requirements'              => is_array($job->qualifications) ? $job->qualifications : [],
                     'benefits'                  => is_array($job->perks) ? $job->perks : [],
@@ -50,18 +51,7 @@ class AdminJobController extends Controller
                 ];
             });
 
-        $teamMembers = Admin::select('id', 'name', 'email', 'role')
-            ->get()
-            ->map(function ($tm) {
-                return [
-                    'id'          => $tm->id,
-                    'uuid'        => (string) $tm->id,
-                    'name'        => $tm->name,
-                    'email'       => $tm->email,
-                    'active_task' => str_replace('_', ' ', ucwords($tm->role, '_')),
-                    'active'      => true,
-                ];
-            });
+        $teamMembers = Admin::select('id', 'name', 'email', 'phone', 'role')->get();
 
         return Inertia::render('Admin/Jobs', [
             'jobs'        => $jobs,
@@ -81,17 +71,19 @@ class AdminJobController extends Controller
                 'subcategories' => $c->subcategories->map(fn($s) => ['id' => $s->id, 'name' => $s->name])
             ]);
 
-        $companies = Company::where('status', 1)->select('id', 'name')->get();
-        
+        $companies = Company::where('status', 'active')->select('uuid', 'name', 'location')->get();
+
         $skills = Skill::where('status', 1)->select('id', 'name')->get()->map(fn($s) => [
             'id' => $s->id,
             'name' => $s->name,
             'demand' => 'high'
         ]);
 
-        $teamMembers = Admin::select('id', 'name', 'role')->get()->map(fn($m) => [
+        $teamMembers = Admin::select('id', 'name', 'email', 'phone', 'role')->get()->map(fn($m) => [
             'id' => $m->id,
             'name' => $m->name,
+            'email' => $m->email,
+            'phone' => $m->phone,
             'role' => $m->role,
             'activeTask' => str_replace('_', ' ', ucwords($m->role, '_'))
         ]);
@@ -104,36 +96,53 @@ class AdminJobController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+public function store(Request $request)
     {
         $validated = $request->validate([
-            'title'       => 'required|string|max:255',
-            'company'     => 'required|string|max:255',
-            'category'    => 'required|string|max:255',
-            'location'    => 'required|string|max:255',
-            'desc'        => 'required|string',
-            'salaryMin'   => 'required|numeric',
-            'salaryMax'   => 'required|numeric',
+            'title'        => 'required|string|max:255',
+            'company_uuid' => 'required|exists:companies,uuid',
+            'location'     => 'required|string|max:255',
+            'desc'         => 'required|string',
+            'salaryMin'    => 'required|numeric',
+            'salaryMax'    => 'required|numeric',
         ]);
+
+        $company = Company::where('uuid', $validated['company_uuid'])->first();
 
         JobPost::create([
             'title'                => $validated['title'],
-            'company'              => $validated['company'],
+            'company_uuid'         => $company->uuid,
+            'company_id'           => $company->id ?? null,
+            'company'              => $company->name,
+            'company_about'        => $company->description ?? null,
+            'company_size'         => $company->company_size ?? '1 - 10 employees',
+            'company_address'      => $request->input('companyAddress', $validated['location']),
             'location'             => $validated['location'],
+            'category_id'          => $request->input('categoryId') ?: null,
+            'sub_category_id'      => $request->input('subCategoryId') ?: null,
             'description'          => $validated['desc'],
-            'min_lpa'              => $validated['salaryMin'],
-            'max_lpa'              => $validated['salaryMax'],
-            'job_type'             => $request->input('type', 'Full-time'),
-            'salary_type'          => $request->input('salaryType', 'yearly'), // <--- Added
-            'working_days'         => $request->input('workingDays', 'Mon - Sat'), // <--- Added
-            'shift_timing'         => $request->input('shiftTiming', '10:00 AM - 7:00 PM'), // <--- Added
-            'experience'           => $request->input('exp', '2-3 Years'),
+            'min_salary'           => $validated['salaryMin'], // <-- Updated to min_salary
+            'max_salary'           => $validated['salaryMax'], // <-- Updated to max_salary
+            'job_type'             => $request->input('type', 'Full Time'),
+            'salary_type'          => $request->input('salaryType', 'monthly'),
+            'bonus_offered'        => $request->input('bonusOffered', 'no'),
+            'working_days'         => $request->input('workingDays', 'Mon - Sat'),
+            'shift_timing'         => $request->input('shiftTiming', '9:30 AM - 6:30 PM'),
+            'interview_details'    => $request->input('interviewDetails', ''),
+            'experience'           => $request->input('exp', 'Any'),
+            'min_age'              => $request->input('minAge') ?: null,
+            'max_age'              => $request->input('maxAge') ?: null,
             'openings'             => $request->input('openings', 1),
+            'last_date'            => $request->input('lastDate') ?: null,
             'badge'                => $request->input('isHot') ? 'hot' : 'standard',
             'skills'               => $request->input('skills', []),
-            'key_responsibilities' => array_values(array_filter($request->input('responsibilities', []))),
-            'qualifications'       => array_values(array_filter($request->input('requirements', []))),
-            'perks'                => $request->input('benefits', []),
+            'languages'            => $request->input('languages', []),
+            'qualifications'       => $request->input('qualifications', []),
+            'assets'               => $request->input('assets', []),
+            'contact_person'       => $request->input('contactPersonName'),
+            'contact_phone'        => $request->input('contactPhone'),
+            'contact_email'        => $request->input('contactEmail'),
+            'assigned_to'          => null,
             'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
             'created_by'           => auth('admin')->id(),
         ]);

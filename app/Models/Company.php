@@ -47,19 +47,14 @@ class Company extends Model
         });
     }
 
-    /**
-     * Route model binding ke liye uuid use karein
-     */
     public function getRouteKeyName(): string
     {
         return 'uuid';
     }
 
-    /**
-     * Company has many JobPosts
-     */
+    // Company has many JobPosts via company_uuid
     public function jobPosts()
     {
-        return $this->hasMany(JobPost::class, 'company_id', 'id');
+        return $this->hasMany(JobPost::class, 'company_uuid', 'uuid');
     }
 }

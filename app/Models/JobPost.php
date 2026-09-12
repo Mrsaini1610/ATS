@@ -13,19 +13,57 @@ class JobPost extends Model
     protected $table = 'job_posts';
 
     protected $fillable = [
-        'uuid', 'company_id', 'category_id', 'sub_category_id', 'title',
-        'company', 'company_about', 'company_size', 'description', 'location',
-        'latitude', 'longitude', 'job_type', 'working_days', 'shift_timing', 'badge', 'openings', 'experience',
-        'min_age', 'max_age', 'min_lpa', 'max_lpa', 'salary_type', 'skills', 'perks',
-        'key_responsibilities', 'qualifications', 'assets', 'application_questions',
-        'last_date', 'company_image', 'contact_person', 'contact_phone',
-        'contact_email', 'company_address', 'applicants', 'status', 'created_by',
-        'approved_by', 'approved_at', 'rejection_reason', 'resubmitted_at', 'approval_logs'
+        'uuid',
+        'company_uuid', // <-- Yeh yahan add kiya gaya hai
+        'company_id',
+        'category_id',
+        'sub_category_id',
+        'title',
+        'company',
+        'company_about',
+        'company_size',
+        'description',
+        'location',
+        'latitude',
+        'longitude',
+        'job_type',
+        'working_days',
+        'shift_timing',
+        'badge',
+        'openings',
+        'experience',
+        'min_age',
+        'max_age',
+        'min_salary',
+        'max_salary',
+        'salary_type',
+        'bonus_offered',
+        'skills',
+        'languages',
+        'perks',
+        'key_responsibilities',
+        'qualifications',
+        'assets',
+        'application_questions',
+        'last_date',
+        'company_image',
+        'contact_person',
+        'contact_phone',
+        'contact_email',
+        'company_address',
+        'applicants',
+        'status',
+        'created_by',
+        'approved_by',
+        'approved_at',
+        'rejection_reason',
+        'resubmitted_at',
+        'approval_logs',
+        'interview_details',
+        'assigned_to'
     ];
 
     protected $casts = [
-        'latitude'              => 'decimal:8',
-        'longitude'             => 'decimal:8',
         'min_lpa'               => 'decimal:2',
         'max_lpa'               => 'decimal:2',
         'openings'              => 'integer',
@@ -33,9 +71,10 @@ class JobPost extends Model
         'max_age'               => 'integer',
         'applicants'            => 'integer',
         'skills'                => 'array',
+        'languages'             => 'array',
         'perks'                 => 'array',
-        'key_responsibilities'  => 'array', // <--- Yeh add karein
-        'qualifications'        => 'array', // <--- Yeh add karein
+        'key_responsibilities'  => 'array',
+        'qualifications'        => 'array',
         'assets'                => 'array',
         'application_questions' => 'array',
         'approval_logs'         => 'array',
@@ -60,7 +99,7 @@ class JobPost extends Model
 
     public function companyRelation()
     {
-        return $this->belongsTo(Company::class, 'company_id', 'id');
+        return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
     }
 
     public function category()
@@ -72,9 +111,9 @@ class JobPost extends Model
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
     }
-    // Assigned Member / Approver relationship
+
     public function assignedMember()
     {
-        return $this->belongsTo(Admin::class, 'approved_by', 'id');
+        return $this->belongsTo(Admin::class, 'assigned_to', 'id');
     }
 }

@@ -14,102 +14,110 @@ class CompanyController extends Controller
     /**
      * Companies list fetch karein
      */
-    public function index(Request $request): Response
-    {
-        $companies = Company::query()
-            ->withCount(['jobPosts' => function ($query) {
-                $query->whereIn('status', ['active', 'approved']);
-            }])
-            ->latest()
-            ->get()
-            ->map(function ($comp) {
-                return [
-                    'uuid'        => $comp->uuid,
-                    'name'        => $comp->name,
-                    'slug'        => $comp->slug,
-                    'logo'        => $comp->logo,
-                    'website'     => $comp->website,
-                    'location'    => $comp->location,
-                    'description' => $comp->description,
-                    'status'      => $comp->status,
-                    'jobs'        => $comp->job_posts_count ?? 0, // <--- Yahan 0 ki jagah actual database count aayega
-                    'createdAt'   => $comp->created_at ? $comp->created_at->format('d M Y') : null,
-                ];
-            });
+public function index()
+{
+    $companies = Company::latest()
+        ->get()
+        ->map(function ($comp) {
+            $jobs = \App\Models\JobPost::where('company_uuid', trim($comp->uuid))
+                ->get(['uuid', 'title', 'status']);
 
-        return Inertia::render('Admin/Companies', [
-            'companies' => $companies,
-        ]);
-    }
-
-    /**
-     * New company add karein
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'website'     => 'nullable|string|max:255',
-            'location'    => 'nullable|string|max:255',
-            'logo'        => 'nullable|string|max:50',
-            'description' => 'nullable|string',
-            'status'      => 'nullable|in:active,inactive',
-        ]);
-
-        $slug = Str::slug($validated['name']);
-        $count = Company::where('slug', 'like', "{$slug}%")->count();
-        if ($count > 0) {
-            $slug .= '-' . ($count + 1);
-        }
-
-        Company::create([
-            'uuid'        => (string) Str::uuid(),
-            'name'        => $validated['name'],
-            'slug'        => $slug,
-            'website'     => $validated['website'] ?? null,
-            'location'    => $validated['location'] ?? null,
-            'logo'        => $validated['logo'] ?? strtoupper(substr($validated['name'], 0, 2)),
-            'description' => $validated['description'] ?? null,
-            'status'      => $validated['status'] ?? 'active',
-        ]);
-
-        return redirect()->back()->with('success', 'Company successfully create ho gayi.');
-    }
-
-    /**
-     * Existing company update karein (via UUID)
-     */
-    public function update(Request $request, Company $company)
-    {
-        $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'website'     => 'nullable|string|max:255',
-            'location'    => 'nullable|string|max:255',
-            'logo'        => 'nullable|string|max:50',
-            'description' => 'nullable|string',
-            'status'      => 'nullable|in:active,inactive',
-        ]);
-
-        if ($company->name !== $validated['name']) {
-            $slug = Str::slug($validated['name']);
-            $count = Company::where('slug', 'like', "{$slug}%")->where('id', '!=', $company->id)->count();
-            if ($count > 0) {
-                $slug .= '-' . ($count + 1);
+            if ($jobs->isEmpty()) {
+                $jobs = \App\Models\JobPost::where('company', 'LIKE', '%' . trim($comp->name) . '%')
+                    ->get(['uuid', 'title', 'status']);
             }
-            $company->slug = $slug;
-        }
 
-        $company->update([
-            'name'        => $validated['name'],
-            'website'     => $validated['website'] ?? null,
-            'location'    => $validated['location'] ?? null,
-            'logo'        => $validated['logo'] ?? strtoupper(substr($validated['name'], 0, 2)),
-            'description' => $validated['description'] ?? null,
-            'status'      => $validated['status'] ?? $company->status,
-        ]);
+            return [
+                'uuid'         => $comp->uuid,
+                'name'         => $comp->name,
+                'slug'         => $comp->slug,
+                'logo'         => $comp->logo,
+                'website'      => $comp->website,
+                'location'     => $comp->location,
+                'company_size' => $comp->company_size, // <-- yahan map kiya gaya hai
+                'description'  => $comp->description,
+                'status'       => $comp->status,
+                'jobs_count'   => $jobs->count(),
+                'jobs'         => $jobs->map(fn($job) => [
+                    'uuid'   => $job->uuid,
+                    'title'  => $job->title,
+                    'status' => $job->status,
+                ]),
+            ];
+        });
 
-        return redirect()->back()->with('success', 'Company profile successfully update ho gayi.');
+    return Inertia::render('Admin/Companies', [
+        'companies' => $companies,
+    ]);
+}
+
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'name'         => 'required|string|max:255',
+        'website'      => 'nullable|string|max:255',
+        'location'     => 'nullable|string|max:255',
+        'company_size' => 'nullable|string|max:255', // <-- Validation added
+        'description'  => 'nullable|string',
+        'status'       => 'required|string',
+        'logo'         => 'nullable',
+    ]);
+
+    $logoPath = null;
+    if ($request->hasFile('logo')) {
+        $logoPath = $request->file('logo')->store('company-logos', 'public');
+    } else {
+        $logoPath = $request->input('logo');
     }
+
+    Company::create([
+        'name'         => $validated['name'],
+        'slug'         => \Illuminate\Support\Str::slug($validated['name']),
+        'website'      => $validated['website'] ?? null,
+        'location'     => $validated['location'] ?? null,
+        'company_size' => $validated['company_size'] ?? null, // <-- Saved here
+        'description'  => $validated['description'] ?? null,
+        'status'       => $validated['status'] ?? 'active',
+        'logo'         => $logoPath,
+    ]);
+
+    return redirect()->route('admin.companies.index')->with('success', 'Company successfully created.');
+}
+
+public function update(Request $request, $uuid)
+{
+    $company = Company::where('uuid', $uuid)->firstOrFail();
+
+    $validated = $request->validate([
+        'name'         => 'required|string|max:255',
+        'website'      => 'nullable|string|max:255',
+        'location'     => 'nullable|string|max:255',
+        'company_size' => 'nullable|string|max:255', // <-- Validation added
+        'description'  => 'nullable|string',
+        'status'       => 'required|string',
+        'logo'         => 'nullable',
+    ]);
+
+    $logoPath = $company->logo;
+    if ($request->hasFile('logo')) {
+        $logoPath = $request->file('logo')->store('company-logos', 'public');
+    } elseif ($request->filled('logo')) {
+        $logoPath = $request->input('logo');
+    }
+
+    $company->update([
+        'name'         => $validated['name'],
+        'slug'         => \Illuminate\Support\Str::slug($validated['name']),
+        'website'      => $validated['website'] ?? null,
+        'location'     => $validated['location'] ?? null,
+        'company_size' => $validated['company_size'] ?? null, // <-- Updated here
+        'description'  => $validated['description'] ?? null,
+        'status'       => $validated['status'] ?? 'active',
+        'logo'         => $logoPath,
+    ]);
+
+    return redirect()->route('admin.companies.index')->with('success', 'Company successfully updated.');
+}
 
     /**
      * Active/Inactive status toggle karein (via UUID)
