@@ -109,7 +109,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
     maxAge: "",
     assets: [],
     certifications: [],
-    preferredIndustry: "Any Industry",
+    preferredIndustry: [], // <-- Ab yeh array ban gaya hai multi-select ke liye
     shiftTiming: "9:30 AM - 6:30 PM | Monday to Saturday",
     interviewDetails: "11:00 AM - 4:00 PM | Monday to Saturday",
 
@@ -607,11 +607,23 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
 
             {activeFields.industry && (
               <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100 space-y-3 mt-2">
-                <div className="flex justify-between items-center"><span className="text-xs font-bold text-teal-900 uppercase">Preferred Industry</span><button onClick={() => toggleField("industry")} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-teal-900 uppercase">Preferred Industry (Multi-select)</span>
+                  <button onClick={() => toggleField("industry")} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {INDUSTRIES_LIST.map((ind) => (
-                    <button key={ind} type="button" onClick={() => setData("preferredIndustry", ind)} className={`px-4 py-2 rounded-xl text-xs font-medium border cursor-pointer transition ${data.preferredIndustry === ind ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-white text-gray-700 border-gray-200"}`}>
-                      {ind}
+                    <button
+                      key={ind}
+                      type="button"
+                      onClick={() => toggleSelection("preferredIndustry", ind)}
+                      className={`px-4 py-2 rounded-xl text-xs font-medium border cursor-pointer transition ${
+                        data.preferredIndustry.includes(ind)
+                          ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {ind} {data.preferredIndustry.includes(ind) && "✓"}
                     </button>
                   ))}
                 </div>
