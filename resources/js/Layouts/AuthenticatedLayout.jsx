@@ -21,7 +21,7 @@ import { RiAccountBoxFill } from "react-icons/ri";
 import { MdContactSupport } from "react-icons/md";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { IoCloseSharp } from "react-icons/io5";
-import Sidebar from '@/Pages/Admin/Layouts/Sidebar';
+import Sidebar from '@/Components/Admin/Layout/Sidebar.jsx';
 import {
     DropdownMenu,
     DropdownMenuContent,
