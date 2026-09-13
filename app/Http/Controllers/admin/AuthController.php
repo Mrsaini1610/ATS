@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
-class AuthController extends Controller
+class ADMINAuthController extends Controller
 {
     public function showLogin()
     {
