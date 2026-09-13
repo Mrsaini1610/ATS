@@ -13,3 +13,5 @@ class BulkMessageController extends Controller
 
         // Agar aapke table me 'name' single column hi hai, toh check karein ki table ka naam 'users' hi hai ya kuch aur.
         // Agar table me columns 'name', 'email', 'phone' hain hi nahi, toh pehle migration check karein.
+    }
+}
