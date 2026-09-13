@@ -233,17 +233,19 @@ export default function Dashboard({
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-5 py-3 text-xs font-bold text-gray-600">Candidate</th>
-                    <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Job</th>
-                    <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Status</th>
-                  </tr>
-                </thead>
+                {recentApplications.length > 0 && (
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-600">Candidate</th>
+                      <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Job</th>
+                      <th className="text-left px-3 py-3 text-xs font-bold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                )}
                 <tbody className="divide-y divide-gray-100">
                   {recentApplications.length === 0 ? (
                     <tr>
-                      <td colSpan="3" className="text-center py-6 text-xs font-medium text-gray-400">
+                      <td className="text-center py-8 text-xs font-medium text-gray-400">
                         No recent records available.
                       </td>
                     </tr>

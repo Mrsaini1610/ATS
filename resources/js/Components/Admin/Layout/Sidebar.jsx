@@ -42,6 +42,10 @@ export default function SidebarLayout({ children }) {
   
   const role = admin?.role || "team_member";
 
+  // Safely grab both Inertia and real browser path
+  const browserPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const currentPath = (url && url !== "" ? url : browserPath).split("?")[0].split("#")[0];
+
   // Sidebar Collapse/Expand State
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -83,49 +87,40 @@ export default function SidebarLayout({ children }) {
           )}
         </div>
 
-        {/* User Card - Dynamic Data */}
-        {!isCollapsed && (
-          <div className="p-3 mx-3 my-2 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-extrabold text-sm shrink-0">
-              {admin?.name ? admin.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "TM"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-extrabold text-white truncate">
-                {admin?.name || "Team Member"}
-              </p>
-              <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-md capitalize border ${
-                role === 'super_admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
-                role === 'admin' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-              }`}>
-                {role.replace("_", " ")}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Navigation List */}
-        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
+        {/* Navigation List (Scrollbar hidden) */}
+        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {visibleNav.map((item) => {
             const Icon = item.icon;
-            const isActive = url.startsWith(item.href);
+            
+            // Force active layout for Dashboard if path matches dashboard or admin root
+            let isActive = false;
+            if (item.href === "/admin/dashboard") {
+              isActive =
+                currentPath === "" ||
+                currentPath === "/" ||
+                currentPath === "/admin" ||
+                currentPath === "/admin/" ||
+                currentPath.includes("dashboard");
+            } else {
+              isActive = currentPath.startsWith(item.href);
+            }
 
             return (
               <Link
                 key={item.label}
                 href={item.href}
                 title={isCollapsed ? item.label : ""}
-                className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-sm font-extrabold transition-all cursor-pointer ${
+                className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-2xl text-sm font-extrabold transition-all cursor-pointer ${
                   isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-white/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent"
                 }`}
               >
                 <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
                   <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
                   {!isCollapsed && <span>{item.label}</span>}
                 </div>
-                {!isCollapsed && isActive && <ChevronRight className="w-4 h-4 text-white/70" />}
+                {!isCollapsed && isActive && <ChevronRight className="w-4 h-4 text-white/90" />}
               </Link>
             );
           })}
@@ -162,20 +157,20 @@ export default function SidebarLayout({ children }) {
             <div>
               <h1 className="text-sm font-black text-gray-900 leading-tight">
                 {(() => {
-                  if (url.startsWith("/admin/dashboard") || url === "/admin") return "Dashboard";
-                  if (url.startsWith("/admin/jobs")) return "Job Posts";
-                  if (url.startsWith("/admin/applications")) return "Applications";
-                  if (url.startsWith("/admin/users")) return "Users";
-                  if (url.startsWith("/admin/interviews")) return "Interviews";
-                  if (url.startsWith("/admin/tasks")) return "Tasks";
-                  if (url.startsWith("/admin/team")) return "Staff & Team";
-                  if (url.startsWith("/admin/bulk")) return "Bulk Messages";
-                  if (url.startsWith("/admin/companies")) return "Companies";
-                  if (url.startsWith("/admin/categories")) return "Categories";
-                  if (url.startsWith("/admin/skills")) return "Skills";
-                  if (url.startsWith("/admin/permissions")) return "Permissions";
-                  if (url.startsWith("/admin/profile")) return "My Profile";
-                  if (url.startsWith("/admin/notifications")) return "Notifications";
+                  if (currentPath.includes("dashboard") || currentPath === "/admin" || currentPath === "/admin/" || currentPath === "/") return "Dashboard";
+                  if (currentPath.startsWith("/admin/jobs")) return "Job Posts";
+                  if (currentPath.startsWith("/admin/applications")) return "Applications";
+                  if (currentPath.startsWith("/admin/users")) return "Users";
+                  if (currentPath.startsWith("/admin/interviews")) return "Interviews";
+                  if (currentPath.startsWith("/admin/tasks")) return "Tasks";
+                  if (currentPath.startsWith("/admin/team")) return "Staff & Team";
+                  if (currentPath.startsWith("/admin/bulk")) return "Bulk Messages";
+                  if (currentPath.startsWith("/admin/companies")) return "Companies";
+                  if (currentPath.startsWith("/admin/categories")) return "Categories";
+                  if (currentPath.startsWith("/admin/skills")) return "Skills";
+                  if (currentPath.startsWith("/admin/permissions")) return "Permissions";
+                  if (currentPath.startsWith("/admin/profile")) return "My Profile";
+                  if (currentPath.startsWith("/admin/notifications")) return "Notifications";
                   return "Admin Portal";
                 })()}
               </h1>
@@ -219,15 +214,6 @@ export default function SidebarLayout({ children }) {
                     <p className="text-xs text-gray-500 truncate mt-0.5">
                       {admin?.email || "admin@ats.in"}
                     </p>
-                    <div className="mt-2">
-                      <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded capitalize ${
-                        role === 'super_admin' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                        role === 'admin' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                        'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      }`}>
-                        {role.replace("_", " ")}
-                      </span>
-                    </div>
                   </div>
 
                   <div className="pt-2 space-y-0.5 px-2">

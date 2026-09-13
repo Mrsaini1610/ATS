@@ -474,18 +474,20 @@ export default function Applications({ applications = [], teamMembers = [] }) {
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50/75 border-b border-gray-100">
-                    <tr>
-                      {["Candidate", "Job", "Status", "Applied", "Assigned Staff", ""].map((h) => (
-                        <th
-                          key={h}
-                          className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
+                  {filtered.length > 0 && (
+                    <thead className="bg-gray-50/75 border-b border-gray-100">
+                      <tr>
+                        {["Candidate", "Job", "Status", "Applied", "Assigned Staff", ""].map((h) => (
+                          <th
+                            key={h}
+                            className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                  )}
                   <tbody className="divide-y divide-gray-100">
                     {filtered.map((app) => (
                       <tr

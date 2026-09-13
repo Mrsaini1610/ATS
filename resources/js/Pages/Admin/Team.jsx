@@ -259,7 +259,7 @@ export default function Team({ members = [] }) {
           </div>
         )}
 
-        {/* Member Modal (Add / Edit) - Exact layout matching image */}
+        {/* Member Modal (Add / Edit) */}
         {modal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -427,11 +427,15 @@ export default function Team({ members = [] }) {
         </div>
 
         {/* Admins Section */}
-        {admins.length > 0 && (
-          <div className="mb-6">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5" /> ADMINS
-            </p>
+        <div className="mb-6">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Users className="w-3.5 h-3.5" /> ADMINS
+          </p>
+          {admins.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs font-medium shadow-xs">
+              No admins found.
+            </div>
+          ) : (
             <div className="grid sm:grid-cols-2 gap-3">
               {admins.map((m) => (
                 <MemberCard
@@ -444,26 +448,32 @@ export default function Team({ members = [] }) {
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Team Members Section */}
         <div>
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
             <UserCog className="w-3.5 h-3.5" /> TEAM MEMBERS
           </p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {teamMembers.map((m) => (
-              <MemberCard
-                key={m.id}
-                member={m}
-                onEdit={() => openEditModal(m)}
-                onToggle={() => toggleActive(m.id)}
-                onDelete={() => deleteMember(m.id, m.name)}
-                canEdit={isSuperAdmin}
-              />
-            ))}
-          </div>
+          {teamMembers.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs font-medium shadow-xs">
+              No team members found.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {teamMembers.map((m) => (
+                <MemberCard
+                  key={m.id}
+                  member={m}
+                  onEdit={() => openEditModal(m)}
+                  onToggle={() => toggleActive(m.id)}
+                  onDelete={() => deleteMember(m.id, m.name)}
+                  canEdit={isSuperAdmin}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>

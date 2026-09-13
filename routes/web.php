@@ -14,7 +14,7 @@ use App\Http\Controllers\Auth\CandidateAuthController;
 use App\Http\Controllers\Candidate\ProfileController;
 use App\Http\Controllers\Candidate\LocationController;
 
-use App\Http\Controllers\Admin\ADMINAuthController;
+use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -75,13 +75,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // 1. Guest Routes (Login)
     Route::middleware(['guest:admin', 'no-cache'])->group(function () {
-        Route::get('/login', [ADMINAuthController::class, 'showLogin'])->name('login');
-        Route::post('/login', [ADMINAuthController::class, 'login'])->name('login.submit');
+        Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+        Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
     });
 
     // 2. Authenticated Admin Group
     Route::middleware(['admin.auth'])->group(function () {
-        Route::post('/logout', [ADMINAuthController::class, 'logout'])->name('logout');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
         // Main Dashboard Route (Handles all roles dynamically)
         Route::get('/dashboard', [DashboardController::class, 'superAdminDashboard'])->name('dashboard');
