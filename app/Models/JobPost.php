@@ -97,10 +97,10 @@ class JobPost extends Model
         return 'uuid';
     }
 
-    // public function companyRelation()
-    // {
-    //     return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
-    // }
+    public function companyRelation()
+    {
+        return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
+    }
 
     public function category()
     {
