@@ -83,7 +83,7 @@ class TaskController extends Controller
             'end_date'     => $validated['dueDate'] ?? null,
             'specific_day' => $validated['area'] ?? null,
             'start_from'   => $validated['notes'] ?? null,
-            'task_type'    => $validated['priority'], // Mapping priority directly to task_type
+            'task_type'    => $validated['priority'], 
             'status'       => 'pending',
         ]);
 

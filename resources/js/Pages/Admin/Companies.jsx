@@ -395,7 +395,7 @@ export default function Companies({ companies = [] }) {
         </div>
 
         <div className="flex gap-5 items-start">
-          <div className={`flex-1 ${selectedCompany ? "hidden lg:grid" : "grid"} sm:grid-cols-2 xl:grid-cols-3 gap-4`}>
+          <div className={`flex-1 grid ${selectedCompany ? "grid-cols-1 xl:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
               const isSelected = selectedCompany?.uuid === company.uuid;
@@ -483,17 +483,17 @@ export default function Companies({ companies = [] }) {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-blue-600 flex items-center gap-1">
                       View Jobs <ChevronRight className="w-3.5 h-3.5" />
                     </span>
 
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1.5 items-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(company.uuid)}
                         disabled={!canManage}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                           company.status === "active"
                             ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             : "bg-green-50 text-green-700 hover:bg-green-100"
@@ -536,7 +536,7 @@ export default function Companies({ companies = [] }) {
           </div>
 
           {selectedCompany && (
-            <div className="flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs mb-12">
+            <div className="w-full lg:w-80 xl:w-96 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs shrink-0 mb-12">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
                 <div className="flex items-center gap-3 min-w-0">
                   {selectedCompany.logo && (selectedCompany.logo.startsWith("http") || selectedCompany.logo.includes(".") || selectedCompany.logo.includes("/") || selectedCompany.logo.startsWith("company-logos/")) ? (
