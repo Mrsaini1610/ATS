@@ -43,6 +43,25 @@ class CategoryController extends Controller
             'categories' => $categories,
         ]);
     }
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name'   => 'required|string|max:255|unique:categories,name',
+            'icon'   => 'nullable|string|max:50',
+            'status' => 'nullable|string|in:active,inactive',
+        ]);
+
+        Category::create([
+            'uuid'   => (string) \Illuminate\Support\Str::uuid(),
+            'name'   => $validated['name'],
+            'slug'   => Str::slug($validated['name']),
+            'icon'   => $validated['icon'] ?? '📁',
+            'status' => $validated['status'] ?? 'active',
+        ]);
+
+        return redirect()->back()->with('success', 'Category successfully add ho gayi.');
+    }
+
 public function storeSubcategory(Request $request, Category $category)
     {
         $validated = $request->validate([
