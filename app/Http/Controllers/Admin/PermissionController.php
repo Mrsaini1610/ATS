@@ -20,7 +20,9 @@ class PermissionController extends Controller
                     'id'          => $admin->id,
                     'name'        => $admin->name,
                     'role'        => $admin->role,
-                    'permissions' => $admin->permissions ? json_decode($admin->permissions, true) : [],
+                    'permissions' => is_string($admin->permissions) 
+                        ? json_decode($admin->permissions, true) 
+                        : ($admin->permissions ?? []),
                 ];
             });
 
