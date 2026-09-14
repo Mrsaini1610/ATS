@@ -14,42 +14,57 @@ class CategoryController extends Controller
      *
      * Request Body: { "search": "software", "status": "active" } (optional)
      */
-    public function getCategories(Request $request)
-    {
-        try {
-            $query = Category::query();
+public function getCategories(Request $request)
+{
+    try {
+        $query = Category::with('subcategories'); // Eager load subcategories relation
 
-            // Status filter (Default active agar filter nahi bheja)
-            if ($request->filled('status')) {
-                $query->where('status', $request->status);
-            } else {
-                $query->where('status', 'active');
-            }
+        // Count job posts per category so cat.jobs works on the frontend
+        $query->withCount('jobPosts');
 
-            // Search by Name or Slug
-            if ($request->filled('search')) {
-                $searchTerm = $request->search;
-                $query->where(function ($q) use ($searchTerm) {
-                    $q->where('name', 'LIKE', "%{$searchTerm}%")
-                      ->orWhere('slug', 'LIKE', "%{$searchTerm}%");
-                });
-            }
-
-            $categories = $query->latest()->get();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Categories fetched successfully.',
-                'data' => $categories
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Failed to fetch categories: ' . $e->getMessage()
-            ], 500);
+        // Status filter (Default active if not provided)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        } else {
+            $query->where('status', 'active');
         }
+
+        // Search by Name or Slug
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('slug', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        $categories = $query->latest()->get();
+
+        // Map data to match keys expected by the frontend (e.g., mapping jobPosts_count to jobs)
+        $formattedCategories = $categories->map(function ($cat) {
+            return [
+                'name' => $cat->name,
+                'icon' => $cat->icon ?? '📁', // Fallback icon if null
+                'iconBg' => 'bg-blue-100',      // You can add logic or keep a default style
+                'trend' => '+5%',               // Default or dynamic trend if you have a column
+                'jobs' => $cat->job_posts_count ?? 0,
+                'subcategories' => $cat->subcategories->pluck('name')->toArray() // Extract subcategory names as an array of strings
+            ];
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Categories fetched successfully.',
+            'data' => $formattedCategories
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Failed to fetch categories: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Get single category by UUID
