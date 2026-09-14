@@ -97,10 +97,10 @@ class JobPost extends Model
         return 'uuid';
     }
 
-    public function companyRelation()
-    {
-        return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
-    }
+    // public function companyRelation()
+    // {
+    //     return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
+    // }
 
     public function category()
     {
@@ -115,5 +115,9 @@ class JobPost extends Model
     public function assignedMember()
     {
         return $this->belongsTo(Admin::class, 'assigned_to', 'id');
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class, 'company_uuid', 'uuid');
     }
 }
