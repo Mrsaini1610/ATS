@@ -41,7 +41,7 @@ class TaskController extends Controller
                 'assignedTo'     => $t->member_id,
                 'assignedToName' => $t->member->name ?? 'Staff Member',
                 'assignedBy'     => $t->creator->name ?? 'Admin',
-                'priority'       => $t->task_type === 'one_time' ? 'medium' : 'high',
+                'priority' => in_array($t->task_type, ['high', 'medium', 'low']) ? $t->task_type : 'medium',
                 'status'         => $mappedStatus,
                 'dueDate'        => $t->end_date ? $t->end_date->format('Y-m-d') : null,
                 'area'           => $t->specific_day ?? 'General',
@@ -68,6 +68,7 @@ class TaskController extends Controller
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
             'assignedTo'  => 'required|exists:admins,id',
+            'priority'    => 'required|in:high,medium,low',
             'dueDate'     => 'nullable|date',
             'area'        => 'nullable|string|max:255',
             'notes'       => 'nullable|string',
@@ -82,13 +83,12 @@ class TaskController extends Controller
             'end_date'     => $validated['dueDate'] ?? null,
             'specific_day' => $validated['area'] ?? null,
             'start_from'   => $validated['notes'] ?? null,
-            'task_type'    => 'one_time',
+            'task_type'    => $validated['priority'], // Mapping priority directly to task_type
             'status'       => 'pending',
         ]);
 
         return redirect()->back()->with('success', 'Task successfully assigned to team member.');
     }
-
     public function updateStatus(Request $request, Task $task)
     {
         $validated = $request->validate([

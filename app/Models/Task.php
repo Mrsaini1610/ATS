@@ -17,6 +17,7 @@ class Task extends Model
         'uuid',
         'title',
         'description',
+        'priority', // <--- Yeh line add karein
         'task_type',
         'specific_day',
         'specific_date',
