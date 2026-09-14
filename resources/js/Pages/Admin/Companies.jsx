@@ -395,7 +395,8 @@ export default function Companies({ companies = [] }) {
         </div>
 
         <div className="flex gap-5 items-start">
-          <div className={`flex-1 grid ${selectedCompany ? "grid-cols-1 xl:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
+          {/* Responsive Grid that shrinks gracefully when panel opens */}
+          <div className={`flex-1 grid ${selectedCompany ? "grid-cols-1 md:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
               const isSelected = selectedCompany?.uuid === company.uuid;
@@ -406,7 +407,7 @@ export default function Companies({ companies = [] }) {
                   key={company.uuid}
                   onClick={() => setSelectedCompany(company)}
                   className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
-                    isSelected ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" : "border-gray-100 hover:border-blue-200"
+                    isSelected ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/25" : "border-gray-100 hover:border-blue-200"
                   }`}
                 >
                   <div>
@@ -448,12 +449,12 @@ export default function Companies({ companies = [] }) {
                     <div className="space-y-1.5 text-xs text-gray-500 mb-4">
                       <p className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {company.location || "Location not set"}
+                        <span className="truncate">{company.location || "Location not set"}</span>
                       </p>
                       {company.company_size && (
                         <p className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          {company.company_size}
+                          <span className="truncate">{company.company_size}</span>
                         </p>
                       )}
                       {company.website && (
@@ -472,7 +473,7 @@ export default function Companies({ companies = [] }) {
                       )}
                       <p className="flex items-center gap-1.5">
                         <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {company.jobs_count ?? 0} active jobs
+                        <span>{company.jobs_count ?? 0} active jobs</span>
                       </p>
                     </div>
 
@@ -483,17 +484,18 @@ export default function Companies({ companies = [] }) {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-blue-600 flex items-center gap-1">
-                      View Jobs <ChevronRight className="w-3.5 h-3.5" />
+                  {/* Clean bottom actions layout to avoid overflow */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
+                    <span className="text-xs font-semibold text-blue-600 flex items-center gap-0.5 shrink-0">
+                      View <ChevronRight className="w-3.5 h-3.5" />
                     </span>
 
-                    <div className="flex gap-1.5 items-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(company.uuid)}
                         disabled={!canManage}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                        className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition ${
                           company.status === "active"
                             ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             : "bg-green-50 text-green-700 hover:bg-green-100"
@@ -507,16 +509,16 @@ export default function Companies({ companies = [] }) {
                           <button
                             type="button"
                             onClick={() => openEditModal(company)}
-                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl cursor-pointer transition"
-                            title="Edit Company"
+                            className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
+                            title="Edit"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeleteUuid(company.uuid)}
-                            className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer transition"
-                            title="Delete Company"
+                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
+                            title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -535,6 +537,7 @@ export default function Companies({ companies = [] }) {
             )}
           </div>
 
+          {/* Right side active jobs panel */}
           {selectedCompany && (
             <div className="w-full lg:w-80 xl:w-96 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs shrink-0 mb-12">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
