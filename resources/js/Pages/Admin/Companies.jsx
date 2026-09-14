@@ -395,8 +395,8 @@ export default function Companies({ companies = [] }) {
         </div>
 
         <div className="flex gap-5 items-start">
-          {/* Responsive Grid that shrinks gracefully when panel opens */}
-          <div className={`flex-1 grid ${selectedCompany ? "grid-cols-1 md:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
+          {/* Flexbox layout container to keep exact card dimensions and wrap nicely */}
+          <div className={`flex-1 flex flex-wrap gap-4 ${selectedCompany ? "max-w-[calc(100%-380px)]" : "w-full"}`}>
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
               const isSelected = selectedCompany?.uuid === company.uuid;
@@ -406,7 +406,9 @@ export default function Companies({ companies = [] }) {
                 <div
                   key={company.uuid}
                   onClick={() => setSelectedCompany(company)}
-                  className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[calc(50%-8px)] ${
+                    selectedCompany ? "xl:w-[calc(50%-8px)]" : "xl:w-[calc(33.333%-11px)]"
+                  } ${
                     isSelected ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/25" : "border-gray-100 hover:border-blue-200"
                   }`}
                 >
@@ -484,7 +486,6 @@ export default function Companies({ companies = [] }) {
                     )}
                   </div>
 
-                  {/* Clean bottom actions layout to avoid overflow */}
                   <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
                     <span className="text-xs font-semibold text-blue-600 flex items-center gap-0.5 shrink-0">
                       View <ChevronRight className="w-3.5 h-3.5" />
@@ -531,7 +532,7 @@ export default function Companies({ companies = [] }) {
             })}
 
             {filtered.length === 0 && (
-              <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
+              <div className="w-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
                 No companies found in database
               </div>
             )}
