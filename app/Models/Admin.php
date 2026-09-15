@@ -58,4 +58,31 @@ class Admin extends Authenticatable
             }
         });
     }
+
+    // Role helper methods (Ye missing the, isliye error aaya)
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isTeamMember(): bool
+    {
+        return $this->role === 'team_member';
+    }
+
+    // Relationships
+    public function creator()
+    {
+        return $this->belongsTo(Admin::class, 'created_by');
+    }
+
+    public function createdStaff()
+    {
+        return $this->hasMany(Admin::class, 'created_by');
+    }
 }
