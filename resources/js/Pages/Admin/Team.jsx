@@ -99,7 +99,7 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
         </p>
         <p className="flex items-center gap-1.5">
           <Phone className="w-3.5 h-3.5 text-gray-400" />
-          {member.phone || "No phone listed"}
+          {member.phone ? `+91 ${member.phone}` : "No phone listed"}
         </p>
       </div>
 
@@ -167,7 +167,7 @@ export default function Team({ members = [] }) {
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
-  const [modal, setModal] = useState(null); // { mode: "add" | "edit", data: {...} }
+  const [modal, setModal] = useState(null);
 
   const { data, setData, post, put, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
@@ -177,6 +177,7 @@ export default function Team({ members = [] }) {
     password: "",
     role: "team_member",
     permissions: [],
+    force_action: "", // Restore conflict handle ke liye
   });
 
   const openAddModal = () => {
@@ -189,6 +190,7 @@ export default function Team({ members = [] }) {
       password: "",
       role: "team_member",
       permissions: [],
+      force_action: "",
     });
     setModal({ mode: "add" });
   };
@@ -203,6 +205,7 @@ export default function Team({ members = [] }) {
       password: "",
       role: member.role || "team_member",
       permissions: member.permissions || [],
+      force_action: "",
     });
     setModal({ mode: "edit", data: member });
   };
@@ -221,12 +224,30 @@ export default function Team({ members = [] }) {
     setData("permissions", updated);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (e, forceAction = null) => {
+    if (e) e.preventDefault();
+
+    let submissionData = data;
+    if (forceAction) {
+      submissionData = { ...data, force_action: forceAction };
+    }
+
     if (modal.mode === "add") {
-      post(route("admin.super.staff.store"), {
+      router.post(route("admin.super.staff.store"), submissionData, {
         preserveScroll: true,
-        onSuccess: () => closeModal(),
+        onSuccess: (page) => {
+          // Check agar backend se duplicate soft-deleted confirmation maangi gayi hai
+          if (page.props.flash?.trashed_conflict) {
+            const conflictData = page.props.flash.trashed_conflict;
+            if (confirm(`A deleted member with email "${conflictData.email}" or username already exists. Do you want to restore/activate them instead? (Click OK to Restore, Cancel to Overwrite & Create New)`)) {
+              handleSubmit(null, 'restore');
+            } else {
+              handleSubmit(null, 'force_new');
+            }
+          } else {
+            closeModal();
+          }
+        },
       });
     } else {
       put(route("admin.super.staff.update", modal.data.id), {
@@ -277,14 +298,19 @@ export default function Team({ members = [] }) {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name *</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name * (Alphabets only)</label>
                     <input
                       type="text"
                       value={data.name}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "name", e.target.value, data)}
+                      onChange={(e) => {
+                        // Sirf alphabets aur spaces allow karega
+                        const val = e.target.value.replace(/[^A-Za-z\s]/g, "");
+                        setData("name", val);
+                        clearErrors("name");
+                      }}
                       placeholder="e.g. Rohit Sharma"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                       autoFocus
@@ -297,7 +323,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="email"
                       value={data.email}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "email", e.target.value, data)}
+                      onChange={(e) => setData("email", e.target.value)}
                       placeholder="rohit@workindia.in"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -305,14 +331,24 @@ export default function Team({ members = [] }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
-                    <input
-                      type="text"
-                      value={data.phone}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "phone", e.target.value, data)}
-                      placeholder="+91 91234 56789"
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Phone (10 digits only)</label>
+                    <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                      <span className="bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-500 border-r border-gray-200">+91</span>
+                      <input
+                        type="text"
+                        maxLength="10"
+                        value={data.phone}
+                        onChange={(e) => {
+                          // Sirf 10 digits allow karega, alphabets remove kar dega
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setData("phone", val);
+                          clearErrors("phone");
+                        }}
+                        placeholder="9123456789"
+                        className="w-full px-3 py-2.5 text-sm outline-none"
+                      />
+                    </div>
+                    {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                   </div>
 
                   <div>
@@ -328,12 +364,12 @@ export default function Team({ members = [] }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Username *</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Username * (All characters allowed)</label>
                     <input
                       type="text"
                       value={data.username}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "username", e.target.value, data)}
-                      placeholder="rohit_ats"
+                      onChange={(e) => setData("username", e.target.value)}
+                      placeholder="rohit_ats123"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
@@ -346,7 +382,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="password"
                       value={data.password}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "password", e.target.value, data)}
+                      onChange={(e) => setData("password", e.target.value)}
                       placeholder="••••••••"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
