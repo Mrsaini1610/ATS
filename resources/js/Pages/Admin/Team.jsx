@@ -13,6 +13,7 @@ import {
   Users,
   Trash2,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const PERMISSION_GROUPS = [
   {
@@ -168,7 +169,7 @@ export default function Team({ members = [] }) {
 
   const [modal, setModal] = useState(null); // { mode: "add" | "edit", data: {...} }
 
-  const { data, setData, post, put, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, put, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
     username: "",
     email: "",
@@ -283,7 +284,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="text"
                       value={data.name}
-                      onChange={(e) => setData("name", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "name", e.target.value, data)}
                       placeholder="e.g. Rohit Sharma"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                       autoFocus
@@ -296,7 +297,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="email"
                       value={data.email}
-                      onChange={(e) => setData("email", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "email", e.target.value, data)}
                       placeholder="rohit@workindia.in"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -308,7 +309,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="text"
                       value={data.phone}
-                      onChange={(e) => setData("phone", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "phone", e.target.value, data)}
                       placeholder="+91 91234 56789"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -331,7 +332,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="text"
                       value={data.username}
-                      onChange={(e) => setData("username", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "username", e.target.value, data)}
                       placeholder="rohit_ats"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -345,7 +346,7 @@ export default function Team({ members = [] }) {
                     <input
                       type="password"
                       value={data.password}
-                      onChange={(e) => setData("password", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "password", e.target.value, data)}
                       placeholder="••••••••"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />

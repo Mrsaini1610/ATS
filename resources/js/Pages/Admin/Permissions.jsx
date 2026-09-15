@@ -58,32 +58,9 @@ export default function Permissions({ members: propMembers = [] }) {
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
-  const defaultMembers = [
-    {
-      id: "1",
-      name: "Admin Operations",
-      role: "admin",
-      permissions: [
-        "create_jobs", "approve_jobs", "view_applications", "update_application_status",
-        "create_companies", "edit_companies", "view_users", "call_users",
-        "assign_tasks", "view_tasks", "schedule_interviews", "update_interviews",
-      ],
-    },
-    {
-      id: "2",
-      name: "Team Member 1",
-      role: "team_member",
-      permissions: [
-        "view_applications", "update_application_status",
-        "view_users", "call_users", "view_tasks", "complete_tasks",
-        "schedule_interviews", "update_interviews",
-      ],
-    },
-  ];
-
-  const initialList = propMembers.length > 0 ? propMembers : defaultMembers;
+  const initialList = propMembers;
   const [members, setMembers] = useState(
-    initialList.filter((m) => m.role !== "super_admin")
+    Array.isArray(initialList) ? initialList.filter((m) => m.role !== "super_admin") : []
   );
   const [selectedId, setSelectedId] = useState(members[0]?.id || "");
   const [toast, setToast] = useState(null);
@@ -183,6 +160,13 @@ export default function Permissions({ members: propMembers = [] }) {
               Staff Members
             </p>
             <div className="space-y-2">
+              {members.length === 0 && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 text-center shadow-xs">
+                  <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-gray-700">No staff members found</p>
+                  <p className="text-xs text-gray-400 mt-1">Create an Admin or Team Member first.</p>
+                </div>
+              )}
               {members.map((m) => (
                 <button
                   type="button"

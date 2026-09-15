@@ -19,12 +19,17 @@ import {
 
 const STATUS_CFG = {
   applied: { label: "Applied", color: "bg-gray-100 text-gray-600" },
-  reviewed: { label: "Reviewed", color: "bg-blue-50 text-blue-700" },
+  viewed: { label: "Viewed", color: "bg-blue-50 text-blue-700" },
   shortlisted: { label: "Shortlisted", color: "bg-yellow-50 text-yellow-700" },
+  assigned_to_calling_member: { label: "Assigned", color: "bg-indigo-50 text-indigo-700" },
+  calling_in_progress: { label: "Calling In Progress", color: "bg-purple-50 text-purple-700" },
+  admin_review: { label: "Admin Review", color: "bg-purple-50 text-purple-700" },
   interview_scheduled: { label: "Interview Scheduled", color: "bg-purple-50 text-purple-700" },
+  offer_letter_generated: { label: "Offer Letter Generated", color: "bg-green-50 text-green-700" },
   hired: { label: "Hired ✓", color: "bg-green-50 text-green-700" },
   rejected: { label: "Rejected", color: "bg-red-50 text-red-600" },
-  not_interested: { label: "Not Interested", color: "bg-gray-100 text-gray-500" },
+  not_selected: { label: "Not Selected", color: "bg-red-50 text-red-600" },
+  waiting_list: { label: "Waiting List", color: "bg-orange-50 text-orange-700" },
 };
 
 const ALL_STATUSES = Object.keys(STATUS_CFG);
@@ -40,6 +45,20 @@ function OfferLetterModal({ app, onClose }) {
   const [salary, setSalary] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [sent, setSent] = useState("");
+  const [validationError, setValidationError] = useState("");
+
+  const canSend = () => {
+    if (!salary || Number(salary) <= 0) {
+      setValidationError("Enter a positive offered CTC.");
+      return false;
+    }
+    if (!joiningDate || joiningDate < new Date().toISOString().slice(0, 10)) {
+      setValidationError("Select today or a future joining date.");
+      return false;
+    }
+    setValidationError("");
+    return true;
+  };
 
   const letter = `Dear ${app.userName},
 
@@ -60,6 +79,7 @@ Best regards,
 ATS Recruitment Team`;
 
   const recordAndSendWA = () => {
+    if (!canSend()) return;
     router.post(
       route("admin.applications.save-offer", app.uuid),
       { salary, joining_date: joiningDate },
@@ -73,7 +93,7 @@ ATS Recruitment Team`;
   };
 
   const recordAndSendEmail = () => {
-    if (!app.userEmail) return;
+    if (!app.userEmail || !canSend()) return;
     router.post(
       route("admin.applications.save-offer", app.uuid),
       { salary, joining_date: joiningDate },
@@ -148,6 +168,7 @@ ATS Recruitment Team`;
               Offer details logged. Verify and send via selected channel.
             </div>
           )}
+          {validationError && <p className="text-xs text-red-500">{validationError}</p>}
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -159,7 +180,7 @@ ATS Recruitment Team`;
             <button
               type="button"
               onClick={recordAndSendEmail}
-              disabled={!app.userEmail}
+              disabled={!app.userEmail || !salary || !joiningDate}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer transition shadow-md shadow-blue-600/20"
             >
               <Mail className="w-4 h-4" /> Email

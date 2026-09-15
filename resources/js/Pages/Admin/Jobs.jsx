@@ -22,7 +22,7 @@ const STATUS_CONFIG = {
   active:      { label: "Active",      color: "bg-blue-50 text-blue-700 border-blue-200",       dotColor: "bg-blue-500" },
   rejected:    { label: "Rejected",    color: "bg-red-50 text-red-600 border-red-200",          dotColor: "bg-red-500" },
   hold:        { label: "On Hold",     color: "bg-orange-50 text-orange-600 border-orange-200", dotColor: "bg-orange-400" },
-  deactivated: { label: "Deactivated", color: "bg-gray-100 text-gray-500 border-gray-200",      dotColor: "bg-gray-400" },
+  inactive:    { label: "Inactive",    color: "bg-gray-100 text-gray-500 border-gray-200",      dotColor: "bg-gray-400" },
 };
 
 function StatusBadge({ status }) {

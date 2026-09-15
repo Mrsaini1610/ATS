@@ -13,6 +13,7 @@ import {
   ThumbsUp,
   ThumbsDown,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const STATUS_CFG = {
   scheduled: { label: "Scheduled", color: "bg-blue-50 text-blue-700" },
@@ -33,7 +34,7 @@ export default function Interviews({ interviews = [] }) {
   const [scheduleModal, setScheduleModal] = useState(false);
   const [remarkText, setRemarkText] = useState("");
 
-  const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
     applicationId: "",
     candidateName: "",
     candidatePhone: "",
@@ -145,7 +146,7 @@ export default function Interviews({ interviews = [] }) {
                   <input
                     type="text"
                     value={data.candidateName}
-                    onChange={(e) => setData("candidateName", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "candidateName", e.target.value, data)}
                     placeholder="e.g. Priya Mehta"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     autoFocus
@@ -163,7 +164,7 @@ export default function Interviews({ interviews = [] }) {
                     <input
                       type="text"
                       value={data.candidatePhone}
-                      onChange={(e) => setData("candidatePhone", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "candidatePhone", e.target.value, data)}
                       placeholder="+91 99001 12345"
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -191,7 +192,7 @@ export default function Interviews({ interviews = [] }) {
                     <input
                       type="date"
                       value={data.date}
-                      onChange={(e) => setData("date", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "date", e.target.value, data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     {errors.date && (

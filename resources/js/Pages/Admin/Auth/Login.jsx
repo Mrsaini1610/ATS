@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useForm, Head, Link } from "@inertiajs/react";
 import { Briefcase, Mail, Lock, Eye, EyeOff, AlertCircle, Shield } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 export default function AdminLogin() {
   const [showPass, setShowPass] = useState(false);
 
-  const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+  const { data, setData, post, processing, errors, reset, clearErrors, setError } = useForm({
     login: "",
     password: "",
     remember: false,
@@ -123,7 +124,7 @@ export default function AdminLogin() {
                       type="text"
                       name="login"
                       value={data.login}
-                      onChange={(e) => setData("login", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "login", e.target.value, data)}
                       placeholder="username or email@ats.com"
                       className={`w-full pl-10 pr-4 py-3 bg-gray-800 border text-white rounded-xl text-sm placeholder-gray-600 outline-none transition focus:ring-2 ${
                         errors.login
@@ -151,7 +152,7 @@ export default function AdminLogin() {
                       type={showPass ? "text" : "password"}
                       name="password"
                       value={data.password}
-                      onChange={(e) => setData("password", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "password", e.target.value, data)}
                       placeholder="••••••••"
                       className={`w-full pl-10 pr-12 py-3 bg-gray-800 border text-white rounded-xl text-sm placeholder-gray-600 outline-none transition focus:ring-2 ${
                         errors.password

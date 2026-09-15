@@ -10,6 +10,7 @@ import {
   X,
   UserPlus,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const INDIA_CITIES = [
   "Mumbai",
@@ -35,7 +36,7 @@ export default function Users({ users = [] }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [addModal, setAddModal] = useState(false);
 
-  const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
     phone: "",
     email: "",
@@ -124,7 +125,7 @@ export default function Users({ users = [] }) {
                   <input
                     type="text"
                     value={data.name}
-                    onChange={(e) => setData("name", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "name", e.target.value, data)}
                     placeholder="e.g. Arjun Sharma"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
@@ -139,7 +140,7 @@ export default function Users({ users = [] }) {
                   <input
                     type="text"
                     value={data.phone}
-                    onChange={(e) => setData("phone", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "phone", e.target.value, data)}
                     placeholder="e.g. +91 98765 43210"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -153,7 +154,7 @@ export default function Users({ users = [] }) {
                   <input
                     type="email"
                     value={data.email}
-                    onChange={(e) => setData("email", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "email", e.target.value, data)}
                     placeholder="e.g. arjun@example.com"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />

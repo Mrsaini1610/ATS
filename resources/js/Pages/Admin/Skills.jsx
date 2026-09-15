@@ -10,6 +10,7 @@ import {
   Search,
   Zap,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const CATEGORIES = [
   "IT & Software",
@@ -42,7 +43,7 @@ export default function Skills({ skills = [] }) {
   const [catFilter, setCatFilter] = useState("all");
   const [modal, setModal] = useState(null);
 
-  const { data, setData, post, put, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, put, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
     category: "Telecalling & BPO",
     demand: "medium",
@@ -141,7 +142,7 @@ export default function Skills({ skills = [] }) {
                   <input
                     type="text"
                     value={data.name}
-                    onChange={(e) => setData("name", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "name", e.target.value, data)}
                     placeholder="e.g. Telecalling / React.js"
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     autoFocus
@@ -155,7 +156,7 @@ export default function Skills({ skills = [] }) {
                   </label>
                   <select
                     value={data.category}
-                    onChange={(e) => setData("category", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "category", e.target.value, data)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     {CATEGORIES.map((c) => (

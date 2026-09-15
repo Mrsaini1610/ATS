@@ -13,6 +13,7 @@ import {
   EyeOff,
   UserCog,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const ROLE_LABELS = {
   super_admin: "Super Admin",
@@ -132,7 +133,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     <input
                       type={showOld ? "text" : "password"}
                       value={passwordForm.data.current_password}
-                      onChange={(e) => passwordForm.setData("current_password", e.target.value)}
+                      onChange={(e) => updateAdminField(passwordForm.setData, passwordForm.setError, passwordForm.clearErrors, "current_password", e.target.value, passwordForm.data)}
                       placeholder="••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -157,7 +158,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     <input
                       type={showNew ? "text" : "password"}
                       value={passwordForm.data.new_password}
-                      onChange={(e) => passwordForm.setData("new_password", e.target.value)}
+                      onChange={(e) => updateAdminField(passwordForm.setData, passwordForm.setError, passwordForm.clearErrors, "new_password", e.target.value, passwordForm.data)}
                       placeholder="••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
@@ -174,6 +175,18 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                   )}
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={passwordForm.data.new_password_confirmation}
+                    onChange={(e) => passwordForm.setData("new_password_confirmation", e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  {passwordForm.errors.new_password_confirmation && <p className="text-xs text-red-500 mt-1">{passwordForm.errors.new_password_confirmation}</p>}
+                </div>
+
                 <div className="flex gap-3 mt-5">
                   <button
                     type="button"
@@ -184,7 +197,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                   </button>
                   <button
                     type="submit"
-                    disabled={passwordForm.processing || !passwordForm.data.current_password || !passwordForm.data.new_password}
+                    disabled={passwordForm.processing || !passwordForm.data.current_password || !passwordForm.data.new_password || passwordForm.data.new_password !== passwordForm.data.new_password_confirmation}
                     className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/30"
                   >
                     {passwordForm.processing ? "Updating..." : "Update"}
@@ -210,7 +223,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name</label>
                     <input
                       value={profileForm.data.name}
-                      onChange={(e) => profileForm.setData("name", e.target.value)}
+                      onChange={(e) => updateAdminField(profileForm.setData, profileForm.setError, profileForm.clearErrors, "name", e.target.value, profileForm.data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     {profileForm.errors.name && (
@@ -221,7 +234,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
                     <input
                       value={profileForm.data.phone}
-                      onChange={(e) => profileForm.setData("phone", e.target.value)}
+                      onChange={(e) => updateAdminField(profileForm.setData, profileForm.setError, profileForm.clearErrors, "phone", e.target.value, profileForm.data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>

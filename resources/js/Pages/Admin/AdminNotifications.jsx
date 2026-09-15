@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 
-import { Head, usePage } from "@inertiajs/react";
+import { Head, usePage, router } from "@inertiajs/react";
 import {
   Bell,
   CheckCircle2,
@@ -45,51 +45,28 @@ export default function AdminNotifications({ notifications = [] }) {
   const { auth } = usePage().props;
   const admin = auth?.admin;
 
-  // Default fallback data if backend notifications are not yet populated
-  const defaultNotifs = [
-    {
-      id: "alert-1",
-      type: "alert",
-      title: "System Notice",
-      body: "WorkIndia Admin Panel is ready with role-based access for Super Admin, Admin, and Calling Team.",
-      time: "2026-08-20",
-      read: false,
-    },
-    {
-      id: "job-1",
-      type: "job",
-      title: "New Job Pending Review",
-      body: '"Senior Telecaller" at Apex Corp needs approval',
-      time: "2026-08-25",
-      read: false,
-    },
-    {
-      id: "app-1",
-      type: "application",
-      title: "New Application",
-      body: "Rahul Sharma applied for Customer Support at Tech Solutions",
-      time: "2026-08-28",
-      read: true,
-    },
-  ];
-
-  const [notifs, setNotifs] = useState(
-    notifications.length > 0 ? notifications : defaultNotifs
-  );
+  const [notifs, setNotifs] = useState(notifications);
   const [filter, setFilter] = useState("all");
 
   const markRead = (id) => {
-    setNotifs((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, read: true } : x))
-    );
+    router.post(route("admin.notifications.read", id), {}, {
+      preserveScroll: true,
+      onSuccess: () => setNotifs((prev) => prev.map((x) => (x.id === id ? { ...x, read: true } : x))),
+    });
   };
 
   const markAllRead = () => {
-    setNotifs((prev) => prev.map((x) => ({ ...x, read: true })));
+    router.post(route("admin.notifications.read-all"), {}, {
+      preserveScroll: true,
+      onSuccess: () => setNotifs((prev) => prev.map((x) => ({ ...x, read: true }))),
+    });
   };
 
   const deleteNotif = (id) => {
-    setNotifs((prev) => prev.filter((x) => x.id !== id));
+    router.delete(route("admin.notifications.destroy", id), {
+      preserveScroll: true,
+      onSuccess: () => setNotifs((prev) => prev.filter((x) => x.id !== id)),
+    });
   };
 
   const filtered = notifs.filter((n) => {

@@ -12,6 +12,7 @@ import {
   Tags,
   Search,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const ICONS = [
   "💻", "💰", "📣", "🎨", "👥", "⚙️", "📊", "🏥",
@@ -27,7 +28,7 @@ export default function Categories({ categories = [] }) {
   const [expandedId, setExpandedId] = useState(null);
   const [modal, setModal] = useState(null); // { mode: 'cat' | 'sub', action: 'add' | 'edit', parentUuid?: string, uuid?: string }
 
-  const { data, setData, post, put, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, put, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
     icon: "📁",
     parent_uuid: "",
@@ -194,7 +195,7 @@ export default function Categories({ categories = [] }) {
                   <input
                     type="text"
                     value={data.name}
-                    onChange={(e) => setData("name", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "name", e.target.value, data)}
                     placeholder={
                       modal.mode === "cat"
                         ? "e.g. IT & Software"

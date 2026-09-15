@@ -90,6 +90,7 @@ export default function BulkNotifications({
   const [channel, setChannel] = useState("whatsapp");
   const [templateId, setTemplateId] = useState("job_alert");
   const [message, setMessage] = useState(TEMPLATES[0].body);
+  const [messageError, setMessageError] = useState("");
   const [sendState, setSendState] = useState("idle");
   const [toast, setToast] = useState(null);
 
@@ -114,6 +115,7 @@ export default function BulkNotifications({
   }, [candidateList, selCities, selExp]);
 
   const handleSend = () => {
+    if (message.length > 2000) return showToast("Message cannot exceed 2000 characters");
     if (!message.trim()) return showToast("Please write a message first");
     if (matchedUsers.length === 0)
       return showToast("No users matched the selected filters");
@@ -465,13 +467,18 @@ export default function BulkNotifications({
                 </label>
                 <textarea
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => {
+                    const nextMessage = e.target.value;
+                    setMessage(nextMessage);
+                    setMessageError(nextMessage.length > 2000 ? "Maximum 2000 characters allowed." : "");
+                  }}
                   rows={9}
                   placeholder="Type your broadcast message here…"
                   className="w-full px-3.5 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none font-mono leading-relaxed"
                 />
                 <div className="flex justify-between mt-1">
                   <p className="text-xs text-gray-400">{message.length} characters</p>
+                  {messageError && <p className="text-xs text-red-500 mt-1">{messageError}</p>}
                   {channel === "whatsapp" && message.length > 1024 && (
                     <p className="text-xs text-amber-500">
                       Long message – may be split by WhatsApp API
@@ -512,7 +519,7 @@ export default function BulkNotifications({
                   <button
                     type="button"
                     onClick={previewWA}
-                    disabled={matchedUsers.length === 0 || !message.trim()}
+                    disabled={matchedUsers.length === 0 || !message.trim() || Boolean(messageError)}
                     className="px-5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 font-medium cursor-pointer transition"
                   >
                     Test Preview

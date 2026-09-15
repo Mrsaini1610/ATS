@@ -27,6 +27,8 @@ use App\Http\Controllers\Admin\TaskController;
 use App\Http\Controllers\Admin\BulkMessageController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\AdminPageController;
+use App\Http\Controllers\Admin\AdminNotificationController;
 
 
 // ==========================================
@@ -93,6 +95,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Staff & Role Management (Super Admin Exclusive)
             Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
             Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+            Route::put('/staff/{admin}', [StaffController::class, 'update'])->name('staff.update');
             Route::post('/staff/{admin}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
             Route::delete('/staff/{admin}', [StaffController::class, 'destroy'])->name('staff.destroy');
         });
@@ -107,7 +110,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // 1. Profile & Notifications
         Route::get('/profile', fn () => Inertia::render('Admin/AdminProfile'))->name('profile');
-        Route::get('/notifications', fn () => Inertia::render('Admin/AdminNotifications'))->name('notifications');
+        Route::put('/profile', [AdminPageController::class, 'updateProfile'])->name('profile.update');
+        Route::put('/profile/password', [AdminPageController::class, 'updatePassword'])->name('profile.password');
+        Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('notifications');
+        Route::post('/notifications', [AdminNotificationController::class, 'store'])->name('notifications.store');
+        Route::post('/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::post('/notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('notifications.read');
+        Route::delete('/notifications/{notification}', [AdminNotificationController::class, 'destroy'])->name('notifications.destroy');
 
         // 2. Job Posts & Moderation
         Route::get('/jobs', [AdminJobController::class, 'index'])->name('jobs.index');

@@ -66,12 +66,17 @@ export default function Dashboard({
 
   const statusColor = {
     applied: "bg-gray-100 text-gray-700 font-bold",
-    reviewed: "bg-blue-50 text-blue-700 font-bold",
+    viewed: "bg-blue-50 text-blue-700 font-bold",
     shortlisted: "bg-yellow-50 text-yellow-700 font-bold",
     interview_scheduled: "bg-purple-50 text-purple-700 font-bold",
     hired: "bg-green-50 text-green-800 font-bold",
     rejected: "bg-red-50 text-red-700 font-bold",
-    not_interested: "bg-gray-100 text-gray-600 font-bold",
+    assigned_to_calling_member: "bg-indigo-50 text-indigo-700 font-bold",
+    calling_in_progress: "bg-purple-50 text-purple-700 font-bold",
+    admin_review: "bg-purple-50 text-purple-700 font-bold",
+    offer_letter_generated: "bg-green-50 text-green-700 font-bold",
+    not_selected: "bg-red-50 text-red-700 font-bold",
+    waiting_list: "bg-orange-50 text-orange-700 font-bold",
   };
 
   const taskPriorityColor = {

@@ -10,6 +10,7 @@ import {
   Users,
   ClipboardList,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const PRIORITY_COLOR = {
   high: "bg-red-50 text-red-600 border-red-200",
@@ -33,7 +34,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
     title: "",
     description: "",
     assignedTo: "",
@@ -119,7 +120,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                   <input
                     type="text"
                     value={data.title}
-                    onChange={(e) => setData("title", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "title", e.target.value, data)}
                     placeholder="e.g. Call verified leads queue for Jaipur branch"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
@@ -147,7 +148,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                     </label>
                     <select
                       value={data.assignedTo}
-                      onChange={(e) => setData("assignedTo", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "assignedTo", e.target.value, data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select staff member</option>
@@ -186,7 +187,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                     <input
                       type="date"
                       value={data.dueDate}
-                      onChange={(e) => setData("dueDate", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "dueDate", e.target.value, data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

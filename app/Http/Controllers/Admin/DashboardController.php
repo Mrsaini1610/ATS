@@ -100,7 +100,9 @@ class DashboardController extends Controller
             'totalCompanies'      => 0,
             'totalApps'           => JobApplication::where('assigned_calling_team_member_id', $admin->id)->count(),
             'shortlisted'         => JobApplication::where('assigned_calling_team_member_id', $admin->id)->where('status', 'shortlisted')->count(),
-            'scheduledInterviews' => Interview::count(),
+            'scheduledInterviews' => Interview::whereHas('application', function ($query) use ($admin) {
+                $query->where('assigned_calling_team_member_id', $admin->id);
+            })->where('status', 'scheduled')->count(),
             'pendingTasks'        => Task::where('member_id', $admin->id)->whereIn('status', ['pending', 'running'])->count(),
             'hired'               => JobApplication::where('assigned_calling_team_member_id', $admin->id)->where('status', 'hired')->count(),
         ];
@@ -114,7 +116,7 @@ class DashboardController extends Controller
                 return [
                     'id'       => $app->id,
                     'userName' => $app->candidate_name ?? 'Applicant',
-                    'userCity' => 'India',
+                    'userCity' => $app->candidate->city ?? 'India',
                     'jobTitle' => $app->jobPost->title ?? 'Position',
                     'company'  => $app->jobPost->company ?? 'Client',
                     'status'   => $app->status,

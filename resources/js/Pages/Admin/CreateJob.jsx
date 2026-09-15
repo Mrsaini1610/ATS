@@ -82,6 +82,60 @@ const INDUSTRIES_LIST = [
   "Insurance", "Telecom / ISP", "Credit Card", "Automobile", "Loan"
 ];
 
+const getToday = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
+const validateJob = (data, activeFields) => {
+  const validationErrors = {};
+  const trimmed = (value) => String(value || "").trim();
+  const numberValue = (value) => Number(value);
+  const isValidNumber = (value) => value !== "" && Number.isFinite(numberValue(value));
+
+  if (!trimmed(data.title)) validationErrors.title = "Job title is required.";
+  else if (!/[A-Za-z]/.test(data.title) || !/^[A-Za-z0-9\s&'().,+/-]+$/.test(data.title)) validationErrors.title = "Enter a valid job title.";
+  if (!trimmed(data.categoryId)) validationErrors.categoryId = "Category is required.";
+  if (!trimmed(data.company_uuid)) validationErrors.company_uuid = "Company is required.";
+  if (!trimmed(data.location)) validationErrors.location = "Location is required.";
+  if (!isValidNumber(data.openings) || !Number.isInteger(numberValue(data.openings)) || numberValue(data.openings) < 1) validationErrors.openings = "Enter at least 1 whole opening.";
+  if (!trimmed(data.lastDate)) validationErrors.lastDate = "Last date is required.";
+  else if (new Date(`${data.lastDate}T00:00:00`) < getToday()) validationErrors.lastDate = "Last date cannot be in the past.";
+
+  if (data.exp === "Any") {
+    if (!isValidNumber(data.maxExp) || numberValue(data.maxExp) < 0) validationErrors.maxExp = "Enter a valid maximum experience.";
+  } else if (data.exp === "Experienced Only") {
+    if (!isValidNumber(data.minExp) || numberValue(data.minExp) < 0) validationErrors.minExp = "Enter a valid minimum experience.";
+    if (!isValidNumber(data.maxExp) || numberValue(data.maxExp) < 0) validationErrors.maxExp = "Enter a valid maximum experience.";
+    if (!validationErrors.minExp && !validationErrors.maxExp && numberValue(data.maxExp) < numberValue(data.minExp)) validationErrors.maxExp = "Maximum experience must be at least the minimum.";
+  }
+  if (!isValidNumber(data.salaryMin) || numberValue(data.salaryMin) <= 0) validationErrors.salaryMin = "Enter a positive minimum salary.";
+  if (!isValidNumber(data.salaryMax) || numberValue(data.salaryMax) <= 0) validationErrors.salaryMax = "Enter a positive maximum salary.";
+  if (!validationErrors.salaryMin && !validationErrors.salaryMax && numberValue(data.salaryMax) < numberValue(data.salaryMin)) validationErrors.salaryMax = "Maximum salary must be at least the minimum.";
+  if (!trimmed(data.desc)) validationErrors.desc = "Description is required.";
+  else if (data.desc.length > 350) validationErrors.desc = "Description cannot exceed 350 characters.";
+  if (!data.skills.length) validationErrors.skills = "Select at least one skill.";
+
+  if (activeFields.age) {
+    if (!isValidNumber(data.minAge) || numberValue(data.minAge) < 0) validationErrors.minAge = "Enter a valid minimum age.";
+    if (!isValidNumber(data.maxAge) || numberValue(data.maxAge) < 0) validationErrors.maxAge = "Enter a valid maximum age.";
+    if (!validationErrors.minAge && !validationErrors.maxAge && numberValue(data.maxAge) < numberValue(data.minAge)) validationErrors.maxAge = "Maximum age must be at least the minimum.";
+  }
+  if (activeFields.language && !data.languages.length) validationErrors.languages = "Select at least one language.";
+  if (activeFields.assets && !data.assets.length) validationErrors.assets = "Select at least one asset.";
+  if (activeFields.degree && !data.qualifications.length) validationErrors.qualifications = "Select at least one degree.";
+  if (activeFields.certification && !data.certifications.length) validationErrors.certifications = "Select at least one certification.";
+  if (activeFields.industry && !data.preferredIndustry.length) validationErrors.preferredIndustry = "Select at least one industry.";
+  if (!trimmed(data.shiftTiming)) validationErrors.shiftTiming = "Shift timing is required.";
+  if (!trimmed(data.interviewDetails)) validationErrors.interviewDetails = "Interview details are required.";
+  if (!trimmed(data.contactPersonName)) validationErrors.contactPersonName = "Contact person is required.";
+  if (!/^\d{10}$/.test(trimmed(data.contactPhone))) validationErrors.contactPhone = "Phone must contain exactly 10 digits.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed(data.contactEmail))) validationErrors.contactEmail = "Enter a valid email address.";
+  if (!trimmed(data.companyAddress)) validationErrors.companyAddress = "Company address is required.";
+
+  return validationErrors;
+};
+
 export default function CreateJob({ companies = [], categories = [], teamMembers = [] }) {
   const { auth } = usePage().props;
   const currentUser = auth?.admin;
@@ -121,6 +175,15 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
     fillPositionUrgency: "Immediately (1-2 weeks)",
     hiringFrequency: "Every Month",
     companyAddress: "",
+    activeFields: {
+      skills: false,
+      age: false,
+      language: false,
+      assets: false,
+      degree: false,
+      certification: false,
+      industry: false,
+    },
     is_draft: false,
   });
 
@@ -143,10 +206,15 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
   };
 
   const toggleField = (field) => {
-    setActiveFields((prev) => ({ ...prev, [field]: !prev[field] }));
+    setActiveFields((prev) => {
+      const next = { ...prev, [field]: !prev[field] };
+      setData("activeFields", next);
+      return next;
+    });
   };
 
   const [toast, setToast] = useState(null);
+  const [clientErrors, setClientErrors] = useState({});
   const [certSearch, setCertSearch] = useState("");
   const [skillSearch, setSkillSearch] = useState("");
   const [staffSearch, setStaffSearch] = useState("");
@@ -208,7 +276,20 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
     skill.toLowerCase().includes(skillSearch.toLowerCase())
   );
 
+  const validationErrors = validateJob(data, activeFields);
+  const getFieldError = (field) => clientErrors[field] || errors[field] || validationErrors[field];
+  const fieldClass = (field, className) => `${className} ${getFieldError(field) ? "border-red-500 focus:ring-red-500" : ""}`;
+
   const handleSubmit = (isDraft) => {
+    if (!isDraft) {
+      const nextErrors = validateJob(data, activeFields);
+      setClientErrors(nextErrors);
+      if (Object.keys(nextErrors).length) {
+        showToast("Please check all required fields.");
+        return;
+      }
+    }
+
     data.is_draft = isDraft;
     post(route("admin.jobs.store"), {
       preserveScroll: true,
@@ -259,9 +340,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                       key={t}
                       type="button"
                       onClick={() => setData("type", t)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                        data.type === t ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                      }`}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${data.type === t ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
                     >
                       {t}
                     </button>
@@ -275,9 +355,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   value={data.title}
                   onChange={(e) => setData("title", e.target.value)}
                   placeholder="Enter the Job Title (e.g. Senior Telecaller)"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50"
+                  className={fieldClass("title", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50")}
                 />
-                {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
+                {getFieldError("title") && <p className="text-xs text-red-500 mt-1">{getFieldError("title")}</p>}
               </div>
 
               {/* Dynamic Category & Subcategory Selection */}
@@ -287,13 +367,14 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   <select
                     value={data.categoryId}
                     onChange={(e) => setData(prev => ({ ...prev, categoryId: e.target.value, subCategoryId: "" }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={fieldClass("categoryId", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-indigo-500")}
                   >
                     <option value="">Select Category</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
                     ))}
                   </select>
+                  {getFieldError("categoryId") && <p className="text-xs text-red-500 mt-1">{getFieldError("categoryId")}</p>}
                 </div>
 
                 <div>
@@ -320,8 +401,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     value={data.openings}
                     onChange={(e) => setData("openings", e.target.value)}
                     placeholder="e.g. 2"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50"
+                    className={fieldClass("openings", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50")}
                   />
+                  {getFieldError("openings") && <p className="text-xs text-red-500 mt-1">{getFieldError("openings")}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Last Date to Apply *</label>
@@ -329,8 +411,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     type="date"
                     value={data.lastDate}
                     onChange={(e) => setData("lastDate", e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50"
+                    className={fieldClass("lastDate", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50")}
                   />
+                  {getFieldError("lastDate") && <p className="text-xs text-red-500 mt-1">{getFieldError("lastDate")}</p>}
                 </div>
               </div>
             </div>
@@ -351,9 +434,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                       key={exp}
                       type="button"
                       onClick={() => setData("exp", exp)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                        data.exp === exp ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                      }`}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${data.exp === exp ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
                     >
                       {exp}
                     </button>
@@ -373,7 +455,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Maximum Experience (Years) *</label>
-                      <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50" />
+                      <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                      {getFieldError("maxExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("maxExp")}</p>}
                     </div>
                   </div>
                 </div>
@@ -389,11 +472,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Minimum Experience (Years) *</label>
-                    <input type="number" value={data.minExp} onChange={(e) => setData("minExp", e.target.value)} placeholder="e.g. 1" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50" />
+                    <input type="number" value={data.minExp} onChange={(e) => setData("minExp", e.target.value)} placeholder="e.g. 1" className={fieldClass("minExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                    {getFieldError("minExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("minExp")}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Maximum Experience (Years) *</label>
-                    <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50" />
+                    <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                    {getFieldError("maxExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("maxExp")}</p>}
                   </div>
                 </div>
               )}
@@ -407,9 +492,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                       key={st.value}
                       type="button"
                       onClick={() => setData("salaryType", st.value)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                        data.salaryType === st.value ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                      }`}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${data.salaryType === st.value ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
                     >
                       {st.label}
                     </button>
@@ -420,13 +504,14 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">In-hand salary (Min) *</label>
-                  <input
+                    <input
                     type="number"
                     value={data.salaryMin}
                     onChange={(e) => setData("salaryMin", e.target.value)}
                     placeholder="e.g. 15000"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+                    className={fieldClass("salaryMin", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
                   />
+                  {getFieldError("salaryMin") && <p className="text-xs text-red-500 mt-1">{getFieldError("salaryMin")}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">In-hand salary (Max) *</label>
@@ -435,8 +520,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     value={data.salaryMax}
                     onChange={(e) => setData("salaryMax", e.target.value)}
                     placeholder="e.g. 30000"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+                    className={fieldClass("salaryMax", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
                   />
+                  {getFieldError("salaryMax") && <p className="text-xs text-red-500 mt-1">{getFieldError("salaryMax")}</p>}
                 </div>
               </div>
 
@@ -448,8 +534,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   rows={3}
                   maxLength={350}
                   placeholder="Write clear description about role, duties and expectations..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+                  className={fieldClass("desc", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
                 />
+                {getFieldError("desc") && <p className="text-xs text-red-500 mt-1">{getFieldError("desc")}</p>}
                 <p className="text-right text-xs text-gray-400 mt-1">Remaining characters: {350 - data.desc.length}</p>
               </div>
 
@@ -460,13 +547,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   <button
                     type="button"
                     onClick={() => toggleField("skills")}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all ${
-                      activeFields.skills ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all ${activeFields.skills ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+                      }`}
                   >
                     <Plus className="w-3.5 h-3.5" /> {activeFields.skills ? "Close Skills" : "Add Skills"}
                   </button>
                 </div>
+                {getFieldError("skills") && <p className="text-xs text-red-500 mt-1">{getFieldError("skills")}</p>}
 
                 {data.skills.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3 p-3 bg-blue-50/30 rounded-2xl border border-blue-100/50">
@@ -496,9 +583,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                           key={skill}
                           type="button"
                           onClick={() => toggleSelection("skills", skill)}
-                          className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition flex items-center justify-between ${
-                            data.skills.includes(skill) ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-gray-50 text-gray-700"
-                          }`}
+                          className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition flex items-center justify-between ${data.skills.includes(skill) ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-gray-50 text-gray-700"
+                            }`}
                         >
                           <span>{skill}</span>
                           {data.skills.includes(skill) && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
@@ -530,9 +616,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   key={item.key}
                   type="button"
                   onClick={() => toggleField(item.key)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeFields[item.key] ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${activeFields[item.key] ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                    }`}
                 >
                   {item.label} <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -543,9 +628,11 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
               <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100 space-y-3 mt-2">
                 <div className="flex justify-between items-center"><span className="text-xs font-bold text-teal-900 uppercase">Age Limit</span><button onClick={() => toggleField("age")} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="number" placeholder="Min Age" value={data.minAge} onChange={(e) => setData("minAge", e.target.value)} className="p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500" />
-                  <input type="number" placeholder="Max Age" value={data.maxAge} onChange={(e) => setData("maxAge", e.target.value)} className="p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500" />
+                  <input type="number" placeholder="Min Age" value={data.minAge} onChange={(e) => setData("minAge", e.target.value)} className={fieldClass("minAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
+                  <input type="number" placeholder="Max Age" value={data.maxAge} onChange={(e) => setData("maxAge", e.target.value)} className={fieldClass("maxAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
                 </div>
+                {getFieldError("minAge") && <p className="text-xs text-red-500">{getFieldError("minAge")}</p>}
+                {getFieldError("maxAge") && <p className="text-xs text-red-500">{getFieldError("maxAge")}</p>}
               </div>
             )}
 
@@ -559,6 +646,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </button>
                   ))}
                 </div>
+                {getFieldError("languages") && <p className="text-xs text-red-500">{getFieldError("languages")}</p>}
               </div>
             )}
 
@@ -572,6 +660,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </button>
                   ))}
                 </div>
+                {getFieldError("assets") && <p className="text-xs text-red-500">{getFieldError("assets")}</p>}
               </div>
             )}
 
@@ -585,6 +674,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </button>
                   ))}
                 </div>
+                {getFieldError("qualifications") && <p className="text-xs text-red-500">{getFieldError("qualifications")}</p>}
               </div>
             )}
 
@@ -602,6 +692,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </button>
                   ))}
                 </div>
+                {getFieldError("certifications") && <p className="text-xs text-red-500">{getFieldError("certifications")}</p>}
               </div>
             )}
 
@@ -617,16 +708,16 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                       key={ind}
                       type="button"
                       onClick={() => toggleSelection("preferredIndustry", ind)}
-                      className={`px-4 py-2 rounded-xl text-xs font-medium border cursor-pointer transition ${
-                        data.preferredIndustry.includes(ind)
+                      className={`px-4 py-2 rounded-xl text-xs font-medium border cursor-pointer transition ${data.preferredIndustry.includes(ind)
                           ? "bg-teal-600 text-white border-teal-600 shadow-sm"
                           : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {ind} {data.preferredIndustry.includes(ind) && "✓"}
                     </button>
                   ))}
                 </div>
+                {getFieldError("preferredIndustry") && <p className="text-xs text-red-500">{getFieldError("preferredIndustry")}</p>}
               </div>
             )}
           </div>
@@ -639,11 +730,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Job Timings *</label>
-                <input value={data.shiftTiming} onChange={(e) => setData("shiftTiming", e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50/50" />
+                <input value={data.shiftTiming} onChange={(e) => setData("shiftTiming", e.target.value)} className={fieldClass("shiftTiming", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50/50")} />
+                {getFieldError("shiftTiming") && <p className="text-xs text-red-500 mt-1">{getFieldError("shiftTiming")}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Interview Details *</label>
-                <input value={data.interviewDetails} onChange={(e) => setData("interviewDetails", e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50/50" />
+                <input value={data.interviewDetails} onChange={(e) => setData("interviewDetails", e.target.value)} className={fieldClass("interviewDetails", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50/50")} />
+                {getFieldError("interviewDetails") && <p className="text-xs text-red-500 mt-1">{getFieldError("interviewDetails")}</p>}
               </div>
             </div>
           </div>
@@ -660,7 +753,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                 <select
                   value={data.company_uuid}
                   onChange={(e) => handleCompanyChange(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-orange-500"
+                  className={fieldClass("company_uuid", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-orange-500")}
                 >
                   <option value="">Select Company</option>
                   {companies.map((comp) => (
@@ -669,7 +762,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </option>
                   ))}
                 </select>
-                {errors.company_uuid && <p className="text-xs text-red-500 mt-1">{errors.company_uuid}</p>}
+                {getFieldError("company_uuid") && <p className="text-xs text-red-500 mt-1">{getFieldError("company_uuid")}</p>}
               </div>
 
               <div>
@@ -679,9 +772,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   value={data.location}
                   onChange={(e) => setData("location", e.target.value)}
                   placeholder="e.g. Jaipur, Rajasthan"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-orange-500"
+                  className={fieldClass("location", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 outline-none focus:ring-2 focus:ring-orange-500")}
                 />
-                {errors.location && <p className="text-xs text-red-500 mt-1">{errors.location}</p>}
+                {getFieldError("location") && <p className="text-xs text-red-500 mt-1">{getFieldError("location")}</p>}
               </div>
             </div>
 
@@ -728,6 +821,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </div>
                   </div>
                 )}
+                {getFieldError("contactPersonName") && <p className="text-xs text-red-500 mt-1">{getFieldError("contactPersonName")}</p>}
                 <p className="text-[11px] text-gray-400 mt-1">Format: Name (Role) auto-generated.</p>
               </div>
 
@@ -740,9 +834,10 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     value={data.contactPhone}
                     onChange={(e) => setData("contactPhone", e.target.value)}
                     placeholder="9876543210"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-r-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50"
+                    className={fieldClass("contactPhone", "w-full px-4 py-3 border border-gray-200 rounded-r-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50")}
                   />
                 </div>
+                {getFieldError("contactPhone") && <p className="text-xs text-red-500 mt-1">{getFieldError("contactPhone")}</p>}
                 <p className="text-[11px] text-gray-400 mt-1">Candidates will call you on this number.</p>
               </div>
             </div>
@@ -755,8 +850,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   value={data.contactEmail}
                   onChange={(e) => setData("contactEmail", e.target.value)}
                   placeholder="company@example.com"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50"
+                  className={fieldClass("contactEmail", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50")}
                 />
+                {getFieldError("contactEmail") && <p className="text-xs text-red-500 mt-1">{getFieldError("contactEmail")}</p>}
                 <p className="text-[11px] text-gray-400 mt-1">Candidates will send resumes on this email-id.</p>
               </div>
             </div>
@@ -795,8 +891,9 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                 value={data.companyAddress}
                 onChange={(e) => setData("companyAddress", e.target.value)}
                 placeholder="Enter complete office address..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50"
+                className={fieldClass("companyAddress", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-500 bg-gray-50/50")}
               />
+              {getFieldError("companyAddress") && <p className="text-xs text-red-500 mt-1">{getFieldError("companyAddress")}</p>}
               <p className="text-[11px] text-gray-400 mt-1">(Address ONLY shown to registered candidates) Please fill complete address, mention Landmark near your office</p>
             </div>
           </div>
@@ -814,8 +911,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           <button
             type="button"
             onClick={() => handleSubmit(false)}
-            disabled={processing}
-            className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-indigo-600/30 cursor-pointer transition disabled:opacity-50"
+            disabled={processing || Object.keys(validationErrors).length > 0}
+            className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-indigo-600/30 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {processing ? "Submitting..." : "Submit Job Post"}
           </button>

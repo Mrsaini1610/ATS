@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
+use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserProfileController;
 use App\Http\Controllers\Api\ResumeController;
@@ -41,6 +43,14 @@ Route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
 Route::post('/user/update-location', [CityController::class, 'updateLocation']);
+
+Route::middleware(['admin.auth'])->prefix('admin/notifications')->name('api.admin.notifications.')->group(function () {
+    Route::get('/', [AdminNotificationController::class, 'index'])->name('index');
+    Route::post('/', [AdminNotificationController::class, 'store'])->name('store');
+    Route::post('/read-all', [AdminNotificationController::class, 'markAllRead'])->name('read-all');
+    Route::post('/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('read');
+    Route::delete('/{notification}', [AdminNotificationController::class, 'destroy'])->name('destroy');
+});
     // --------------------------------------
     // Profile Section Group (/profile/...)
     // --------------------------------------

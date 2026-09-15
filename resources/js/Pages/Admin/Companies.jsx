@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Users,
 } from "lucide-react";
+import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const COLORS = [
   "bg-blue-600",
@@ -44,7 +45,7 @@ export default function Companies({ companies = [] }) {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [logoType, setLogoType] = useState("initials");
 
-  const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+  const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
     website: "",
     location: "",
@@ -202,7 +203,7 @@ export default function Companies({ companies = [] }) {
                     <input
                       type="text"
                       value={data.location}
-                      onChange={(e) => setData("location", e.target.value)}
+                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "location", e.target.value, data)}
                       placeholder="e.g. Jaipur, Rajasthan"
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     />
@@ -282,7 +283,7 @@ export default function Companies({ companies = [] }) {
                   <input
                     type="text"
                     value={data.website}
-                    onChange={(e) => setData("website", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "website", e.target.value, data)}
                     placeholder="https://company.com"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -295,7 +296,7 @@ export default function Companies({ companies = [] }) {
                   <textarea
                     rows={3}
                     value={data.description}
-                    onChange={(e) => setData("description", e.target.value)}
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "description", e.target.value, data)}
                     placeholder="Brief description about company and business domain..."
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500"
                   />
