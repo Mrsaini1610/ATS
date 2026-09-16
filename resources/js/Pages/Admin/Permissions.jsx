@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
-import { Head, usePage, router } from "@inertiajs/react";
+import { Head, usePage, router, Link } from "@inertiajs/react";
 import { Shield, CheckCircle2, Save, Users, Lock } from "lucide-react";
 
 const ALL_PERMISSIONS = [
@@ -165,6 +165,12 @@ export default function Permissions({ members: propMembers = [] }) {
                   <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-gray-700">No staff members found</p>
                   <p className="text-xs text-gray-400 mt-1">Create an Admin or Team Member first.</p>
+                  <Link
+                    href="/admin/super/staff"
+                    className="inline-flex mt-3 px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700"
+                  >
+                    Open Team Management
+                  </Link>
                 </div>
               )}
               {members.map((m) => (
