@@ -39,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     $admin = Auth::guard('admin')->user();
                     if ($admin->role === 'super_admin') {
                         return route('admin.super.dashboard');
-                    } elseif ($admin->role === 'team_member') { 
+                    } elseif ($admin->role === 'team_member') {
                         return route('admin.member.dashboard');
                     }
                     return route('admin.dashboard');

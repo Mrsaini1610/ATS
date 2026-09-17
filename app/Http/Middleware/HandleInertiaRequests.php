@@ -23,7 +23,7 @@ class HandleInertiaRequests extends Middleware
         // Check if admin guard is authenticated
         if (Auth::guard('admin')->check()) {
             $adminUser = Auth::guard('admin')->user();
-        } 
+        }
         // Fallback: If session has our custom admin id, fetch directly
         elseif (session()->has('admin_id')) {
             $adminUser = Admin::find(session('admin_id'));

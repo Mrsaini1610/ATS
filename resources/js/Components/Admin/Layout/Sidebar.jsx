@@ -42,7 +42,7 @@ export default function SidebarLayout({ children }) {
   const auth = props?.auth;
   const admin = auth?.admin;
   const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
-  
+
   const role = admin?.role || "team_member";
   const permissions = Array.isArray(admin?.permissions) ? admin.permissions : [];
   const canView = (item) =>
@@ -107,7 +107,7 @@ export default function SidebarLayout({ children }) {
         <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {visibleNav.map((item) => {
             const Icon = item.icon;
-            
+
             // Force active layout for Dashboard if path matches dashboard or admin root
             let isActive = false;
             if (item.href === "/admin/dashboard") {
