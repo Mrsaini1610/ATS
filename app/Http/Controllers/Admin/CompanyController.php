@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,11 +55,11 @@ public function store(Request $request)
 {
     $validated = $request->validate([
         'name'         => 'required|string|max:255',
-        'website'      => 'nullable|url|max:255',
+        'website'      => 'nullable|string|max:255',
         'location'     => 'nullable|string|max:255',
         'company_size' => 'nullable|string|max:255', // <-- Validation added
         'description'  => 'nullable|string',
-        'status'       => ['required', Rule::in(['active', 'inactive'])],
+        'status'       => 'required|string',
         'logo'         => 'nullable',
     ]);
 
@@ -90,12 +89,12 @@ public function update(Request $request, $uuid)
     $company = Company::where('uuid', $uuid)->firstOrFail();
 
     $validated = $request->validate([
-        'name'         => ['required', 'string', 'max:255', Rule::unique('companies', 'name')->ignore($company->id)],
-        'website'      => 'nullable|url|max:255',
+        'name'         => 'required|string|max:255',
+        'website'      => 'nullable|string|max:255',
         'location'     => 'nullable|string|max:255',
         'company_size' => 'nullable|string|max:255', // <-- Validation added
         'description'  => 'nullable|string',
-        'status'       => ['required', Rule::in(['active', 'inactive'])],
+        'status'       => 'required|string',
         'logo'         => 'nullable',
     ]);
 

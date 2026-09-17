@@ -10,7 +10,6 @@ use App\Models\Company;
 use App\Models\Skill;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Validation\Rule;
 
 class AdminJobController extends Controller
 {
@@ -97,90 +96,54 @@ class AdminJobController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+public function store(Request $request)
     {
         $validated = $request->validate([
-            'is_draft'           => ['nullable', 'boolean'],
-            'activeFields'       => ['nullable', 'array'],
-            'activeFields.age'   => ['nullable', 'boolean'],
-            'activeFields.language' => ['nullable', 'boolean'],
-            'activeFields.assets' => ['nullable', 'boolean'],
-            'activeFields.degree' => ['nullable', 'boolean'],
-            'activeFields.certification' => ['nullable', 'boolean'],
-            'activeFields.industry' => ['nullable', 'boolean'],
-            'title'              => ['required_unless:is_draft,true', 'string', 'max:255', 'regex:/[A-Za-z]/', 'regex:/^[A-Za-z0-9\s&\'().,+\/-]+$/'],
-            'company_uuid'       => ['required_unless:is_draft,true', 'nullable', 'exists:companies,uuid'],
-            'location'           => ['required_unless:is_draft,true', 'nullable', 'string', 'max:255'],
-            'categoryId'         => ['required_unless:is_draft,true', 'nullable', 'exists:categories,id'],
-            'subCategoryId'      => ['nullable', 'exists:subcategories,id'],
-            'type'               => ['nullable', 'string', 'max:50'],
-            'openings'           => ['required_unless:is_draft,true', 'nullable', 'integer', 'min:1'],
-            'lastDate'           => ['required_unless:is_draft,true', 'nullable', 'date', 'after_or_equal:today'],
-            'exp'                => ['nullable', Rule::in(['Any', 'Fresher Only', 'Experienced Only'])],
-            'minExp'             => ['nullable', 'numeric', 'min:0'],
-            'maxExp'             => ['nullable', 'numeric', 'min:0', 'gte:minExp'],
-            'salaryMin'          => ['required_unless:is_draft,true', 'nullable', 'numeric', 'gt:0'],
-            'salaryMax'          => ['required_unless:is_draft,true', 'nullable', 'numeric', 'gt:0', 'gte:salaryMin'],
-            'salaryType'         => ['nullable', 'string', 'max:30'],
-            'desc'               => ['required_unless:is_draft,true', 'nullable', 'string', 'max:350'],
-            'skills'             => ['required_unless:is_draft,true', 'array', 'min:1'],
-            'languages'          => ['nullable', 'array', 'required_if:activeFields.language,true', 'min:1'],
-            'qualifications'     => ['nullable', 'array', 'required_if:activeFields.degree,true', 'min:1'],
-            'assets'             => ['nullable', 'array', 'required_if:activeFields.assets,true', 'min:1'],
-            'certifications'     => ['nullable', 'array', 'required_if:activeFields.certification,true', 'min:1'],
-            'preferredIndustry'  => ['nullable', 'array', 'required_if:activeFields.industry,true', 'min:1'],
-            'minAge'             => ['nullable', 'integer', 'min:0', 'required_if:activeFields.age,true'],
-            'maxAge'             => ['nullable', 'integer', 'min:0', 'gte:minAge', 'required_if:activeFields.age,true'],
-            'shiftTiming'        => ['required_unless:is_draft,true', 'nullable', 'string', 'max:255'],
-            'interviewDetails'   => ['required_unless:is_draft,true', 'nullable', 'string', 'max:1000'],
-            'contactPersonName'  => ['required_unless:is_draft,true', 'nullable', 'string', 'max:255'],
-            'contactPhone'       => ['required_unless:is_draft,true', 'nullable', 'regex:/^\d{10}$/'],
-            'contactEmail'       => ['required_unless:is_draft,true', 'nullable', 'email', 'max:255'],
-            'companyAddress'     => ['required_unless:is_draft,true', 'nullable', 'string'],
-            'assignedToId'       => ['nullable', 'exists:admins,id'],
+            'title'        => 'required|string|max:255',
+            'company_uuid' => 'required|exists:companies,uuid',
+            'location'     => 'required|string|max:255',
+            'desc'         => 'required|string',
+            'salaryMin'    => 'required|numeric',
+            'salaryMax'    => 'required|numeric',
         ]);
 
         $company = Company::where('uuid', $validated['company_uuid'])->first();
 
         JobPost::create([
-            'title'                => $validated['title'] ?? null,
-            'company_uuid'         => $company?->uuid,
-            'company_id'           => $company?->id,
-            'company'             => $company?->name,
-            'company_about'       => $company?->description,
-            'company_size'        => $company?->company_size ?? '1 - 10 employees',
-            'company_address'     => $validated['companyAddress'] ?? $validated['location'] ?? null,
-            'location'            => $validated['location'] ?? null,
-            'category_id'         => $validated['categoryId'] ?? null,
-            'sub_category_id'     => $validated['subCategoryId'] ?? null,
-            'description'         => $validated['desc'] ?? null,
-            'min_salary'          => $validated['salaryMin'] ?? null,
-            'max_salary'          => $validated['salaryMax'] ?? null,
-            'job_type'            => $validated['type'] ?? 'Full Time',
-            'salary_type'         => $validated['salaryType'] ?? 'monthly',
+            'title'                => $validated['title'],
+            'company_uuid'         => $company->uuid,
+            'company_id'           => $company->id ?? null,
+            'company'              => $company->name,
+            'company_about'        => $company->description ?? null,
+            'company_size'         => $company->company_size ?? '1 - 10 employees',
+            'company_address'      => $request->input('companyAddress', $validated['location']),
+            'location'             => $validated['location'],
+            'category_id'          => $request->input('categoryId') ?: null,
+            'sub_category_id'      => $request->input('subCategoryId') ?: null,
+            'description'          => $validated['desc'],
+            'min_salary'           => $validated['salaryMin'], // <-- Updated to min_salary
+            'max_salary'           => $validated['salaryMax'], // <-- Updated to max_salary
+            'job_type'             => $request->input('type', 'Full Time'),
+            'salary_type'          => $request->input('salaryType', 'monthly'),
             'bonus_offered'        => $request->input('bonusOffered', 'no'),
             'working_days'         => $request->input('workingDays', 'Mon - Sat'),
-            'shift_timing'         => $validated['shiftTiming'] ?? null,
-            'interview_details'    => $validated['interviewDetails'] ?? null,
-            'experience'           => $validated['exp'] ?? 'Any',
-            'min_experience'       => $validated['minExp'] ?? null,
-            'max_experience'       => $validated['maxExp'] ?? null,
-            'min_age'              => $validated['minAge'] ?? null,
-            'max_age'              => $validated['maxAge'] ?? null,
-            'openings'             => $validated['openings'] ?? 1,
-            'last_date'            => $validated['lastDate'] ?? null,
+            'shift_timing'         => $request->input('shiftTiming', '9:30 AM - 6:30 PM'),
+            'interview_details'    => $request->input('interviewDetails', ''),
+            'experience'           => $request->input('exp', 'Any'),
+            'min_age'              => $request->input('minAge') ?: null,
+            'max_age'              => $request->input('maxAge') ?: null,
+            'openings'             => $request->input('openings', 1),
+            'last_date'            => $request->input('lastDate') ?: null,
             'badge'                => $request->input('isHot') ? 'hot' : 'standard',
-            'skills'               => $validated['skills'] ?? [],
-            'languages'            => $validated['languages'] ?? [],
-            'qualifications'       => $validated['qualifications'] ?? [],
-            'assets'               => $validated['assets'] ?? [],
-            'certifications'       => $validated['certifications'] ?? [],
-            'preferred_industries' => $validated['preferredIndustry'] ?? [],
-            'contact_person'       => $validated['contactPersonName'] ?? null,
-            'contact_phone'        => $validated['contactPhone'] ?? null,
-            'contact_email'        => $validated['contactEmail'] ?? null,
-            'assigned_to'          => $validated['assignedToId'] ?? null,
-            'status'               => $request->boolean('is_draft') ? 'inactive' : 'pending',
+            'skills'               => $request->input('skills', []),
+            'languages'            => $request->input('languages', []),
+            'qualifications'       => $request->input('qualifications', []),
+            'assets'               => $request->input('assets', []),
+            'contact_person'       => $request->input('contactPersonName'),
+            'contact_phone'        => $request->input('contactPhone'),
+            'contact_email'        => $request->input('contactEmail'),
+            'assigned_to'          => null,
+            'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
             'created_by'           => auth('admin')->id(),
         ]);
 
@@ -190,7 +153,7 @@ class AdminJobController extends Controller
     public function updateStatus(Request $request, $uuid)
     {
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['pending', 'approved', 'active', 'rejected', 'hold', 'inactive'])],
+            'status' => 'required|string',
             'remark' => 'nullable|string|max:1000',
         ]);
 
@@ -215,7 +178,7 @@ class AdminJobController extends Controller
     public function assignTeam(Request $request, $uuid)
     {
         $validated = $request->validate([
-            'team_member_uuid' => 'nullable|exists:admins,id',
+            'team_member_uuid' => 'nullable',
         ]);
 
         $job = JobPost::where('uuid', $uuid)->firstOrFail();
@@ -226,7 +189,7 @@ class AdminJobController extends Controller
             $adminId = $admin?->id;
         }
 
-        $job->update(['assigned_to' => $adminId]);
+        $job->update(['approved_by' => $adminId]);
 
         return redirect()->back()->with('success', $adminId ? 'Team member assigned successfully.' : 'Assignment removed.');
     }

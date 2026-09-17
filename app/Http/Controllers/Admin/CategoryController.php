@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -92,7 +91,7 @@ public function storeSubcategory(Request $request, Category $category)
     public function update(Request $request, Category $category)
     {
         $validated = $request->validate([
-            'name'   => ['required', 'string', 'max:255', Rule::unique('categories', 'name')->ignore($category->id)],
+            'name'   => 'required|string|max:255',
             'icon'   => 'nullable|string|max:50',
             'status' => 'nullable|string|in:active,inactive',
         ]);

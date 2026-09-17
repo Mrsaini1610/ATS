@@ -45,10 +45,10 @@ class InterviewController extends Controller
     {
         $validated = $request->validate([
             'candidateName'  => 'required|string|max:255',
-            'candidatePhone' => ['nullable', 'regex:/^\d{10}$/'],
+            'candidatePhone' => 'nullable|string|max:50',
             'jobTitle'       => 'nullable|string|max:255',
             'company'        => 'nullable|string|max:255',
-            'date'           => 'required|date|after_or_equal:today',
+            'date'           => 'required|date',
             'time'           => 'required|string|max:20',
             'mode'           => 'required|in:phone,video,in_person',
             'applicationId'  => 'nullable|string|max:255',

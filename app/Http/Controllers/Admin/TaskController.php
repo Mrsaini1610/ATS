@@ -69,7 +69,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'assignedTo'  => 'required|exists:admins,id',
             'priority'    => 'required|in:high,medium,low',
-            'dueDate'     => 'nullable|date|after_or_equal:today',
+            'dueDate'     => 'nullable|date',
             'area'        => 'nullable|string|max:255',
             'notes'       => 'nullable|string',
         ]);

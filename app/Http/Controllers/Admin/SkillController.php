@@ -31,7 +31,7 @@ class SkillController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255|regex:/.*\S.*/|unique:skills,name',
+            'name'     => 'required|string|max:255|unique:skills,name',
             'category' => 'required|string|max:255',
             'demand'   => 'required|in:high,medium,low',
         ]);
@@ -49,7 +49,7 @@ class SkillController extends Controller
     public function update(Request $request, Skill $skill)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255|regex:/.*\S.*/|unique:skills,name,' . $skill->id,
+            'name'     => 'required|string|max:255|unique:skills,name,' . $skill->id,
             'category' => 'required|string|max:255',
             'demand'   => 'required|in:high,medium,low',
         ]);

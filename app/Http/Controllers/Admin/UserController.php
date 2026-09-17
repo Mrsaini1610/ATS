@@ -48,7 +48,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name'       => 'required|string|max:255',
-            'phone'      => 'required|regex:/^\d{10}$/|unique:users,phone',
+            'phone'      => 'required|string|max:20|unique:users,phone',
             'email'      => 'nullable|email|max:255|unique:users,email',
             'city'       => 'nullable|string|max:255',
             'jobTitle'   => 'nullable|string|max:255',

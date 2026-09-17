@@ -12,17 +12,6 @@ use Inertia\Response;
 
 class JobApplicationController extends Controller
 {
-    private function ensureApplicationAccess(JobApplication $application): void
-    {
-        $admin = auth('admin')->user();
-
-        abort_if(
-            $admin?->role === 'team_member' && $application->assigned_calling_team_member_id !== $admin->id,
-            403,
-            'You can only update applications assigned to you.'
-        );
-    }
-
     public function index(Request $request): Response
     {
         $admin = auth('admin')->user();
@@ -68,10 +57,8 @@ class JobApplicationController extends Controller
 
     public function updateStatus(Request $request, JobApplication $application)
     {
-        $this->ensureApplicationAccess($application);
-
         $validated = $request->validate([
-            'status' => 'required|in:applied,viewed,shortlisted,rejected,waiting_list,hired,not_selected,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated',
+            'status' => 'required|string|max:100',
         ]);
 
         $adminId = auth('admin')->id();
@@ -89,8 +76,6 @@ class JobApplicationController extends Controller
 
     public function assign(Request $request, JobApplication $application)
     {
-        abort_unless(auth('admin')->user()?->role !== 'team_member', 403, 'Team members cannot reassign applications.');
-
         $validated = $request->validate([
             'team_member_id' => 'required|exists:admins,id',
         ]);
@@ -104,10 +89,8 @@ class JobApplicationController extends Controller
 
     public function updateRemark(Request $request, JobApplication $application)
     {
-        $this->ensureApplicationAccess($application);
-
         $validated = $request->validate([
-            'remark' => 'required|string|max:2000',
+            'remark' => 'required|string',
         ]);
 
         $application->admin_notes = $validated['remark'];
@@ -118,11 +101,9 @@ class JobApplicationController extends Controller
 
     public function saveOfferDetails(Request $request, JobApplication $application)
     {
-        abort_unless(auth('admin')->user()?->role !== 'team_member', 403, 'Team members cannot record offer details.');
-
         $validated = $request->validate([
-            'salary'       => 'required|numeric|gt:0',
-            'joining_date' => 'required|date|after_or_equal:today',
+            'salary'       => 'nullable|string|max:255',
+            'joining_date' => 'nullable|date',
         ]);
 
         $application->offer_salary_package = $validated['salary'] ?? null;
