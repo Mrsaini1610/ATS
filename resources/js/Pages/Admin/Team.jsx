@@ -4,7 +4,6 @@ import { Head, usePage, useForm, router } from "@inertiajs/react";
 import {
   Plus,
   Edit3,
-  CheckCircle2,
   X,
   UserCog,
   Phone,
@@ -29,6 +28,7 @@ const PERMISSION_GROUPS = [
     perms: [
       "create_companies", "edit_companies", "delete_companies",
       "create_categories", "edit_categories", "create_skills", "edit_skills",
+      "send_bulk_messages",
     ],
   },
   {
@@ -163,7 +163,7 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
 }
 
 export default function Team({ members = [] }) {
-  const { auth, flash } = usePage().props;
+  const { auth } = usePage().props;
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
@@ -275,12 +275,6 @@ export default function Team({ members = [] }) {
       <Head title="Team & Staff Management - ATS Admin" />
 
       <div className="p-6">
-        {flash?.success && (
-          <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
-          </div>
-        )}
-
         {/* Member Modal (Add / Edit) */}
         {modal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">

@@ -6,7 +6,7 @@ import { Shield, CheckCircle2, Save, Users, Lock } from "lucide-react";
 const ALL_PERMISSIONS = [
   "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
   "view_applications", "update_application_status",
-  "create_companies", "edit_companies", "delete_companies", "create_categories", "edit_categories", "create_skills", "edit_skills",
+  "create_companies", "edit_companies", "delete_companies", "create_categories", "edit_categories", "delete_categories", "create_skills", "edit_skills", "delete_skills",
   "create_admin", "create_team_member", "manage_permissions", "add_users", "view_users", "call_users", "delete_user",
   "assign_tasks", "view_tasks", "complete_tasks", "schedule_interviews", "update_interviews",
 ];
@@ -27,7 +27,7 @@ const PERMISSION_GROUPS = [
     icon: "🏢",
     perms: [
       "create_companies", "edit_companies", "delete_companies",
-      "create_categories", "edit_categories", "create_skills", "edit_skills",
+      "create_categories", "edit_categories", "delete_categories", "create_skills", "edit_skills", "delete_skills",
     ],
   },
   {
@@ -54,7 +54,7 @@ const ROLE_COLOR = {
 };
 
 export default function Permissions({ members: propMembers = [] }) {
-  const { auth, flash } = usePage().props;
+  const { auth } = usePage().props;
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
@@ -63,7 +63,6 @@ export default function Permissions({ members: propMembers = [] }) {
     Array.isArray(initialList) ? initialList.filter((m) => m.role !== "super_admin") : []
   );
   const [selectedId, setSelectedId] = useState(members[0]?.id || "");
-  const [toast, setToast] = useState(null);
 
   if (!isSuperAdmin) {
     return (
@@ -78,11 +77,6 @@ export default function Permissions({ members: propMembers = [] }) {
       </div>
     );
   }
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  };
 
   const selected = members.find((m) => String(m.id) === String(selectedId));
 
@@ -127,8 +121,7 @@ export default function Permissions({ members: propMembers = [] }) {
       { permissions: selected.permissions },
       {
         preserveScroll: true,
-        onSuccess: () => showToast("Permissions saved successfully!"),
-        onError: () => showToast("Failed to update permissions"),
+        preserveState: true,
       }
     );
   };
@@ -138,12 +131,6 @@ export default function Permissions({ members: propMembers = [] }) {
       <Head title="Permission Management - WorkIndia Admin" />
 
       <div className="p-6">
-        {(flash?.success || toast) && (
-          <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash?.success || toast}
-          </div>
-        )}
-
         <div className="mb-6">
           <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
             <Shield className="w-5 h-5 text-blue-600" /> Permission Management

@@ -115,6 +115,8 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
+  const permissions = admin?.permissions || [];
+  const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -249,7 +251,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
               {jobs.length} total · {counts.pending || 0} pending review
             </p>
           </div>
-          {canManage && (
+          {can("create_jobs") && (
             <Link
               href={route("admin.jobs.create")}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
@@ -329,7 +331,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
 
                     {canManage && (
                       <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        {job.status !== "approved" && job.status !== "active" && (
+                        {can("approve_jobs") && job.status !== "approved" && job.status !== "active" && (
                           <button
                             type="button"
                             onClick={() => updateStatus(job.uuid, "approved")}
@@ -339,7 +341,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                             <span className="hidden sm:inline">Approve</span>
                           </button>
                         )}
-                        {job.status !== "rejected" && (
+                        {can("reject_jobs") && job.status !== "rejected" && (
                           <button
                             type="button"
                             onClick={() => {
@@ -525,7 +527,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
 
               {canManage && (
                 <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/50">
-                  {selectedJob.status !== "approved" && selectedJob.status !== "active" && (
+                  {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
                     <button
                       type="button"
                       onClick={() => updateStatus(selectedJob.uuid, "approved")}
@@ -534,7 +536,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                       <CheckCircle2 className="w-4 h-4" /> Approve
                     </button>
                   )}
-                  {selectedJob.status !== "rejected" && (
+                  {can("reject_jobs") && selectedJob.status !== "rejected" && (
                     <button
                       title="Reject"
                       type="button"
@@ -547,7 +549,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                       <XCircle className="w-4 h-4" /> Reject
                     </button>
                   )}
-                  {selectedJob.status !== "hold" && (
+                  {can("hold_jobs") && selectedJob.status !== "hold" && (
                     <button
                       title="Hold"
                       type="button"
@@ -560,7 +562,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                       <Clock className="w-4 h-4" /> Hold
                     </button>
                   )}
-                  {selectedJob.status === "deactivated" ? (
+                  {can("deactivate_jobs") && (selectedJob.status === "deactivated" ? (
                     <button
                       title="Activate"
                       type="button"
@@ -578,7 +580,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                     >
                       <EyeOff className="w-4 h-4" /> Deactivate
                     </button>
-                  )}
+                  ))}
                 </div>
               )}
             </div>

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AdminAuthenticate;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\PreventBackHistory;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -50,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Custom Middleware Aliases
         $middleware->alias([
             'admin.auth' => AdminAuthenticate::class,
+            'permission'  => CheckPermission::class,
             'no-cache'   => PreventBackHistory::class, // <--- 419 error fix karne ke liye add kiya
         ]);
     })

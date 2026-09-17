@@ -75,6 +75,21 @@ class Admin extends Authenticatable
         return $this->role === 'team_member';
     }
 
+    public function permissionList(): array
+    {
+        $permissions = $this->permissions;
+
+        while (is_string($permissions)) {
+            $decoded = json_decode($permissions, true);
+            if (!is_array($decoded)) {
+                return [];
+            }
+            $permissions = $decoded;
+        }
+
+        return is_array($permissions) ? array_values(array_filter($permissions, 'is_string')) : [];
+    }
+
     // Relationships
     public function creator()
     {

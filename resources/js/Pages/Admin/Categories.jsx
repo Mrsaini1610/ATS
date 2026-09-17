@@ -23,6 +23,8 @@ export default function Categories({ categories = [] }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
+  const permissions = admin?.permissions || [];
+  const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
 
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
@@ -255,7 +257,7 @@ export default function Categories({ categories = [] }) {
             </p>
           </div>
 
-          {canManage && (
+          {can("create_categories") && (
             <button
               type="button"
               onClick={openAddCategoryModal}
@@ -325,25 +327,25 @@ export default function Categories({ categories = [] }) {
                       {isActive ? "Active" : "Inactive"}
                     </span>
 
-                    {canManage && (
+                    {(can("create_categories") || can("edit_categories") || can("delete_categories")) && (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button
+                        {can("create_categories") && <button
                           type="button"
                           onClick={() => openAddSubcategoryModal(cat.uuid)}
                           className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg cursor-pointer transition"
                           title="Add subcategory"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                        </button>
-                        <button
+                        </button>}
+                        {can("edit_categories") && <button
                           type="button"
                           onClick={() => openEditCategoryModal(cat)}
                           className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
                           title="Edit category"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
+                        </button>}
+                        {can("edit_categories") && <button
                           type="button"
                           onClick={() => handleToggleStatus(cat.uuid)}
                           className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer transition ${
@@ -353,15 +355,15 @@ export default function Categories({ categories = [] }) {
                           }`}
                         >
                           {isActive ? "Turn Off" : "Turn On"}
-                        </button>
-                        <button
+                        </button>}
+                        {can("delete_categories") && <button
                           type="button"
                           onClick={() => handleDeleteCategory(cat.uuid)}
                           className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
                           title="Delete category"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </button>}
                       </div>
                     )}
                   </div>
@@ -382,7 +384,7 @@ export default function Categories({ categories = [] }) {
                             <p className="text-xs text-gray-400">
                               {sub.job_count ?? 0} jobs
                             </p>
-                            {canManage && (
+                            {can("delete_categories") && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteSubcategory(cat.uuid, sub.uuid)}

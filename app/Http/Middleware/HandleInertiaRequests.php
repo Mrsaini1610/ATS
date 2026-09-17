@@ -41,13 +41,14 @@ class HandleInertiaRequests extends Middleware
                     'name'          => $adminUser->name,
                     'email'         => $adminUser->email,
                     'role'          => $adminUser->role, // super_admin, admin, team_member
+                    'permissions'   => $adminUser->permissionList(),
                     'profile_image' => $adminUser->profile_image,
                 ] : null,
             ],
             'csrf_token' => csrf_token(),
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
+                'success' => fn () => $request->session()->pull('success'),
+                'error'   => fn () => $request->session()->pull('error'),
             ],
         ]);
     }

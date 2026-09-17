@@ -15,14 +15,12 @@ class PermissionController extends Controller
         $members = Admin::where('role', '!=', 'super_admin')
             ->latest()
             ->get()
-            ->map(function ($admin) {
+            ->map(function (Admin $admin) {
                 return [
                     'id'          => $admin->id,
                     'name'        => $admin->name,
                     'role'        => $admin->role,
-                    'permissions' => is_string($admin->permissions) 
-                        ? json_decode($admin->permissions, true) 
-                        : ($admin->permissions ?? []),
+                    'permissions' => $admin->permissionList(),
                 ];
             });
 
@@ -39,7 +37,7 @@ class PermissionController extends Controller
         ]);
 
         $admin->update([
-            'permissions' => json_encode($validated['permissions']),
+            'permissions' => array_values($validated['permissions']),
         ]);
 
         return redirect()->back()->with('success', 'Permissions updated successfully.');

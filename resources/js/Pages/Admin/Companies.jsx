@@ -38,6 +38,8 @@ export default function Companies({ companies = [] }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
+  const permissions = admin?.permissions || [];
+  const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
 
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
@@ -373,7 +375,7 @@ export default function Companies({ companies = [] }) {
             </p>
           </div>
 
-          {canManage && (
+          {can("create_companies") && (
             <button
               type="button"
               onClick={openAddModal}
@@ -493,39 +495,33 @@ export default function Companies({ companies = [] }) {
                     </span>
 
                     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
+                      {can("edit_companies") && <button
                         type="button"
                         onClick={() => handleToggleStatus(company.uuid)}
-                        disabled={!canManage}
                         className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition ${
                           company.status === "active"
                             ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             : "bg-green-50 text-green-700 hover:bg-green-100"
-                        } ${!canManage ? "cursor-default" : "cursor-pointer"}`}
+                        } cursor-pointer`}
                       >
                         {company.status === "active" ? "Deactivate" : "Activate"}
-                      </button>
-
-                      {canManage && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(company)}
-                            className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
-                            title="Edit"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteUuid(company.uuid)}
-                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
+                      </button>}
+                      {can("edit_companies") && <button
+                        type="button"
+                        onClick={() => openEditModal(company)}
+                        className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
+                        title="Edit"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>}
+                      {can("delete_companies") && <button
+                        type="button"
+                        onClick={() => setDeleteUuid(company.uuid)}
+                        className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>}
                     </div>
                   </div>
                 </div>

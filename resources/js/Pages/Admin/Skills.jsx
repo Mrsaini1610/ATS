@@ -38,6 +38,8 @@ export default function Skills({ skills = [] }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
+  const permissions = admin?.permissions || [];
+  const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
 
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -219,7 +221,7 @@ export default function Skills({ skills = [] }) {
             </p>
           </div>
 
-          {canManage && (
+          {can("create_skills") && (
             <button
               type="button"
               onClick={openAddModal}
@@ -299,24 +301,24 @@ export default function Skills({ skills = [] }) {
                   {skill.active ? "Active" : "Inactive"}
                 </button>
 
-                {canManage && (
+                {(can("edit_skills") || can("delete_skills")) && (
                   <div className="flex gap-1">
-                    <button
+                    {can("edit_skills") && <button
                       type="button"
                       onClick={() => openEditModal(skill)}
                       className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
                       title="Edit Skill"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
+                    </button>}
+                    {can("delete_skills") && <button
                       type="button"
                       onClick={() => deleteSkill(skill.id, skill.name)}
                       className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
                       title="Delete Skill"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>

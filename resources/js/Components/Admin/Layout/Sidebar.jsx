@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, usePage } from "@inertiajs/react";
+import { useAlerts } from "@/Components/Alerts";
+import { Toaster } from "react-hot-toast";
 import {
   LayoutDashboard,
   Briefcase,
@@ -22,16 +24,16 @@ import {
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase },
-  { href: "/admin/applications", label: "Applications", icon: ClipboardList },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/interviews", label: "Interviews", icon: Calendar },
-  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList },
-  { href: "/admin/team", label: "Staff & Team", icon: UserCog, roles: ["super_admin"] },
-  { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, roles: ["super_admin", "admin"] },
-  { href: "/admin/companies", label: "Companies", icon: Building2 },
-  { href: "/admin/categories", label: "Categories", icon: Tags },
-  { href: "/admin/skills", label: "Skills", icon: Zap },
+  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase, permissions: ["create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
+  { href: "/admin/applications", label: "Applications", icon: ClipboardList, permissions: ["view_applications", "update_application_status"] },
+  { href: "/admin/users", label: "Users", icon: Users, permissions: ["add_users", "view_users", "call_users", "delete_user"] },
+  { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["schedule_interviews", "update_interviews"] },
+  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, permissions: ["assign_tasks", "view_tasks", "complete_tasks"] },
+  { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["create_team_member", "manage_permissions"] },
+  { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, permissions: ["send_bulk_messages"] },
+  { href: "/admin/companies", label: "Companies", icon: Building2, permissions: ["create_companies", "edit_companies", "delete_companies"] },
+  { href: "/admin/categories", label: "Categories", icon: Tags, permissions: ["create_categories", "edit_categories"] },
+  { href: "/admin/skills", label: "Skills", icon: Zap, permissions: ["create_skills", "edit_skills", "delete_skills"] },
   { href: "/admin/permissions", label: "Permissions", icon: Shield, roles: ["super_admin"] },
 ];
 
@@ -39,8 +41,14 @@ export default function SidebarLayout({ children }) {
   const { url, props } = usePage();
   const auth = props?.auth;
   const admin = auth?.admin;
+  const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
   
   const role = admin?.role || "team_member";
+  const permissions = Array.isArray(admin?.permissions) ? admin.permissions : [];
+  const canView = (item) =>
+    role === "super_admin" ||
+    (!item.roles || item.roles.includes(role)) &&
+    (!item.permissions || item.permissions.some((permission) => permissions.includes(permission)));
 
   // Safely grab both Inertia and real browser path
   const browserPath = typeof window !== "undefined" ? window.location.pathname : "";
@@ -52,6 +60,13 @@ export default function SidebarLayout({ children }) {
   // Dropdown open/close state
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (props?.flash?.success) successAlert(props.flash.success);
+    if (props?.flash?.error) errorAlert(props.flash.error);
+    if (props?.flash?.warning) warningAlert(props.flash.warning);
+    if (props?.flash?.info) infoAlert(props.flash.info);
+  }, [props?.flash]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -65,11 +80,12 @@ export default function SidebarLayout({ children }) {
   }, []);
 
   const visibleNav = NAV_ITEMS.filter(
-    (item) => !item.roles || item.roles.includes(role)
+    canView
   );
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+      <Toaster position="top-right" reverseOrder={false} gutter={8} />
       {/* Sidebar Left */}
       <aside className={`${isCollapsed ? "w-20" : "w-64"} bg-[#0f172a] text-slate-300 flex flex-col shrink-0 h-full border-r border-slate-800 transition-all duration-300`}>
         {/* Brand Header */}
