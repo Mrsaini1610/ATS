@@ -26,15 +26,17 @@ const PERMISSION_GROUPS = [
   {
     label: "Company & Content",
     perms: [
-      "create_companies", "edit_companies", "delete_companies",
-      "create_categories", "edit_categories", "create_skills", "edit_skills",
+      "view_companies", "create_companies", "edit_companies", "delete_companies",
+      "view_categories", "create_categories", "edit_categories", "delete_categories",
+      "view_subcategories", "create_subcategories", "edit_subcategories", "delete_subcategories",
+      "view_skills", "create_skills", "edit_skills", "delete_skills",
       "send_bulk_messages",
     ],
   },
   {
     label: "Team & Users",
     perms: [
-      "create_team_member", "manage_permissions",
+      "view_team_member", "create_team_member", "manage_permissions",
       "add_users", "view_users", "call_users", "delete_user",
     ],
   },

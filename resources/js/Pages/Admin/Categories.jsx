@@ -25,6 +25,7 @@ export default function Categories({ categories = [] }) {
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
   const permissions = admin?.permissions || [];
   const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
+  const canViewSubcategories = can("view_subcategories");
 
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
@@ -62,6 +63,12 @@ export default function Categories({ categories = [] }) {
     setModal({ mode: "sub", action: "add", parentUuid });
   };
 
+  const openEditSubcategoryModal = (parentUuid, sub) => {
+    clearErrors();
+    setData({ name: sub.name || "", icon: "", parent_uuid: parentUuid, status: "active" });
+    setModal({ mode: "sub", action: "edit", parentUuid, uuid: sub.uuid });
+  };
+
   const closeModal = () => {
     setModal(null);
     reset();
@@ -84,8 +91,11 @@ export default function Categories({ categories = [] }) {
         });
       }
     } else {
-      // Subcategory Store Route
-      post(route("admin.categories.subcategories.store", modal.parentUuid), {
+      const submit = modal.action === "edit" ? put : post;
+      const endpoint = modal.action === "edit"
+        ? route("admin.categories.subcategories.update", [modal.parentUuid, modal.uuid])
+        : route("admin.categories.subcategories.store", modal.parentUuid);
+      submit(endpoint, {
         preserveScroll: true,
         onSuccess: () => {
           setExpandedId(modal.parentUuid);
@@ -154,7 +164,9 @@ export default function Categories({ categories = [] }) {
                     ? modal.action === "add"
                       ? "Add Category"
                       : "Edit Category"
-                    : "Add Subcategory"}
+                    : modal.action === "edit"
+                      ? "Edit Subcategory"
+                      : "Add Subcategory"}
                 </h3>
                 <button
                   type="button"
@@ -327,9 +339,9 @@ export default function Categories({ categories = [] }) {
                       {isActive ? "Active" : "Inactive"}
                     </span>
 
-                    {(can("create_categories") || can("edit_categories") || can("delete_categories")) && (
+                    {(can("create_categories") || can("edit_categories") || can("delete_categories") || can("create_subcategories")) && (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {can("create_categories") && <button
+                        {can("create_subcategories") && <button
                           type="button"
                           onClick={() => openAddSubcategoryModal(cat.uuid)}
                           className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg cursor-pointer transition"
@@ -369,7 +381,7 @@ export default function Categories({ categories = [] }) {
                   </div>
 
                   {/* Subcategories Accordion */}
-                  {isExpanded && (
+                  {isExpanded && canViewSubcategories && (
                     <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-3 space-y-2">
                       {subCount > 0 ? (
                         cat.subcategories.map((sub) => (
@@ -384,15 +396,25 @@ export default function Categories({ categories = [] }) {
                             <p className="text-xs text-gray-400">
                               {sub.job_count ?? 0} jobs
                             </p>
-                            {can("delete_categories") && (
-                              <button
+                            {(can("edit_subcategories") || can("delete_subcategories")) && (
+                              <>
+                              {can("edit_subcategories") && <button
+                                type="button"
+                                onClick={() => openEditSubcategoryModal(cat.uuid, sub)}
+                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-md cursor-pointer transition"
+                                title="Edit subcategory"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>}
+                              {can("delete_subcategories") && <button
                                 type="button"
                                 onClick={() => handleDeleteSubcategory(cat.uuid, sub.uuid)}
                                 className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md cursor-pointer transition"
                                 title="Delete subcategory"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              </button>}
+                              </>
                             )}
                           </div>
                         ))

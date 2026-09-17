@@ -29,11 +29,11 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users, permissions: ["add_users", "view_users", "call_users", "delete_user"] },
   { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["schedule_interviews", "update_interviews"] },
   { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, permissions: ["assign_tasks", "view_tasks", "complete_tasks"] },
-  { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["create_team_member", "manage_permissions"] },
+  { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["view_team_member", "create_team_member", "manage_permissions"] },
   { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, permissions: ["send_bulk_messages"] },
-  { href: "/admin/companies", label: "Companies", icon: Building2, permissions: ["create_companies", "edit_companies", "delete_companies"] },
-  { href: "/admin/categories", label: "Categories", icon: Tags, permissions: ["create_categories", "edit_categories"] },
-  { href: "/admin/skills", label: "Skills", icon: Zap, permissions: ["create_skills", "edit_skills", "delete_skills"] },
+  { href: "/admin/companies", label: "Companies", icon: Building2, permissions: ["view_companies", "create_companies", "edit_companies", "delete_companies"] },
+  { href: "/admin/categories", label: "Categories", icon: Tags, permissions: ["view_categories", "create_categories", "edit_categories", "delete_categories"] },
+  { href: "/admin/skills", label: "Skills", icon: Zap, permissions: ["view_skills", "create_skills", "edit_skills", "delete_skills"] },
   { href: "/admin/permissions", label: "Permissions", icon: Shield, roles: ["super_admin"] },
 ];
 

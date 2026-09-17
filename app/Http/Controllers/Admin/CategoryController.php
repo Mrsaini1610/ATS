@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -83,9 +84,27 @@ public function storeSubcategory(Request $request, Category $category)
         $category = \App\Models\Category::where('uuid', $categoryUuid)->firstOrFail();
         $subCategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
         
+        /** @var Subcategory $subCategory */
         $subCategory->delete();
 
         return back()->with('success', 'Subcategory deleted successfully.');
+    }
+
+    public function updateSubcategory(Request $request, $categoryUuid, $subUuid)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $category = Category::where('uuid', $categoryUuid)->firstOrFail();
+        /** @var Subcategory $subcategory */
+        $subcategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
+        $subcategory->update([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+        ]);
+
+        return back()->with('success', 'Subcategory updated successfully.');
     }
 
     public function update(Request $request, Category $category)

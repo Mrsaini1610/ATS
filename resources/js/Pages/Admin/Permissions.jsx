@@ -6,7 +6,10 @@ import { Shield, CheckCircle2, Save, Users, Lock } from "lucide-react";
 const ALL_PERMISSIONS = [
   "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
   "view_applications", "update_application_status",
-  "create_companies", "edit_companies", "delete_companies", "create_categories", "edit_categories", "delete_categories", "create_skills", "edit_skills", "delete_skills",
+  "view_companies", "create_companies", "edit_companies", "delete_companies",
+  "view_categories", "create_categories", "edit_categories", "delete_categories",
+  "view_subcategories", "create_subcategories", "edit_subcategories", "delete_subcategories",
+  "view_skills", "create_skills", "edit_skills", "delete_skills",
   "create_admin", "create_team_member", "manage_permissions", "add_users", "view_users", "call_users", "delete_user",
   "assign_tasks", "view_tasks", "complete_tasks", "schedule_interviews", "update_interviews",
 ];
@@ -26,15 +29,17 @@ const PERMISSION_GROUPS = [
     label: "Company & Content",
     icon: "🏢",
     perms: [
-      "create_companies", "edit_companies", "delete_companies",
-      "create_categories", "edit_categories", "delete_categories", "create_skills", "edit_skills", "delete_skills",
+      "view_companies", "create_companies", "edit_companies", "delete_companies",
+      "view_categories", "create_categories", "edit_categories", "delete_categories",
+      "view_subcategories", "create_subcategories", "edit_subcategories", "delete_subcategories",
+      "view_skills", "create_skills", "edit_skills", "delete_skills",
     ],
   },
   {
     label: "Team & Users",
     icon: "👥",
     perms: [
-      "create_admin", "create_team_member", "manage_permissions",
+      "create_admin", "view_team_member", "create_team_member", "manage_permissions",
       "add_users", "view_users", "call_users", "delete_user",
     ],
   },
@@ -52,6 +57,30 @@ const ROLE_COLOR = {
   admin: "bg-blue-100 text-blue-700",
   team_member: "bg-green-100 text-green-700",
 };
+
+const VIEW_PERMISSION_BY_ACTION = {
+  create_companies: "view_companies",
+  edit_companies: "view_companies",
+  delete_companies: "view_companies",
+  create_categories: "view_categories",
+  edit_categories: "view_categories",
+  delete_categories: "view_categories",
+  create_subcategories: "view_subcategories",
+  edit_subcategories: "view_subcategories",
+  delete_subcategories: "view_subcategories",
+  create_skills: "view_skills",
+  edit_skills: "view_skills",
+  delete_skills: "view_skills",
+  create_team_member: "view_team_member",
+};
+
+const ACTIONS_BY_VIEW_PERMISSION = Object.entries(VIEW_PERMISSION_BY_ACTION).reduce(
+  (groups, [action, view]) => ({
+    ...groups,
+    [view]: [...(groups[view] || []), action],
+  }),
+  {}
+);
 
 export default function Permissions({ members: propMembers = [] }) {
   const { auth } = usePage().props;
@@ -85,11 +114,27 @@ export default function Permissions({ members: propMembers = [] }) {
       prev.map((m) => {
         if (String(m.id) !== String(selectedId)) return m;
         const currentPerms = m.permissions || [];
+        const isGranted = currentPerms.includes(perm);
+
+        if (
+          isGranted &&
+          ACTIONS_BY_VIEW_PERMISSION[perm]?.some((action) => currentPerms.includes(action))
+        ) {
+          return m;
+        }
+
+        const updatedPerms = isGranted
+          ? currentPerms.filter((p) => p !== perm)
+          : [...currentPerms, perm];
+        const viewPermission = VIEW_PERMISSION_BY_ACTION[perm];
+
+        if (!isGranted && viewPermission && !updatedPerms.includes(viewPermission)) {
+          updatedPerms.push(viewPermission);
+        }
+
         return {
           ...m,
-          permissions: currentPerms.includes(perm)
-            ? currentPerms.filter((p) => p !== perm)
-            : [...currentPerms, perm],
+          permissions: updatedPerms,
         };
       })
     );
