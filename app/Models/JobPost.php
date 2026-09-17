@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Models\Admin;
 
 class JobPost extends Model
 {
@@ -119,7 +120,7 @@ class JobPost extends Model
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by', 'id');
+        return $this->belongsTo(Admin::class, 'created_by', 'id');
     }
 
     public function assignedMember()

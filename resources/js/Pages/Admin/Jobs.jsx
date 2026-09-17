@@ -323,6 +323,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                           {job.applicants ?? 0} applicants
                         </span>
                         <span className="font-medium text-gray-700">{job.salary}</span>
+                        <span className="font-medium text-gray-700">Posted by {job.posted_by || "System"}</span>
                         {job.work_mode && job.work_mode !== job.type && (
                           <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{job.work_mode}</span>
                         )}

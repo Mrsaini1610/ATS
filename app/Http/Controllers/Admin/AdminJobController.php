@@ -15,7 +15,7 @@ class AdminJobController extends Controller
 {
     public function index()
     {
-        $jobs = JobPost::with(['assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
+        $jobs = JobPost::with(['creator:id,name', 'assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
             ->latest()
             ->get()
             ->map(function ($job) {
@@ -38,6 +38,7 @@ class AdminJobController extends Controller
                     'applicants'                => $job->applicants ?? 0,
                     'is_hot'                    => $job->badge === 'hot' || $job->badge === 'featured',
                     'posted_at'                 => $job->created_at ? $job->created_at->format('d M Y') : 'Recent',
+                    'posted_by'                 => $job->creator?->name ?? 'System',
                     'category'                  => $job->category?->name ?? 'General',
                     'desc'                      => $job->description ?? '',
                     'remark'                    => $job->rejection_reason,
