@@ -144,7 +144,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
         // 5. Interviews
-        Route::get('/interviews', [InterviewController::class, 'index'])->middleware('permission:schedule_interviews,update_interviews')->name('interviews.index');
+        Route::get('/interviews', [InterviewController::class, 'index'])->middleware('permission:view_interviews')->name('interviews.index');
         Route::post('/interviews', [InterviewController::class, 'store'])->name('interviews.store');
         Route::post('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->name('interviews.update-status');
         Route::post('/interviews/{interview}/remark', [InterviewController::class, 'updateRemark'])->name('interviews.update-remark');

@@ -5,9 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use App\Services\GeocodingService;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class CompanyController extends Controller
 {
@@ -34,6 +33,9 @@ public function index()
                 'logo'         => $comp->logo,
                 'website'      => $comp->website,
                 'location'     => $comp->location,
+                'address'      => $comp->address,
+                'latitude'     => $comp->latitude,
+                'longitude'    => $comp->longitude,
                 'company_size' => $comp->company_size, // <-- yahan map kiya gaya hai
                 'description'  => $comp->description,
                 'status'       => $comp->status,
@@ -51,12 +53,15 @@ public function index()
     ]);
 }
 
-public function store(Request $request)
+public function store(Request $request, GeocodingService $geocodingService)
 {
     $validated = $request->validate([
         'name'         => 'required|string|max:255',
         'website'      => 'nullable|string|max:255',
         'location'     => 'nullable|string|max:255',
+        'address'      => 'required|string|max:2000',
+        'latitude'     => 'nullable|numeric|between:-90,90',
+        'longitude'    => 'nullable|numeric|between:-180,180',
         'company_size' => 'nullable|string|max:255', // <-- Validation added
         'description'  => 'nullable|string',
         'status'       => 'required|string',
@@ -64,6 +69,10 @@ public function store(Request $request)
     ]);
 
     $logoPath = null;
+    $coordinates = null;
+    if (empty($validated['latitude']) || empty($validated['longitude'])) {
+        $coordinates = $geocodingService->geocode($validated['address']);
+    }
     if ($request->hasFile('logo')) {
         $logoPath = $request->file('logo')->store('company-logos', 'public');
     } else {
@@ -75,6 +84,9 @@ public function store(Request $request)
         'slug'         => \Illuminate\Support\Str::slug($validated['name']),
         'website'      => $validated['website'] ?? null,
         'location'     => $validated['location'] ?? null,
+        'address'      => $validated['address'],
+        'latitude'     => $validated['latitude'] ?? $coordinates['latitude'] ?? null,
+        'longitude'    => $validated['longitude'] ?? $coordinates['longitude'] ?? null,
         'company_size' => $validated['company_size'] ?? null, // <-- Saved here
         'description'  => $validated['description'] ?? null,
         'status'       => $validated['status'] ?? 'active',
@@ -84,7 +96,7 @@ public function store(Request $request)
     return redirect()->route('admin.companies.index')->with('success', 'Company successfully created.');
 }
 
-public function update(Request $request, $uuid)
+public function update(Request $request, $uuid, GeocodingService $geocodingService)
 {
     $company = Company::where('uuid', $uuid)->firstOrFail();
 
@@ -92,6 +104,9 @@ public function update(Request $request, $uuid)
         'name'         => 'required|string|max:255',
         'website'      => 'nullable|string|max:255',
         'location'     => 'nullable|string|max:255',
+        'address'      => 'required|string|max:2000',
+        'latitude'     => 'nullable|numeric|between:-90,90',
+        'longitude'    => 'nullable|numeric|between:-180,180',
         'company_size' => 'nullable|string|max:255', // <-- Validation added
         'description'  => 'nullable|string',
         'status'       => 'required|string',
@@ -99,6 +114,10 @@ public function update(Request $request, $uuid)
     ]);
 
     $logoPath = $company->logo;
+    $coordinates = null;
+    if (empty($validated['latitude']) || empty($validated['longitude'])) {
+        $coordinates = $geocodingService->geocode($validated['address']);
+    }
     if ($request->hasFile('logo')) {
         $logoPath = $request->file('logo')->store('company-logos', 'public');
     } elseif ($request->filled('logo')) {
@@ -110,6 +129,9 @@ public function update(Request $request, $uuid)
         'slug'         => \Illuminate\Support\Str::slug($validated['name']),
         'website'      => $validated['website'] ?? null,
         'location'     => $validated['location'] ?? null,
+        'address'      => $validated['address'],
+        'latitude'     => $validated['latitude'] ?? $coordinates['latitude'] ?? null,
+        'longitude'    => $validated['longitude'] ?? $coordinates['longitude'] ?? null,
         'company_size' => $validated['company_size'] ?? null, // <-- Updated here
         'description'  => $validated['description'] ?? null,
         'status'       => $validated['status'] ?? 'active',

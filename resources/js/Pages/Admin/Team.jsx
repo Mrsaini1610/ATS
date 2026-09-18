@@ -36,15 +36,15 @@ const PERMISSION_GROUPS = [
   {
     label: "Team & Users",
     perms: [
-      "view_team_member", "create_team_member", "manage_permissions",
+      "view_team_member", "create_team_member", "edit_team_member", "delete_team_member", "manage_permissions",
       "add_users", "view_users", "call_users", "delete_user",
     ],
   },
   {
     label: "Tasks & Interviews",
     perms: [
-      "assign_tasks", "view_tasks", "complete_tasks",
-      "schedule_interviews", "update_interviews",
+      "view_tasks", "create_tasks", "edit_tasks", "delete_tasks", "assign_tasks", "complete_tasks",
+      "view_interviews", "create_interviews", "edit_interviews", "delete_interviews", "schedule_interviews", "update_interviews",
     ],
   },
 ];

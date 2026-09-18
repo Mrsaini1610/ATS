@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import LocationInput from "@/Components/LocationInput";
 import { Head, usePage, useForm, router, Link } from "@inertiajs/react";
 import {
   Plus,
@@ -51,6 +52,9 @@ export default function Companies({ companies = [] }) {
     name: "",
     website: "",
     location: "",
+    address: "",
+    latitude: null,
+    longitude: null,
     company_size: "1 - 10 employees",
     logo: "",
     description: "",
@@ -65,6 +69,9 @@ export default function Companies({ companies = [] }) {
       name: "",
       website: "",
       location: "",
+      address: "",
+      latitude: null,
+      longitude: null,
       company_size: "1 - 10 employees",
       logo: "",
       description: "",
@@ -82,6 +89,9 @@ export default function Companies({ companies = [] }) {
       name: comp.name || "",
       website: comp.website || "",
       location: comp.location || "",
+      address: comp.address || comp.location || "",
+      latitude: comp.latitude || null,
+      longitude: comp.longitude || null,
       company_size: comp.company_size || "1 - 10 employees",
       logo: comp.logo || "",
       description: comp.description || "",
@@ -94,6 +104,10 @@ export default function Companies({ companies = [] }) {
     setModal(null);
     reset();
     clearErrors();
+  };
+
+  const handleAddressChange = (address) => {
+    setData((prev) => ({ ...prev, address, latitude: null, longitude: null }));
   };
 
   const handleSubmit = (e) => {
@@ -109,6 +123,9 @@ export default function Companies({ companies = [] }) {
         name: data.name,
         website: data.website,
         location: data.location,
+        address: data.address,
+        latitude: data.latitude,
+        longitude: data.longitude,
         company_size: data.company_size,
         logo: data.logo,
         description: data.description,
@@ -224,6 +241,25 @@ export default function Companies({ companies = [] }) {
                         <option key={size} value={size}>{size}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Complete Company Address *
+                  </label>
+                  <LocationInput
+                    value={data.address}
+                    onChange={handleAddressChange}
+                    onLatLngChange={({ latitude, longitude }) =>
+                      setData((prev) => ({ ...prev, latitude, longitude }))
+                    }
+                    placeholder="Enter complete company address..."
+                  />
+                  {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <input value={data.latitude ?? ""} readOnly placeholder="Latitude auto-filled" className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100" />
+                    <input value={data.longitude ?? ""} readOnly placeholder="Longitude auto-filled" className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100" />
                   </div>
                 </div>
 

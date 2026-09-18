@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, router, Link } from "@inertiajs/react";
-import { Shield, CheckCircle2, Save, Users, Lock } from "lucide-react";
+import { Shield, CheckCircle2, Users, Lock } from "lucide-react";
 
 const ALL_PERMISSIONS = [
   "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
@@ -10,8 +10,9 @@ const ALL_PERMISSIONS = [
   "view_categories", "create_categories", "edit_categories", "delete_categories",
   "view_subcategories", "create_subcategories", "edit_subcategories", "delete_subcategories",
   "view_skills", "create_skills", "edit_skills", "delete_skills",
-  "create_admin", "create_team_member", "manage_permissions", "add_users", "view_users", "call_users", "delete_user",
-  "assign_tasks", "view_tasks", "complete_tasks", "schedule_interviews", "update_interviews",
+  "create_admin", "view_team_member", "create_team_member", "edit_team_member", "delete_team_member", "manage_permissions", "add_users", "view_users", "call_users", "delete_user",
+  "view_tasks", "create_tasks", "edit_tasks", "delete_tasks", "assign_tasks", "complete_tasks",
+  "view_interviews", "create_interviews", "edit_interviews", "delete_interviews", "schedule_interviews", "update_interviews",
 ];
 
 const PERMISSION_GROUPS = [
@@ -39,7 +40,7 @@ const PERMISSION_GROUPS = [
     label: "Team & Users",
     icon: "👥",
     perms: [
-      "create_admin", "view_team_member", "create_team_member", "manage_permissions",
+      "create_admin", "view_team_member", "create_team_member", "edit_team_member", "delete_team_member", "manage_permissions",
       "add_users", "view_users", "call_users", "delete_user",
     ],
   },
@@ -47,8 +48,8 @@ const PERMISSION_GROUPS = [
     label: "Tasks & Interviews",
     icon: "📅",
     perms: [
-      "assign_tasks", "view_tasks", "complete_tasks",
-      "schedule_interviews", "update_interviews",
+      "view_tasks", "create_tasks", "edit_tasks", "delete_tasks", "assign_tasks", "complete_tasks",
+      "view_interviews", "create_interviews", "edit_interviews", "delete_interviews", "schedule_interviews", "update_interviews",
     ],
   },
 ];
@@ -72,6 +73,19 @@ const VIEW_PERMISSION_BY_ACTION = {
   edit_skills: "view_skills",
   delete_skills: "view_skills",
   create_team_member: "view_team_member",
+  edit_team_member: "view_team_member",
+  delete_team_member: "view_team_member",
+  create_admin: "view_team_member",
+  create_tasks: "view_tasks",
+  edit_tasks: "view_tasks",
+  delete_tasks: "view_tasks",
+  assign_tasks: "view_tasks",
+  complete_tasks: "view_tasks",
+  create_interviews: "view_interviews",
+  edit_interviews: "view_interviews",
+  delete_interviews: "view_interviews",
+  schedule_interviews: "view_interviews",
+  update_interviews: "view_interviews",
 };
 
 const ACTIONS_BY_VIEW_PERMISSION = Object.entries(VIEW_PERMISSION_BY_ACTION).reduce(
@@ -109,66 +123,51 @@ export default function Permissions({ members: propMembers = [] }) {
 
   const selected = members.find((m) => String(m.id) === String(selectedId));
 
-  const togglePerm = (perm) => {
-    setMembers((prev) =>
-      prev.map((m) => {
-        if (String(m.id) !== String(selectedId)) return m;
-        const currentPerms = m.permissions || [];
-        const isGranted = currentPerms.includes(perm);
-
-        if (
-          isGranted &&
-          ACTIONS_BY_VIEW_PERMISSION[perm]?.some((action) => currentPerms.includes(action))
-        ) {
-          return m;
-        }
-
-        const updatedPerms = isGranted
-          ? currentPerms.filter((p) => p !== perm)
-          : [...currentPerms, perm];
-        const viewPermission = VIEW_PERMISSION_BY_ACTION[perm];
-
-        if (!isGranted && viewPermission && !updatedPerms.includes(viewPermission)) {
-          updatedPerms.push(viewPermission);
-        }
-
-        return {
-          ...m,
-          permissions: updatedPerms,
-        };
-      })
-    );
-  };
-
-  const grantAll = () => {
-    setMembers((prev) =>
-      prev.map((m) =>
-        String(m.id) === String(selectedId)
-          ? { ...m, permissions: [...ALL_PERMISSIONS] }
-          : m
-      )
-    );
-  };
-
-  const revokeAll = () => {
-    setMembers((prev) =>
-      prev.map((m) =>
-        String(m.id) === String(selectedId) ? { ...m, permissions: [] } : m
-      )
-    );
-  };
-
-  const savePermissions = () => {
+  const savePermissions = (permissions) => {
     if (!selected) return;
+
+    setMembers((prev) => prev.map((member) =>
+      String(member.id) === String(selectedId) ? { ...member, permissions } : member
+    ));
 
     router.put(
       route("admin.permissions.update", selected.id),
-      { permissions: selected.permissions },
-      {
-        preserveScroll: true,
-        preserveState: true,
-      }
+      { permissions },
+      { preserveScroll: true, preserveState: true }
     );
+  };
+
+  const togglePerm = (perm) => {
+    if (!selected) return;
+
+    const currentPerms = selected.permissions || [];
+    const isGranted = currentPerms.includes(perm);
+
+    if (
+      isGranted &&
+      ACTIONS_BY_VIEW_PERMISSION[perm]?.some((action) => currentPerms.includes(action))
+    ) {
+      return;
+    }
+
+    const updatedPerms = isGranted
+      ? currentPerms.filter((p) => p !== perm)
+      : [...currentPerms, perm];
+    const viewPermission = VIEW_PERMISSION_BY_ACTION[perm];
+
+    if (!isGranted && viewPermission && !updatedPerms.includes(viewPermission)) {
+      updatedPerms.push(viewPermission);
+    }
+
+    savePermissions(updatedPerms);
+  };
+
+  const grantAll = () => {
+    savePermissions([...ALL_PERMISSIONS]);
+  };
+
+  const revokeAll = () => {
+    savePermissions([]);
   };
 
   return (
@@ -289,13 +288,6 @@ export default function Permissions({ members: propMembers = [] }) {
                       className="px-3 py-1.5 border border-green-200 text-green-600 rounded-xl text-xs font-semibold hover:bg-green-50 cursor-pointer transition"
                     >
                       Grant All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={savePermissions}
-                      className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/30 cursor-pointer transition"
-                    >
-                      <Save className="w-3.5 h-3.5" /> Save Changes
                     </button>
                   </div>
                 </div>

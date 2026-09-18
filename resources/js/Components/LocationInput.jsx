@@ -177,6 +177,7 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
 
     const handleInputChange = (e) => {
         const inputValue = e.target.value;
+        setSelectedLatLng(null);
         onChange(inputValue);
 
         if (debounceTimerRef.current) {
@@ -228,6 +229,42 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
     };
 
     const handleBlur = () => {
+        const address = value?.trim();
+        if (address && !selectedLatLng) {
+            setLoading(true);
+            if (geocoderRef.current) {
+                geocoderRef.current.geocode(
+                    { address, region: 'IN' },
+                    (results, status) => {
+                        setLoading(false);
+                        const location = results?.[0]?.geometry?.location;
+                        if (status === 'OK' && location) {
+                            const latitude = location.lat();
+                            const longitude = location.lng();
+                            setSelectedLatLng({ lat: latitude, lng: longitude });
+                            onLatLngChange?.({ latitude, longitude });
+                        }
+                    }
+                );
+            } else {
+                fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=${encodeURIComponent(address)}`, {
+                    headers: { Accept: 'application/json' },
+                })
+                    .then((response) => response.json())
+                    .then((results) => {
+                        const result = results?.[0];
+                        if (result?.lat && result?.lon) {
+                            const latitude = Number(result.lat);
+                            const longitude = Number(result.lon);
+                            setSelectedLatLng({ lat: latitude, lng: longitude });
+                            onLatLngChange?.({ latitude, longitude });
+                        }
+                    })
+                    .catch(() => {})
+                    .finally(() => setLoading(false));
+            }
+        }
+
         setTimeout(() => {
             setShowSuggestions(false);
         }, 200);

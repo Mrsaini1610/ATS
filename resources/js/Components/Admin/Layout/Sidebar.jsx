@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { href: "/admin/jobs", label: "Job Posts", icon: Briefcase, permissions: ["create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
   { href: "/admin/applications", label: "Applications", icon: ClipboardList, permissions: ["view_applications", "update_application_status"] },
   { href: "/admin/users", label: "Users", icon: Users, permissions: ["add_users", "view_users", "call_users", "delete_user"] },
-  { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["schedule_interviews", "update_interviews"] },
+  { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["view_interviews", "schedule_interviews", "update_interviews"] },
   { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, permissions: ["assign_tasks", "view_tasks", "complete_tasks"] },
   { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["view_team_member", "create_team_member", "manage_permissions"] },
   { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, permissions: ["send_bulk_messages"] },

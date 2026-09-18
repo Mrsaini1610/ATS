@@ -20,6 +20,8 @@ class Company extends Model
         'website',
         'location',
         'address',
+        'latitude',
+        'longitude',
         'company_size',
         'description',
         'status',
@@ -27,6 +29,11 @@ class Company extends Model
 
     protected $hidden = [
         'id',
+    ];
+
+    protected $casts = [
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
     ];
 
     protected static function booted()
