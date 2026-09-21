@@ -29,7 +29,8 @@ const INDIA_CITIES = [
 export default function Users({ users = [] }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
-  const canManage = admin?.role === "super_admin" || admin?.role === "admin";
+  const permissions = admin?.permissions || [];
+  const can = (permission) => admin?.role === "super_admin" || permissions.includes(permission);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -95,7 +96,7 @@ export default function Users({ users = [] }) {
     <>
       <Head title="Registered Candidates - ATS Admin" />
 
-      <div className="p-6">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
@@ -104,8 +105,8 @@ export default function Users({ users = [] }) {
 
         {/* Add Candidate Modal */}
         {addModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
                 <h3 className="font-bold text-gray-900">Add New Candidate</h3>
                 <button
@@ -161,7 +162,7 @@ export default function Users({ users = [] }) {
                   {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       City
@@ -184,30 +185,53 @@ export default function Users({ users = [] }) {
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Experience
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={data.experience}
                       onChange={(e) => setData("experience", e.target.value)}
-                      placeholder="e.g. 2 Years"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select experience</option>
+                      <option value="Fresher">Fresher</option>
+                      <option value="1 Year">1 Year</option>
+                      <option value="2 Years">2 Years</option>
+                      <option value="3+ Years">3+ Years</option>
+                      <option value="5+ Years">5+ Years</option>
+                    </select>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Job Title / Bio Profile
+                    Target Job Title
                   </label>
                   <input
                     type="text"
                     value={data.jobTitle}
-                    onChange={(e) => setData("jobTitle", e.target.value)}
-                    placeholder="e.g. Telecaller / Full Stack Developer"
+                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "jobTitle", e.target.value, data)}
+                    placeholder="e.g. Telecaller / Sales Associate"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-3 border-t border-gray-100">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Preferred Category
+                  </label>
+                  <select
+                    value={data.category}
+                    onChange={(e) => setData("category", e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id || cat.uuid} value={cat.name}>
+                        {cat.icon ? `${cat.icon} ` : ""}{cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={closeAddModal}
@@ -218,9 +242,9 @@ export default function Users({ users = [] }) {
                   <button
                     type="submit"
                     disabled={processing}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60"
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/30"
                   >
-                    {processing ? "Registering..." : "Register Candidate"}
+                    {processing ? "Adding..." : "Add Candidate"}
                   </button>
                 </div>
               </form>
@@ -229,7 +253,7 @@ export default function Users({ users = [] }) {
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Users</h1>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -237,11 +261,11 @@ export default function Users({ users = [] }) {
             </p>
           </div>
 
-          {canManage && (
+          {can("add_users") && (
             <button
               type="button"
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
             >
               <UserPlus className="w-4 h-4" /> Add User
             </button>
@@ -249,8 +273,8 @@ export default function Users({ users = [] }) {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 mb-5 flex-wrap">
-          <div className="relative flex-1 min-w-64">
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -260,13 +284,13 @@ export default function Users({ users = [] }) {
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {["all", "active", "inactive"].map((s) => (
               <button
                 type="button"
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold capitalize transition-all border cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-semibold capitalize transition-all border cursor-pointer shrink-0 ${
                   statusFilter === s
                     ? "bg-gray-900 text-white border-gray-900 shadow-xs"
                     : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
@@ -278,10 +302,10 @@ export default function Users({ users = [] }) {
           </div>
         </div>
 
-        <div className="flex gap-5">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           {/* Candidates Grid */}
-          <div className={`flex-1 ${selectedUser ? "hidden lg:block" : ""}`}>
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className={`flex-1 w-full ${selectedUser ? "hidden lg:block" : ""}`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {filtered.map((user) => (
                 <div
                   key={user.uuid}
@@ -350,13 +374,22 @@ export default function Users({ users = [] }) {
 
           {/* Candidate Drawer Panel */}
           {selectedUser && (
-            <div className="w-72 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
+            <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-sm">User Details</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUser(null)}
+                    className="text-xs font-semibold text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <h3 className="font-bold text-gray-900 text-sm">User Details</h3>
+                </div>
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -401,7 +434,7 @@ export default function Users({ users = [] }) {
                 </div>
               </div>
 
-              {canManage && (
+              {can("status_users") && (
                 <div className="p-4 border-t border-gray-100 bg-gray-50/50">
                   <button
                     type="button"

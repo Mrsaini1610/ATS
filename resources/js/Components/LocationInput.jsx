@@ -33,7 +33,9 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
             const checkLoaded = setInterval(() => {
                 if (window.google && window.google.maps && window.google.maps.places) {
                     try {
-                        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                        if (typeof window.google.maps.places.AutocompleteSuggestion?.fetchAutocompleteSuggestions !== 'function') {
+                            autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                        }
                         geocoderRef.current = new window.google.maps.Geocoder();
                         setApiError(null);
                     } catch (err) {
@@ -53,7 +55,9 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
         window[callbackName] = () => {
             try {
                 if (window.google && window.google.maps && window.google.maps.places) {
-                    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                    if (typeof window.google.maps.places.AutocompleteSuggestion?.fetchAutocompleteSuggestions !== 'function') {
+                        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                    }
                     geocoderRef.current = new window.google.maps.Geocoder();
                     setApiError(null);
                 } else {
@@ -68,7 +72,7 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
         };
 
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly&callback=${callbackName}&loading=async`;
         script.async = true;
         script.defer = true;
         script.onerror = () => {
@@ -78,6 +82,45 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
         };
         document.head.appendChild(script);
     }, [GOOGLE_MAPS_API_KEY, callbackName]);
+
+    const autoGeocode = useCallback((address) => {
+        const trimmed = (address || '').trim();
+        if (trimmed.length < 3) return;
+
+        if (geocoderRef.current) {
+            geocoderRef.current.geocode(
+                { address: trimmed, region: 'IN' },
+                (results, status) => {
+                    const location = results?.[0]?.geometry?.location;
+                    if (status === 'OK' && location) {
+                        const latitude = location.lat();
+                        const longitude = location.lng();
+                        setSelectedLatLng({ lat: latitude, lng: longitude });
+                        if (onLatLngChange) {
+                            onLatLngChange({ latitude, longitude });
+                        }
+                    }
+                }
+            );
+        } else {
+            fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=${encodeURIComponent(trimmed)}`, {
+                headers: { Accept: 'application/json' },
+            })
+                .then((res) => res.json())
+                .then((results) => {
+                    const result = results?.[0];
+                    if (result?.lat && result?.lon) {
+                        const latitude = Number(result.lat);
+                        const longitude = Number(result.lon);
+                        setSelectedLatLng({ lat: latitude, lng: longitude });
+                        if (onLatLngChange) {
+                            onLatLngChange({ latitude, longitude });
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [onLatLngChange]);
 
     const getLocationSuggestions = useCallback((input) => {
         if (input.length < 2) {
@@ -92,7 +135,48 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
             return;
         }
 
-        // Use Google Maps Places library if loaded
+        // Check for modern Google Places AutocompleteSuggestion (New Places API)
+        if (typeof window.google?.maps?.places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions === 'function') {
+            setLoading(true);
+            window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                input: input,
+                includedRegionCodes: ['in'],
+                language: 'en',
+            })
+            .then((response) => {
+                setLoading(false);
+                const list = response?.suggestions || [];
+                if (list.length > 0) {
+                    const formattedSuggestions = list.map((s) => {
+                        const pred = s.placePrediction;
+                        const fullText = pred?.text?.toString?.() || pred?.text || '';
+                        const parts = fullText.split(',').map((p) => p.trim());
+                        return {
+                            display_name: fullText,
+                            place_id: pred?.placeId,
+                            type: 'location',
+                            locality: parts[0] || '',
+                            city: parts[1] || '',
+                            state: parts[2] || '',
+                            placePrediction: pred,
+                        };
+                    });
+                    setSuggestions(formattedSuggestions);
+                    setShowSuggestions(true);
+                } else {
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                }
+            })
+            .catch(() => {
+                setLoading(false);
+                setSuggestions([]);
+                setShowSuggestions(false);
+            });
+            return;
+        }
+
+        // Use legacy Google Maps Places library if loaded
         if (autocompleteServiceRef.current) {
             setLoading(true);
             autocompleteServiceRef.current.getPlacePredictions(
@@ -177,7 +261,6 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
 
     const handleInputChange = (e) => {
         const inputValue = e.target.value;
-        setSelectedLatLng(null);
         onChange(inputValue);
 
         if (debounceTimerRef.current) {
@@ -185,7 +268,10 @@ const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter l
         }
         debounceTimerRef.current = setTimeout(() => {
             getLocationSuggestions(inputValue);
-        }, 300);
+            if (inputValue.trim().length >= 3) {
+                autoGeocode(inputValue.trim());
+            }
+        }, 500);
     };
 
     const handleSuggestionClick = (suggestion) => {

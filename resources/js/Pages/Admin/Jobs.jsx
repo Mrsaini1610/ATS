@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, Link, router } from "@inertiajs/react";
 import {
@@ -37,22 +37,38 @@ function StatusBadge({ status }) {
 
 /* ── Assign Team Member Modal ── */
 function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing }) {
-  const [selected, setSelected] = useState(job?.assigned_team_member_uuid || "");
+  const currentAssignedKey = job?.assigned_team_member_uuid || job?.assigned_team_member_id ? String(job?.assigned_team_member_uuid || job?.assigned_team_member_id) : "";
+  const [selected, setSelected] = useState(currentAssignedKey);
   const activeMembers = teamMembers.filter((m) => m.role === "team_member" || m.role === "admin");
+  const isReassign = Boolean(job?.assigned_team_member_name);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-100">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-900">Assign Job to Team Member</h3>
+          <h3 className="font-bold text-gray-900">
+            {isReassign ? "Re-assign Job to Team Member" : "Assign Job to Team Member"}
+          </h3>
           <button type="button" onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-6">
           <div className="bg-blue-50 rounded-xl p-3 mb-4 text-sm">
-            <p className="font-semibold text-gray-900">{job?.title}</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-semibold text-gray-900">{job?.title}</p>
+              {isReassign && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                  Assigned
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-0.5">{job?.company} · {job?.location}</p>
+            {isReassign && (
+              <p className="text-xs text-indigo-700 font-medium mt-1">
+                Currently assigned to: <strong>{job.assigned_team_member_name}</strong>
+              </p>
+            )}
             <p className="text-xs text-blue-600 mt-1">All future applications will be routed to the selected member.</p>
           </div>
           <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -71,25 +87,39 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
               {selected === "" && <CheckCircle2 className="w-4 h-4 text-blue-600 ml-auto shrink-0" />}
             </button>
 
-            {activeMembers.map((m) => (
-              <button
-                key={m.uuid}
-                type="button"
-                onClick={() => setSelected(m.uuid)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left cursor-pointer transition ${
-                  selected === m.uuid ? "border-blue-500 bg-blue-50/50" : "border-gray-100 hover:border-gray-200 bg-white"
-                }`}
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  {(m.name || "TM").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{m.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{m.active_task || m.email || "Available"}</p>
-                </div>
-                {selected === m.uuid && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
-              </button>
-            ))}
+            {activeMembers.map((m) => {
+              const memberKey = String(m.uuid || m.id);
+              const isCurrent =
+                String(job?.assigned_team_member_uuid) === memberKey ||
+                String(job?.assigned_team_member_id) === String(m.id);
+
+              return (
+                <button
+                  key={memberKey}
+                  type="button"
+                  onClick={() => setSelected(memberKey)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left cursor-pointer transition ${
+                    selected === memberKey ? "border-blue-500 bg-blue-50/50" : "border-gray-100 hover:border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {(m.name || "TM").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-gray-900 text-sm">{m.name}</p>
+                      {isCurrent && (
+                        <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 truncate">{m.active_task || m.role?.replace("_", " ") || m.email || "Available"}</p>
+                  </div>
+                  {selected === memberKey && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex gap-3 mt-5">
@@ -102,7 +132,7 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
               onClick={() => onAssign(selected)}
               className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60"
             >
-              {processing ? "Saving..." : "Save Assignment"}
+              {processing ? "Saving..." : (isReassign ? "Re-assign Member" : "Save Assignment")}
             </button>
           </div>
         </div>
@@ -125,6 +155,16 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
   const [remark, setRemark] = useState("");
   const [assigningJob, setAssigningJob] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Keep selectedJob in sync with updated jobs prop
+  useEffect(() => {
+    if (selectedJob?.uuid && Array.isArray(jobs)) {
+      const updated = jobs.find((j) => j.uuid === selectedJob.uuid);
+      if (updated) {
+        setSelectedJob(updated);
+      }
+    }
+  }, [jobs]);
 
   const updateStatus = (uuid, status, remarkReason = null) => {
     setIsProcessing(true);
@@ -151,13 +191,19 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
       {
         preserveScroll: true,
         onSuccess: () => {
-          const tm = teamMembers.find((m) => String(m.uuid) === String(teamMemberUuid));
+          const tm = teamMembers.find(
+            (m) => String(m.uuid) === String(teamMemberUuid) || String(m.id) === String(teamMemberUuid)
+          );
+          const memberName = tm?.name || null;
+          const memberKey = tm ? String(tm.uuid || tm.id) : null;
+
           setSelectedJob((prev) =>
             prev?.uuid === jobUuid
               ? {
                   ...prev,
-                  assigned_team_member_uuid: teamMemberUuid,
-                  assigned_team_member_name: tm?.name || null,
+                  assigned_team_member_uuid: memberKey,
+                  assigned_team_member_id: tm?.id || null,
+                  assigned_team_member_name: memberName,
                 }
               : prev
           );
@@ -184,7 +230,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
     <>
       <Head title="Job Posts & Moderation - ATS Admin" />
 
-      <div className="p-6 pb-32">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-32">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
@@ -192,8 +238,8 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
         )}
 
         {remarkModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
               <h3 className="font-bold text-gray-900 mb-1">
                 {remarkModal.newStatus === "rejected" ? "Reject Job Post" : remarkModal.newStatus === "hold" ? "Put on Hold" : "Update Status"}
               </h3>
@@ -244,7 +290,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           />
         )}
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Job Posts</h1>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -254,7 +300,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           {can("create_jobs") && (
             <Link
               href={route("admin.jobs.create")}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" /> Post Job
             </Link>
@@ -286,8 +332,8 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
           />
         </div>
 
-        <div className="flex gap-5 items-start">
-          <div className={`flex-1 ${selectedJob ? "hidden lg:block" : ""} space-y-3`}>
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          <div className={`flex-1 w-full ${selectedJob ? "hidden lg:block" : ""} space-y-3`}>
             {filtered.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
                 <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -359,26 +405,70 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                     )}
                   </div>
 
-                  {job.assigned_team_member_name && (
-                    <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-2.5 py-1.5 mt-2 w-fit">
-                      <Users className="w-3 h-3" /> Managed by {job.assigned_team_member_name}
+                  {job.assigned_team_member_name ? (
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-2.5 py-1.5 w-fit">
+                        <Users className="w-3 h-3 text-blue-600" /> Managed by <strong className="font-semibold">{job.assigned_team_member_name}</strong>
+                      </div>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAssigningJob(job);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline ml-auto"
+                        >
+                          Re-assign
+                        </button>
+                      )}
                     </div>
+                  ) : (
+                    canManage && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAssigningJob(job);
+                          }}
+                          className="text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-2.5 py-1 font-medium cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Users className="w-3 h-3 text-amber-600" /> Unassigned · Click to Assign
+                        </button>
+                      </div>
+                    )
                   )}
 
-                  <p className="text-xs text-gray-400 mt-2">
-                    Posted {job.posted_at} · {job.type}
-                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
-                    · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
-                  </p>
+                  <div className="flex items-center justify-between text-xs text-gray-400 mt-2.5 pt-2 border-t border-gray-100 flex-wrap gap-2">
+                    <p>
+                      Posted {job.posted_at} · {job.type}
+                      {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
+                      · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
+                    </p>
+                    {job.posted_by && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-[11px] shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        Posted by: {job.posted_by}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))
             )}
           </div>
 
           {selectedJob && (
-            <div className="flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs mb-12">
+            <div className="w-full lg:flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs mb-12">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
                 <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJob(null)}
+                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer shrink-0"
+                  >
+                    ← Back
+                  </button>
                   <h3 className="font-bold text-gray-900 break-words">{selectedJob.title}</h3>
                   {selectedJob.is_hot && <Flame className="w-4 h-4 text-orange-500 shrink-0" />}
                 </div>
@@ -415,13 +505,20 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                     { label: "Experience", val: selectedJob.exp },
                     { label: "Openings", val: selectedJob.openings },
                     { label: "Applicants", val: selectedJob.applicants ?? 0 },
-                    { label: "Posted By", val: selectedJob.posted_by },
+                    { label: "Posted By", val: selectedJob.posted_by, isPostedBy: true },
                     { label: "Posted On", val: selectedJob.posted_at },
                     ...(selectedJob.deadline ? [{ label: "Deadline", val: selectedJob.deadline }] : []),
                   ].map((r) => (
                     <div key={r.label}>
-                      <p className="text-xs text-gray-400 font-medium">{r.label}</p>
-                      <p className="font-semibold text-gray-900">{r.val || "—"}</p>
+                      <p className="text-xs text-gray-400 font-medium mb-0.5">{r.label}</p>
+                      {r.isPostedBy ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-xs shadow-sm shadow-indigo-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          {r.val || "System"}
+                        </span>
+                      ) : (
+                        <p className="font-semibold text-gray-900">{r.val || "—"}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -433,29 +530,51 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                       <button
                         type="button"
                         onClick={() => setAssigningJob(selectedJob)}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1"
                       >
-                        {selectedJob.assigned_team_member_name ? "Change" : "Assign"}
+                        {selectedJob.assigned_team_member_name ? "Re-assign" : "Assign"}
                       </button>
                     )}
                   </div>
                   {selectedJob.assigned_team_member_name ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
-                        {selectedJob.assigned_team_member_name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
+                    <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-blue-100 shadow-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-xs">
+                          {selectedJob.assigned_team_member_name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{selectedJob.assigned_team_member_name}</p>
+                          <p className="text-xs text-gray-400">Manages all applications for this job</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{selectedJob.assigned_team_member_name}</p>
-                        <p className="text-xs text-gray-400">Manages all applications for this job</p>
-                      </div>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setAssigningJob(selectedJob)}
+                          className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold rounded-lg transition cursor-pointer"
+                        >
+                          Re-assign
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">Not assigned · Admin handles applications directly</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-gray-400">Not assigned · Admin handles applications directly</p>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setAssigningJob(selectedJob)}
+                          className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
+                        >
+                          Assign
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 

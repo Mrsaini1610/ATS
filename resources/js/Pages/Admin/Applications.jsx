@@ -419,7 +419,7 @@ export default function Applications({ applications = [], teamMembers = [] }) {
     <>
       <Head title="Candidate Applications - ATS Admin" />
 
-      <div className="p-6">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
@@ -442,7 +442,7 @@ export default function Applications({ applications = [], teamMembers = [] }) {
           />
         )}
 
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">
               {isTeamMember ? "My Assigned Applications" : "Job Applications"}
@@ -489,9 +489,9 @@ export default function Applications({ applications = [], teamMembers = [] }) {
           />
         </div>
 
-        <div className="flex gap-5">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           {/* Applications Table */}
-          <div className={`flex-1 min-w-0 ${selectedApp ? "hidden lg:block" : ""}`}>
+          <div className={`flex-1 w-full min-w-0 ${selectedApp ? "hidden lg:block" : ""}`}>
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -559,27 +559,36 @@ export default function Applications({ applications = [], teamMembers = [] }) {
                               <button
                                 type="button"
                                 onClick={() => setAssigningApp(app)}
-                                title="Assign Staff"
                                 className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition"
+                                title="Assign to staff"
                               >
-                                <Users className="w-3.5 h-3.5" />
+                                <Users className="w-4 h-4" />
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedApp(app)}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition"
+                            <a
+                              href={followUpWA(app)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                              title="Chat on WhatsApp"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                            <a
+                              href={`tel:${app.userPhone}`}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Call Candidate"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </a>
                           </div>
                         </td>
                       </tr>
                     ))}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="text-center py-12 text-gray-400">
-                          No applications found matching your query
+                        <td colSpan={6} className="text-center py-16 text-gray-400 text-sm">
+                          Koi application nahi mili.
                         </td>
                       </tr>
                     )}
@@ -591,13 +600,22 @@ export default function Applications({ applications = [], teamMembers = [] }) {
 
           {/* Application Detail Side Drawer */}
           {selectedApp && (
-            <div className="w-80 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-120px)] sticky top-20 shadow-xs">
+            <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-sm">Application Detail</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedApp(null)}
+                    className="text-xs font-semibold text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <h3 className="font-bold text-gray-900 text-sm">Application Detail</h3>
+                </div>
                 <button
                   type="button"
                   onClick={() => setSelectedApp(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>

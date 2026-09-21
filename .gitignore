@@ -26,3 +26,7 @@ Homestead.yaml
 Thumbs.db
 *.zip
 /.history
+migrations-old
+ats_live_backup_20260921_153422.sql
+ats_live_backup_before_remigrate.sql
+

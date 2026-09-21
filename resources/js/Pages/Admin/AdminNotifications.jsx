@@ -81,19 +81,19 @@ export default function AdminNotifications({ notifications = [] }) {
     <>
       <Head title="Notifications - WorkIndia Admin" />
 
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="p-3.5 sm:p-5 lg:p-6 max-w-3xl mx-auto pb-25">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-blue-600" /> Notifications
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 flex items-center gap-2 tracking-tight">
+              <Bell className="w-5 h-5 text-blue-600 shrink-0" /> Notifications
               {unreadCount > 0 && (
                 <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
                   {unreadCount}
                 </span>
               )}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
               {notifs.length} total · {unreadCount} unread
             </p>
           </div>
@@ -101,7 +101,7 @@ export default function AdminNotifications({ notifications = [] }) {
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+              className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer self-start sm:self-auto py-1"
             >
               <Check className="w-3.5 h-3.5" /> Mark all read
             </button>
@@ -109,7 +109,7 @@ export default function AdminNotifications({ notifications = [] }) {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 mb-5 scrollbar-none">
           {FILTER_TABS.map(({ key, label }) => {
             const count =
               key === "all"
@@ -122,9 +122,9 @@ export default function AdminNotifications({ notifications = [] }) {
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                   filter === key
-                    ? "bg-gray-900 text-white border-gray-900"
+                    ? "bg-gray-900 text-white border-gray-900 shadow-xs"
                     : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
                 }`}
               >
@@ -141,7 +141,7 @@ export default function AdminNotifications({ notifications = [] }) {
             return (
               <div
                 key={n.id}
-                className={`group flex gap-4 p-4 rounded-2xl border transition-all hover:shadow-sm ${
+                className={`group flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border transition-all hover:shadow-xs ${
                   n.read
                     ? "bg-white border-gray-100"
                     : "bg-blue-50/50 border-blue-100"
@@ -174,10 +174,10 @@ export default function AdminNotifications({ notifications = [] }) {
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                     {n.body}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1.5">{n.time}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5">{n.time}</p>
                 </div>
 
-                <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-col gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   {!n.read && (
                     <button
                       onClick={() => markRead(n.id)}

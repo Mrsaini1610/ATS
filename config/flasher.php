@@ -31,13 +31,8 @@ return Configuration::from([
     // URL patterns to exclude from asset injection and flash_bag conversion
     'excluded_paths' => [],
 
-    // Map Laravel flash message keys to notification types
-    'flash_bag' => [
-        'success' => ['success'],
-        'error' => ['error', 'danger'],
-        'warning' => ['warning', 'alarm'],
-        'info' => ['info', 'notice', 'alert'],
-    ],
+    // Map Laravel flash message keys to notification types (set to false to disable interception so Inertia handles flash directly)
+    'flash_bag' => false,
 
     // Set criteria to filter which notifications are displayed (optional)
     // 'filter' => [

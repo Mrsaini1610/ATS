@@ -28,14 +28,47 @@ class GeocodingService
     {
         $result = $this->geocodeAddress($address);
 
-        if (! is_array($result)) {
+        if (is_array($result) && !empty($result['latitude']) && !empty($result['longitude'])) {
+            return [
+                'latitude' => (float) $result['latitude'],
+                'longitude' => (float) $result['longitude'],
+            ];
+        }
+
+        return $this->geocodeViaNominatim($address);
+    }
+
+    private function geocodeViaNominatim(string $address): ?array
+    {
+        $address = trim($address);
+        if ($address === '') {
             return null;
         }
 
-        return [
-            'latitude' => isset($result['latitude']) ? (float) $result['latitude'] : null,
-            'longitude' => isset($result['longitude']) ? (float) $result['longitude'] : null,
-        ];
+        try {
+            $response = Http::timeout(5)
+                ->withHeaders(['User-Agent' => 'ATS-Geocoding-Service/1.0'])
+                ->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $address,
+                    'format' => 'jsonv2',
+                    'limit' => 1,
+                    'countrycodes' => 'in',
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (!empty($data[0]['lat']) && !empty($data[0]['lon'])) {
+                    return [
+                        'latitude' => (float) $data[0]['lat'],
+                        'longitude' => (float) $data[0]['lon'],
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('GeocodingService: Nominatim fallback exception', ['error' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     public function geocodeAddress(string $address): ?array

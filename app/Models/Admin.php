@@ -100,4 +100,9 @@ class Admin extends Authenticatable
     {
         return $this->hasMany(Admin::class, 'created_by');
     }
+
+    public function assignedTasks()
+    {
+        return $this->hasMany(Task::class, 'member_id');
+    }
 }

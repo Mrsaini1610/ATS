@@ -37,6 +37,7 @@ use App\Http\Controllers\Admin\AdminNotificationController;
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/job-search', [JobController::class, 'index'])->name('job.search');
 Route::get('/categories', [PageController::class, 'getCategories'])->name('categories');
+Route::get('/companies', [PageController::class, 'companies'])->name('companies');
 Route::get('/services', [PageController::class, 'getServices'])->name('services');
 Route::get('/companies/{company}', [PageController::class, 'getCompany'])->name('companies.show');
 Route::get('/about', [PageController::class, 'about'])->name('about');
@@ -48,9 +49,9 @@ Route::get('/location/states', [LocationController::class, 'getState']);
 Route::get('/location/cities', [LocationController::class, 'getCitybyState']);
 Route::get('/location/towns', [LocationController::class, 'getTownsByCity']);
 Route::post('/location/update', [LocationController::class, 'updateLocation']);
-
+ Route::get('/login', [CandidateAuthController::class, 'showLogin'])->name('login');
 Route::middleware('candidate')->group(function () {
-    Route::get('/login', [CandidateAuthController::class, 'showLogin'])->name('login');
+   
     Route::post('/check-phone', [CandidateAuthController::class, 'checkPhoneLogin'])->name('check.phone');
     Route::post('/phone-login', [CandidateAuthController::class, 'phoneLogin'])->name('phone.login');
 
@@ -119,7 +120,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('/notifications/{notification}', [AdminNotificationController::class, 'destroy'])->name('notifications.destroy');
 
         // 2. Job Posts & Moderation
-        Route::get('/jobs', [AdminJobController::class, 'index'])->middleware('permission:create_jobs,approve_jobs,reject_jobs,hold_jobs,deactivate_jobs')->name('jobs.index');
+        Route::get('/jobs', [AdminJobController::class, 'index'])->middleware('permission:view_jobs,create_jobs,approve_jobs,reject_jobs,hold_jobs,deactivate_jobs')->name('jobs.index');
         Route::get('/jobs/create', [AdminJobController::class, 'create'])->name('jobs.create');
         Route::post('/jobs', [AdminJobController::class, 'store'])->middleware('permission:create_jobs')->name('jobs.store'); // Agar store method bhi hai
         Route::post('/jobs/{uuid}/update-status', [AdminJobController::class, 'updateStatus'])->middleware('permission:approve_jobs,reject_jobs,hold_jobs,deactivate_jobs')->name('jobs.update-status');
@@ -134,25 +135,25 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Staff & Team (URL: /admin/team)
         Route::get('/team', [StaffController::class, 'index'])->middleware('permission:view_team_member')->name('team.index');
-        Route::post('/team', [StaffController::class, 'store'])->name('team.store');
-        Route::post('/team/{admin}/toggle-status', [StaffController::class, 'toggleStatus'])->name('team.toggle-status');
-        Route::delete('/team/{admin}', [StaffController::class, 'destroy'])->name('team.destroy');
+        Route::post('/team', [StaffController::class, 'store'])->middleware('permission:create_team_member')->name('team.store');
+        Route::post('/team/{admin}/toggle-status', [StaffController::class, 'toggleStatus'])->middleware('permission:status_team_member')->name('team.toggle-status');
+        Route::delete('/team/{admin}', [StaffController::class, 'destroy'])->middleware('permission:delete_team_member')->name('team.destroy');
 
         // 4. Candidates / Users
-        Route::get('/users', [UserController::class, 'index'])->middleware('permission:add_users,view_users,call_users,delete_user')->name('users.index');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-        Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::get('/users', [UserController::class, 'index'])->middleware('permission:view_users')->name('users.index');
+        Route::post('/users', [UserController::class, 'store'])->middleware('permission:add_users')->name('users.store');
+        Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:status_users')->name('users.toggle-status');
 
         // 5. Interviews
         Route::get('/interviews', [InterviewController::class, 'index'])->middleware('permission:view_interviews')->name('interviews.index');
-        Route::post('/interviews', [InterviewController::class, 'store'])->name('interviews.store');
-        Route::post('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->name('interviews.update-status');
-        Route::post('/interviews/{interview}/remark', [InterviewController::class, 'updateRemark'])->name('interviews.update-remark');
+        Route::post('/interviews', [InterviewController::class, 'store'])->middleware('permission:schedule_interviews')->name('interviews.store');
+        Route::post('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->middleware('permission:status_interviews')->name('interviews.update-status');
+        Route::post('/interviews/{interview}/remark', [InterviewController::class, 'updateRemark'])->middleware('permission:status_interviews')->name('interviews.update-remark');
 
         // 6. Tasks Workflow
-        Route::get('/tasks', [TaskController::class, 'index'])->middleware('permission:assign_tasks,view_tasks,complete_tasks')->name('tasks.index');
-        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
-        Route::post('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
+        Route::get('/tasks', [TaskController::class, 'index'])->middleware('permission:view_tasks')->name('tasks.index');
+        Route::post('/tasks', [TaskController::class, 'store'])->middleware('permission:assign_tasks')->name('tasks.store');
+        Route::post('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->middleware('permission:status_tasks')->name('tasks.update-status');
 
         // 7. Bulk Messages / Notifications
         Route::get('/bulk', [BulkMessageController::class, 'index'])->middleware('permission:send_bulk_messages')->name('bulk.index');
@@ -162,24 +163,25 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/companies', [CompanyController::class, 'index'])->middleware('permission:view_companies')->name('companies.index');
         Route::post('/companies', [CompanyController::class, 'store'])->middleware('permission:create_companies')->name('companies.store');
         Route::put('/companies/{company}', [CompanyController::class, 'update'])->middleware('permission:edit_companies')->name('companies.update');
-        Route::post('/companies/{company}/toggle-status', [CompanyController::class, 'toggleStatus'])->middleware('permission:edit_companies')->name('companies.toggle-status');
+        Route::post('/companies/{company}/toggle-status', [CompanyController::class, 'toggleStatus'])->middleware('permission:status_companies')->name('companies.toggle-status');
         Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->middleware('permission:delete_companies')->name('companies.destroy');
 
         // 9. Categories & Subcategories
         Route::get('/categories', [CategoryController::class, 'index'])->middleware('permission:view_categories')->name('categories.index');
         Route::post('/categories', [CategoryController::class, 'store'])->middleware('permission:create_categories')->name('categories.store');
         Route::put('/categories/{category}', [CategoryController::class, 'update'])->middleware('permission:edit_categories')->name('categories.update');
-        Route::post('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->middleware('permission:edit_categories')->name('categories.toggle-status');
+        Route::post('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->middleware('permission:status_categories')->name('categories.toggle-status');
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('permission:delete_categories')->name('categories.destroy');
         Route::post('/categories/{category}/subcategories', [CategoryController::class, 'storeSubcategory'])->middleware('permission:create_subcategories')->name('categories.subcategories.store');
         Route::put('/categories/{category}/subcategories/{subCategory}', [CategoryController::class, 'updateSubcategory'])->middleware('permission:edit_subcategories')->name('categories.subcategories.update');
+        Route::post('/categories/{category}/subcategories/{subCategory}/toggle-status', [CategoryController::class, 'toggleStatusSubcategory'])->middleware('permission:status_subcategories')->name('categories.subcategories.toggle-status');
         Route::delete('/categories/{category}/subcategories/{subCategory}', [CategoryController::class, 'destroySubcategory'])->middleware('permission:delete_subcategories')->name('categories.subcategories.destroy');
 
         // 10. Skills
         Route::get('/skills', [SkillController::class, 'index'])->middleware('permission:view_skills')->name('skills.index');
         Route::post('/skills', [SkillController::class, 'store'])->middleware('permission:create_skills')->name('skills.store');
         Route::put('/skills/{skill}', [SkillController::class, 'update'])->middleware('permission:edit_skills')->name('skills.update');
-        Route::post('/skills/{skill}/toggle-status', [SkillController::class, 'toggleStatus'])->middleware('permission:edit_skills')->name('skills.toggle-status');
+        Route::post('/skills/{skill}/toggle-status', [SkillController::class, 'toggleStatus'])->middleware('permission:status_skills')->name('skills.toggle-status');
         Route::delete('/skills/{skill}', [SkillController::class, 'destroy'])->middleware('permission:delete_skills')->name('skills.destroy');
 
         // 11. Permissions & Access Control (Super Admin Exclusive)

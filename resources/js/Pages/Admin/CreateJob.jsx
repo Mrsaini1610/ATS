@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, useForm, Link } from "@inertiajs/react";
 import {
@@ -219,6 +220,12 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
   const [skillSearch, setSkillSearch] = useState("");
   const [staffSearch, setStaffSearch] = useState("");
 
+  useEffect(() => {
+    if (Object.keys(clientErrors).length > 0) {
+      setClientErrors(validateJob(data, activeFields));
+    }
+  }, [data, activeFields]);
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -277,7 +284,8 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
   );
 
   const validationErrors = validateJob(data, activeFields);
-  const getFieldError = (field) => clientErrors[field] || errors[field] || validationErrors[field];
+
+  const getFieldError = (field) => clientErrors[field] || errors[field];
   const fieldClass = (field, className) => `${className} ${getFieldError(field) ? "border-red-500 focus:ring-red-500" : ""}`;
 
   const handleSubmit = (isDraft) => {
@@ -306,27 +314,27 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
     <>
       <Head title="Post a New Job - ATS Admin" />
 
-      <div className="w-full px-4 sm:px-8 py-6 pb-32 space-y-4 font-sans text-gray-800 bg-gray-50/50 min-h-screen">
+      <div className="w-full px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 pb-32 space-y-4 font-sans text-gray-800 bg-gray-50/50 min-h-screen">
         {toast && (
-          <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {toast}
+          <div className="fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm max-w-[90vw]">
+            <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" /> <span className="truncate">{toast}</span>
           </div>
         )}
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-4 bg-white px-6 py-4 rounded-3xl border border-indigo-50 shadow-sm">
-          <Link href={route("admin.jobs.index")} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors">
+        <div className="flex items-center gap-3 mb-4 bg-white px-4 sm:px-6 py-4 rounded-2xl sm:rounded-3xl border border-indigo-50 shadow-xs">
+          <Link href={route("admin.jobs.index")} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div>
-            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Post a New Job</h1>
-            <p className="text-xs text-gray-500">Created by {currentUser?.name || "Admin"}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight truncate">Post a New Job</h1>
+            <p className="text-xs text-gray-500 truncate">Created by {currentUser?.name || "Admin"}</p>
           </div>
         </div>
 
         <div className="space-y-4">
           {/* Basic Job Details */}
-          <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-indigo-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-indigo-500" /> Basic Job Detail
             </h2>
@@ -420,7 +428,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           </div>
 
           {/* Candidate Requirement & Salary Type */}
-          <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-blue-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-blue-500" /> Candidate Requirement & Salary
             </h2>
@@ -598,7 +606,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           </div>
 
           {/* Personal details, Education, additional info */}
-          <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-teal-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-500" /> Personal Details, Education & Additional Info
             </h2>
@@ -627,7 +635,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
             {activeFields.age && (
               <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100 space-y-3 mt-2">
                 <div className="flex justify-between items-center"><span className="text-xs font-bold text-teal-900 uppercase">Age Limit</span><button onClick={() => toggleField("age")} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input type="number" placeholder="Min Age" value={data.minAge} onChange={(e) => setData("minAge", e.target.value)} className={fieldClass("minAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
                   <input type="number" placeholder="Max Age" value={data.maxAge} onChange={(e) => setData("maxAge", e.target.value)} className={fieldClass("maxAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
                 </div>
@@ -723,7 +731,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           </div>
 
           {/* Timings */}
-          <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-purple-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-purple-500" /> Timings
             </h2>
@@ -742,7 +750,7 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           </div>
 
           {/* About Your Company */}
-          <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-orange-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-orange-500" /> About Your Company
             </h2>
@@ -900,19 +908,19 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
         </div>
 
         {/* Centered Footer Actions */}
-        <div className="mt-6 flex items-center justify-center gap-3 bg-white p-4 border border-indigo-50 rounded-3xl shadow-sm">
+        <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 bg-white p-4 border border-indigo-50 rounded-2xl sm:rounded-3xl shadow-xs">
           <button
             type="button"
             onClick={() => handleSubmit(true)}
-            className="px-6 py-3 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 font-bold cursor-pointer transition"
+            className="px-6 py-3 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 font-bold cursor-pointer transition text-center"
           >
             Save Draft
           </button>
           <button
             type="button"
             onClick={() => handleSubmit(false)}
-            disabled={processing || Object.keys(validationErrors).length > 0}
-            className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-indigo-600/30 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={processing}
+            className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-indigo-600/30 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed text-center"
           >
             {processing ? "Submitting..." : "Submit Job Post"}
           </button>

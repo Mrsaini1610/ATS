@@ -47,12 +47,13 @@ class AdminJobController extends Controller
                     'responsibilities'          => is_array($job->key_responsibilities) ? $job->key_responsibilities : [],
                     'requirements'              => is_array($job->qualifications) ? $job->qualifications : [],
                     'benefits'                  => is_array($job->perks) ? $job->perks : [],
-                    'assigned_team_member_uuid' => $job->assignedMember ? (string) $job->assignedMember->id : null,
+                    'assigned_team_member_uuid' => $job->assignedMember ? (string) ($job->assignedMember->uuid ?? $job->assignedMember->id) : null,
+                    'assigned_team_member_id'   => $job->assigned_to,
                     'assigned_team_member_name' => $job->assignedMember?->name,
                 ];
             });
 
-        $teamMembers = Admin::select('id', 'name', 'email', 'phone', 'role')->get();
+        $teamMembers = Admin::select('id', 'uuid', 'name', 'email', 'phone', 'role')->get();
 
         return Inertia::render('Admin/Jobs', [
             'jobs'        => $jobs,
@@ -143,7 +144,7 @@ public function store(Request $request)
             'contact_person'       => $request->input('contactPersonName'),
             'contact_phone'        => $request->input('contactPhone'),
             'contact_email'        => $request->input('contactEmail'),
-            'assigned_to'          => null,
+            'assigned_to'          => $request->input('assignedToId') ?: ($request->input('assigned_to') ?: null),
             'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
             'created_by'           => auth('admin')->id(),
         ]);
@@ -186,11 +187,13 @@ public function store(Request $request)
 
         $adminId = null;
         if (!empty($validated['team_member_uuid'])) {
-            $admin = Admin::where('id', $validated['team_member_uuid'])->first();
+            $admin = Admin::where('uuid', $validated['team_member_uuid'])
+                ->orWhere('id', $validated['team_member_uuid'])
+                ->first();
             $adminId = $admin?->id;
         }
 
-        $job->update(['approved_by' => $adminId]);
+        $job->update(['assigned_to' => $adminId]);
 
         return redirect()->back()->with('success', $adminId ? 'Team member assigned successfully.' : 'Assignment removed.');
     }

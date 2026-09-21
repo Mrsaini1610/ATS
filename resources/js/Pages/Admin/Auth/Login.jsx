@@ -105,8 +105,8 @@ export default function AdminLogin() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
-              <h2 className="text-2xl font-extrabold text-white mb-2">ATS Sign In</h2>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-2">ATS Sign In</h2>
               <p className="text-gray-400 text-xs mb-6">
                 Enter your administrative email or username and password.
               </p>

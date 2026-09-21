@@ -26,11 +26,18 @@ public function index()
                     ->get(['uuid', 'title', 'status']);
             }
 
+            $logo = $comp->logo;
+            if ($logo && !str_starts_with($logo, 'http') && (str_contains($logo, '/') || str_contains($logo, '.'))) {
+                if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($logo)) {
+                    $logo = null;
+                }
+            }
+
             return [
                 'uuid'         => $comp->uuid,
                 'name'         => $comp->name,
                 'slug'         => $comp->slug,
-                'logo'         => $comp->logo,
+                'logo'         => $logo,
                 'website'      => $comp->website,
                 'location'     => $comp->location,
                 'address'      => $comp->address,

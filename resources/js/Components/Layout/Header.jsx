@@ -1,5 +1,6 @@
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, router, usePage } from "@inertiajs/react";
-import { useState, useEffect } from "react";
 import {
   Bell,
   Menu,
@@ -12,39 +13,98 @@ import {
   Navigation,
   Locate,
   Loader2,
+  Search,
+  MapPin,
+  Sparkles,
+  Check,
 } from "lucide-react";
 import axios from "axios";
 
-// 🎯 GPS HIGH ACCURACY CONFIGURATION OPTIONS
-const geoOptions = {
-  enableHighAccuracy: true, // Forces device to use real GPS hardware instead of rough IP location
-  timeout: 10000,           // Wait maximum 10 seconds for precise fix
-  maximumAge: 0,            // Do not use cached/old location values
+// Curated Popular Localities for Top Cities
+const POPULAR_LOCALITIES_BY_CITY = {
+  Jaipur: [
+    "Vaishali Nagar",
+    "Mansarovar",
+    "Malviya Nagar",
+    "C-Scheme",
+    "Tonk Road",
+    "Sitapura",
+    "Raja Park",
+    "Sodala",
+    "Sanganer",
+    "Jhotwara",
+  ],
+  "Delhi NCR": [
+    "Noida",
+    "Gurugram",
+    "Connaught Place",
+    "Saket",
+    "Rohini",
+    "South Extension",
+    "Laxmi Nagar",
+    "Dwarka",
+  ],
+  Bengaluru: [
+    "Koramangala",
+    "Indiranagar",
+    "HSR Layout",
+    "Whitefield",
+    "BTM Layout",
+    "Electronic City",
+    "Jayanagar",
+  ],
+  Mumbai: [
+    "Andheri",
+    "Bandra",
+    "Powai",
+    "Thane",
+    "Navi Mumbai",
+    "Dadar",
+    "Borivali",
+  ],
+  Pune: [
+    "Hinjawadi",
+    "Viman Nagar",
+    "Kothrud",
+    "Baner",
+    "Wakad",
+    "Hadapsar",
+  ],
 };
+
+const POPULAR_CITIES = ["Jaipur", "Delhi NCR", "Bengaluru", "Mumbai", "Pune"];
 
 export default function Header() {
   const { url, props } = usePage();
   const auth = props?.auth;
   const user = auth?.user;
 
+  const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [locationModalOpen, setLocationModalOpen] = useState(false);
+
+  // Active Header Display States
+  const [selectedCityName, setSelectedCityName] = useState("Select City");
+  const [selectedAreaName, setSelectedAreaName] = useState("Select Area");
+
+  // Google Places Autocomplete States
+  const [areaSearchInput, setAreaSearchInput] = useState("");
+  const [googlePredictions, setGooglePredictions] = useState([]);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const autocompleteServiceRef = useRef(null);
 
   // Dynamic API Dropdown States
   const [statesList, setStatesList] = useState([]);
   const [citiesList, setCitiesList] = useState([]);
   const [townsList, setTownsList] = useState([]);
 
-  // Active Header Display States
-  const [selectedCityName, setSelectedCityName] = useState("Select City");
-  const [selectedAreaName, setSelectedAreaName] = useState("Select Area");
-
   // Temporary Form States for Modal
   const [tempStateUuid, setTempStateUuid] = useState("");
   const [tempCityUuid, setTempCityUuid] = useState("");
   const [tempCityName, setTempCityName] = useState("");
   const [tempAreaName, setTempAreaName] = useState("");
+  const [activeCityTab, setActiveCityTab] = useState("Jaipur");
   const [geoDetectedData, setGeoDetectedData] = useState(null);
 
   // Loaders & Errors
@@ -52,39 +112,203 @@ export default function Header() {
   const [loadingTowns, setLoadingTowns] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [activeTab, setActiveTab] = useState("search"); // 'search' | 'popular' | 'manual'
 
-  // Helper Function: Reverse Geocode with Lat / Long via Backend API
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 1. Initialize Google Places Service for live Area Autocomplete
+  useEffect(() => {
+    if (window.google?.maps?.places?.AutocompleteService) {
+      autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+      return;
+    }
+
+    if (!GOOGLE_MAPS_API_KEY) return;
+
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.google?.maps?.places?.AutocompleteService) {
+          autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+        }
+      };
+      document.head.appendChild(script);
+    } else {
+      const timer = setInterval(() => {
+        if (window.google?.maps?.places?.AutocompleteService) {
+          autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+          clearInterval(timer);
+        }
+      }, 300);
+      return () => clearInterval(timer);
+    }
+  }, [GOOGLE_MAPS_API_KEY]);
+
+  // Handle Google Places predictions on typing
+  useEffect(() => {
+    if (!areaSearchInput.trim() || areaSearchInput.length < 2) {
+      setGooglePredictions([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (autocompleteServiceRef.current) {
+        setLoadingGoogle(true);
+        try {
+          autocompleteServiceRef.current.getPlacePredictions(
+            {
+              input: areaSearchInput,
+              componentRestrictions: { country: "in" },
+              types: ["sublocality", "neighborhood", "locality"],
+            },
+            (predictions, status) => {
+              setLoadingGoogle(false);
+              if (status === "OK" && predictions) {
+                setGooglePredictions(predictions);
+              } else {
+                setGooglePredictions([]);
+              }
+            }
+          );
+        } catch (e) {
+          setLoadingGoogle(false);
+        }
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [areaSearchInput]);
+
+  // Helper Function: Reverse Geocode with Lat / Long
   const fetchLocationFromCoords = async (latitude, longitude) => {
+    // 1. Try backend endpoint
     try {
-      const res = await axios.post("/location/update", {
-        latitude,
-        longitude,
-      });
-
-      console.log("====================================");
-      console.log("📍 HIGH ACCURACY LAT/LONG RESPONSE:", { latitude, longitude });
-      console.log("📦 GOOGLE API FULL RESPONSE:", res.data);
-      console.log("====================================");
-
-      if (res.data?.success) {
+      const res = await axios.post("/location/update", { latitude, longitude });
+      if (res.data?.success && res.data?.data) {
         const data = res.data.data;
-
-        console.log("Extracted City:", data?.city);
-        console.log("Extracted Area:", data?.area);
-        console.log("Formatted Address:", data?.formatted_address);
-
-        const cityName = data?.city || data?.state || "Detected Location";
+        const cityName = data?.city || data?.state || "Jaipur";
         const areaName = data?.area || data?.formatted_address || "";
         return { city: cityName, area: areaName };
       }
-      return null;
     } catch (err) {
-      console.error("❌ Geocoding API Error:", err);
-      return null;
+      console.warn("Backend /location/update warning:", err);
     }
+
+    // 2. Client-side Google Geocoder fallback
+    if (window.google?.maps?.Geocoder) {
+      try {
+        const geocoder = new window.google.maps.Geocoder();
+        const response = await geocoder.geocode({
+          location: { lat: latitude, lng: longitude },
+        });
+        if (response.results && response.results[0]) {
+          const result = response.results[0];
+          let city = "";
+          let area = "";
+          for (const comp of result.address_components) {
+            if (comp.types.includes("sublocality_level_1") || comp.types.includes("neighborhood")) {
+              area = comp.long_name;
+            }
+            if (comp.types.includes("locality")) {
+              city = comp.long_name;
+            }
+            if (!city && comp.types.includes("administrative_area_level_2")) {
+              city = comp.long_name;
+            }
+          }
+          return { city: city || "Jaipur", area: area || result.formatted_address };
+        }
+      } catch (gErr) {
+        console.warn("Google Geocoder warning:", gErr);
+      }
+    }
+
+    // 3. OpenStreetMap Nominatim fallback
+    try {
+      const osmRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=jsonv2`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      if (osmRes.ok) {
+        const osmData = await osmRes.json();
+        const city = osmData.address?.city || osmData.address?.state_district || osmData.address?.state || "Jaipur";
+        const area = osmData.address?.suburb || osmData.address?.neighbourhood || osmData.address?.road || "";
+        return { city, area };
+      }
+    } catch (e) {
+      console.warn("Nominatim fallback warning:", e);
+    }
+
+    return null;
   };
 
-  // 1. First Time Visit Auto-Location Detection (WITH HIGH ACCURACY)
+  // Auto-request location helper (Handles high accuracy + standard fallback)
+  const requestCurrentLocation = (isUserInitiated = false) => {
+    if (!("geolocation" in navigator)) {
+      if (isUserInitiated) setLocationError("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setDetectingLocation(true);
+    setLocationError("");
+
+    const handleSuccess = async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const locResult = await fetchLocationFromCoords(latitude, longitude);
+
+        if (locResult && locResult.city) {
+          applyAndSaveLocation(locResult.city, locResult.area);
+          setGeoDetectedData(locResult);
+        } else if (isUserInitiated) {
+          setLocationError("Could not determine area name from GPS coordinates. Please select below.");
+        }
+      } catch (err) {
+        console.error("Location error:", err);
+        if (isUserInitiated) setLocationError("Failed to resolve location.");
+      } finally {
+        setDetectingLocation(false);
+      }
+    };
+
+    const handleFailure = (err) => {
+      console.warn("High accuracy geolocation timed out/denied, trying standard accuracy:", err);
+      // Fallback to standard accuracy (non-GPS / Wi-Fi based)
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        (fallbackErr) => {
+          setDetectingLocation(false);
+          if (isUserInitiated) {
+            if (fallbackErr.code === 1) {
+              setLocationError("Location permission denied in browser. Please allow permission or select city below.");
+            } else if (fallbackErr.code === 3) {
+              setLocationError("Location request timed out. Please select your city/area below.");
+            } else {
+              setLocationError("Unable to retrieve location. Please choose manually below.");
+            }
+          }
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      );
+    };
+
+    // First attempt: High accuracy
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      handleFailure,
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+    );
+  };
+
+  // 1. Initial Load: Check saved location OR prompt browser permission auto-fetch
   useEffect(() => {
     const savedLoc = localStorage.getItem("user_selected_location");
 
@@ -97,49 +321,68 @@ export default function Header() {
         console.error(e);
       }
     } else {
-      if ("geolocation" in navigator) {
-        setDetectingLocation(true);
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude, accuracy } = position.coords;
-            console.log(`🛰️ GPS Coordinates (Accuracy: ${accuracy} meters):`, { latitude, longitude });
-
-            const locResult = await fetchLocationFromCoords(latitude, longitude);
-
-            if (locResult) {
-              setSelectedCityName(locResult.city);
-              setSelectedAreaName(locResult.area);
-              localStorage.setItem(
-                "user_selected_location",
-                JSON.stringify(locResult)
-              );
-            }
-            setDetectingLocation(false);
-          },
-          (error) => {
-            console.warn("⚠️ Location error/denied:", error.message);
-            setDetectingLocation(false);
-          },
-          geoOptions // 🎯 High Accuracy Enabled
-        );
-      }
+      // Prompt browser permission and auto-detect on visit!
+      requestCurrentLocation(false);
     }
   }, []);
 
-  // Modal opening handler
+  // Open modal
   const handleOpenModal = () => {
-    setTempStateUuid("");
-    setTempCityUuid("");
-    setTempCityName("");
-    setTempAreaName("");
-    setGeoDetectedData(null);
+    setAreaSearchInput("");
+    setGooglePredictions([]);
     setLocationError("");
+    setTempCityName(selectedCityName !== "Select City" ? selectedCityName : "");
+    setTempAreaName(selectedAreaName !== "Select Area" ? selectedAreaName : "");
+    setGeoDetectedData(null);
     setLocationModalOpen(true);
   };
 
-  // 2. Fetch States on Modal Open
+  // Universal Apply & Save location
+  const applyAndSaveLocation = (cityName, areaName) => {
+    const cityToSave = cityName || "Jaipur";
+    const areaToSave = areaName || "Select Area";
+
+    setSelectedCityName(cityToSave);
+    setSelectedAreaName(areaToSave);
+
+    const locData = { city: cityToSave, area: areaToSave === "Select Area" ? "" : areaToSave };
+    localStorage.setItem("user_selected_location", JSON.stringify(locData));
+    localStorage.setItem("ats_candidate_city", cityToSave);
+    if (locData.area) {
+      localStorage.setItem("ats_candidate_location", `${locData.area}, ${cityToSave}`);
+    } else {
+      localStorage.setItem("ats_candidate_location", cityToSave);
+    }
+
+    // Trigger event for other components on the page
+    window.dispatchEvent(
+      new CustomEvent("ats_location_changed", { detail: locData })
+    );
+
+    setLocationModalOpen(false);
+  };
+
+  // Select prediction from Google Places
+  const handleSelectPrediction = (prediction) => {
+    const terms = prediction.terms || [];
+    let areaName = prediction.structured_formatting?.main_text || terms[0]?.value || "";
+    let cityName = terms[1]?.value || selectedCityName;
+
+    if (terms.length >= 3 && ["Rajasthan", "Delhi", "Karnataka", "Maharashtra", "India"].includes(cityName)) {
+      cityName = terms[0]?.value;
+    }
+
+    applyAndSaveLocation(cityName, areaName);
+  };
+
+  // Select a popular locality chip
+  const handleSelectLocality = (city, area) => {
+    applyAndSaveLocation(city, area);
+  };
+
+  // State -> City -> Area dropdown handlers
   useEffect(() => {
-    if (locationModalOpen && statesList.length === 0) {
+    if (locationModalOpen && activeTab === "manual" && statesList.length === 0) {
       axios
         .get("/location/states")
         .then((res) => {
@@ -147,16 +390,14 @@ export default function Header() {
         })
         .catch(() => setLocationError("Failed to fetch states."));
     }
-  }, [locationModalOpen]);
+  }, [locationModalOpen, activeTab]);
 
-  // 3. Handle State Change -> Fetch Cities
   const handleStateChange = (e) => {
     const stateUuid = e.target.value;
     setTempStateUuid(stateUuid);
     setTempCityUuid("");
     setTempCityName("");
     setTempAreaName("");
-    setGeoDetectedData(null);
     setCitiesList([]);
     setTownsList([]);
 
@@ -167,23 +408,18 @@ export default function Header() {
         .then((res) => {
           if (res.data?.status) setCitiesList(res.data.data);
         })
-        .catch(() => setLocationError("Failed to load cities."))
         .finally(() => setLoadingCities(false));
     }
   };
 
-  // 4. Handle City Change -> Fetch Towns
   const handleCityChange = (e) => {
     const cityUuid = e.target.value;
     setTempCityUuid(cityUuid);
     setTempAreaName("");
-    setGeoDetectedData(null);
     setTownsList([]);
 
     const matchedCity = citiesList.find((c) => c.uuid === cityUuid);
-    if (matchedCity) {
-      setTempCityName(matchedCity.name);
-    }
+    if (matchedCity) setTempCityName(matchedCity.name);
 
     if (cityUuid) {
       setLoadingTowns(true);
@@ -192,161 +428,99 @@ export default function Header() {
         .then((res) => {
           if (res.data?.status) setTownsList(res.data.data);
         })
-        .catch(() => setLocationError("Failed to load areas/towns."))
         .finally(() => setLoadingTowns(false));
     }
   };
 
-  // 5. Modal Current Location Button (WITH HIGH ACCURACY)
-  const handleUseCurrentLocation = () => {
-    setLocationError("");
-    setDetectingLocation(true);
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
-          console.log(`🎯 Precise Lat/Long (Accuracy: ±${accuracy}m):`, { latitude, longitude });
-
-          const locResult = await fetchLocationFromCoords(latitude, longitude);
-
-          if (locResult) {
-            setGeoDetectedData(locResult);
-            setTempCityName(locResult.city);
-            setTempAreaName(locResult.area);
-          } else {
-            setLocationError("Could not fetch location details from Google API.");
-          }
-          setDetectingLocation(false);
-        },
-        (error) => {
-          setDetectingLocation(false);
-          if (error.code === error.TIMEOUT) {
-            setLocationError("Location request timed out. Please try again.");
-          } else {
-            setLocationError("Location permission denied or unavailable.");
-          }
-        },
-        geoOptions // 🎯 High Accuracy Enabled
-      );
-    } else {
-      setDetectingLocation(false);
-      setLocationError("Geolocation is not supported by your browser.");
-    }
+  const handleApplyManualLocation = () => {
+    applyAndSaveLocation(tempCityName || selectedCityName, tempAreaName || selectedAreaName);
   };
 
-  // Save button confirmation
-  const handleApplyLocation = () => {
-    const cityToSave = tempCityName || selectedCityName;
-    const areaToSave = tempAreaName || selectedAreaName;
-
-    setSelectedCityName(cityToSave);
-    setSelectedAreaName(areaToSave);
-
-    localStorage.setItem(
-      "user_selected_location",
-      JSON.stringify({ city: cityToSave, area: areaToSave })
-    );
-
-    setLocationModalOpen(false);
-  };
-
-  const isSaveAvailable =
-    geoDetectedData !== null || (tempCityUuid !== "" && tempAreaName !== "");
-
-  const isActive = (path) =>
-    path === "/" ? url === "/" : url.startsWith(path);
+  const isActive = (path) => (path === "/" ? url === "/" : url.startsWith(path));
 
   const handleLogout = () => {
     setProfileOpen(false);
     router.post(route("logout"));
   };
 
-  const displayName = user?.name ? user.name.split(" ")[0] : null;
-  const initials = user?.name
-    ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "?";
+  const displayName = user?.full_name ? user.full_name.split(" ")[0] : (user?.name ? user.name.split(" ")[0] : "Candidate");
+  const initials = displayName ? displayName.substring(0, 2).toUpperCase() : "CA";
 
+  // Auth Button: ONLY ONE dynamic button (no extra buttons)
   const isLoginPage = url.startsWith("/login");
   const authButtonConfig = isLoginPage
     ? { label: "Sign Up", href: "/register" }
     : { label: "Sign In", href: "/login" };
 
-  return (
-    <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
-      {/* FULL-PAGE LOADER WHEN AREA LIST IS LOADING */}
-      {loadingTowns && (
-        <div className="fixed inset-0 z-[99999] bg-black/75 backdrop-blur-md flex flex-col items-center justify-center p-4">
-          <Loader2 className="w-14 h-14 text-blue-500 animate-spin mb-4" />
-          <p className="text-white font-semibold text-lg text-center">
-            Fetching Area List...
-          </p>
-          <p className="text-gray-300 text-sm mt-1 text-center">
-            Please wait a moment while we process your request.
-          </p>
-        </div>
-      )}
+  const navLinks = [
+    { href: "/", label: "Home" },
+    { href: "/job-search", label: "Jobs" },
+    { href: "/categories", label: "Categories" },
+    { href: "/companies", label: "Companies" },
+    { href: "/services", label: "Services" },
+    { href: "/about", label: "About" },
+  ];
 
+  return (
+    <header className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 transition-all shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
+        {/* Left: Brand Logo */}
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
           <img
             src="/images/logo.png"
             alt="ATS Logo"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
             className="h-8 w-auto object-contain"
           />
           <div className="flex items-baseline gap-1">
             <span className="text-lg font-black text-gray-900 tracking-tight">
               ATS
             </span>
-            <span className="text-xs text-blue-600 font-semibold hidden sm:inline">
+            <span className="text-xs text-blue-600 font-bold uppercase tracking-wider hidden sm:inline">
               Jobs
             </span>
           </div>
         </Link>
 
-        {/* Location Selector Button */}
+        {/* Center-Left: Location Selector Button */}
         <button
           onClick={handleOpenModal}
-          className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors text-left"
+          type="button"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-gray-100/80 border border-gray-200/60 transition-all text-left cursor-pointer"
         >
-          <Navigation className="w-5 h-5 text-gray-800 fill-gray-800 rotate-45 shrink-0" />
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+            {detectingLocation ? (
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            ) : (
+              <Navigation className="w-4 h-4 rotate-45 text-blue-600" />
+            )}
+          </div>
           <div className="flex flex-col leading-tight">
             <div className="flex items-center gap-1">
-              <span className="font-bold text-gray-900 text-sm sm:text-base">
+              <span className="font-bold text-gray-900 text-xs sm:text-sm">
                 {selectedCityName}
               </span>
-              <ChevronDown className="w-4 h-4 text-gray-700" />
+              <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
             </div>
-            <span className="text-xs text-gray-500 font-medium truncate max-w-[100px] sm:max-w-[140px]">
-              {selectedAreaName || "Select Area"}
+            <span className="text-[11px] text-gray-500 font-medium truncate max-w-[90px] sm:max-w-[130px]">
+              {selectedAreaName !== "Select Area" ? selectedAreaName : "Select Locality"}
             </span>
           </div>
         </button>
 
-        {/* Right Nav Options */}
+        {/* Right: Desktop Navigation & Auth */}
         <div className="flex items-center gap-2 ml-auto">
-          <nav className="hidden lg:flex items-center gap-0.5">
-            {[
-              { href: "/", label: "Home" },
-              { href: "/job-search", label: "Jobs" },
-              { href: "/categories", label: "Categories" },
-              { href: "/services", label: "Services" },
-              { href: "/about", label: "About" },
-              { href: "/apps", label: "App" },
-            ].map((l) => (
+          <nav className="hidden lg:flex items-center gap-1">
+            {navLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
                   isActive(l.href)
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-blue-50 text-blue-600 font-bold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
                 {l.label}
@@ -354,254 +528,419 @@ export default function Header() {
             ))}
           </nav>
 
-          {user && (
-            <Link
-              href="/notifications"
-              className="relative flex p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
-          )}
-
+          {/* User Logged In */}
           {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 pl-1 pr-3 py-1 bg-blue-600 text-white rounded-xl text-sm font-medium"
+            <div className="flex items-center gap-2">
+              <Link
+                href="/notifications"
+                className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                title="Notifications"
               >
-                <div className="w-6 h-6 bg-blue-400 rounded-lg flex items-center justify-center text-xs font-bold">
-                  {initials}
-                </div>
-                <span className="hidden sm:inline">{displayName}</span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
+              </Link>
 
-              {profileOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setProfileOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50">
-                    <div className="px-4 py-3 border-b border-gray-100 mb-1">
-                      <p className="text-sm font-bold text-gray-900">
-                        {user.name || "Candidate"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {user.phone}
-                      </p>
-                    </div>
-
-                    {[
-                      { href: "/profile", icon: User, label: "My Profile" },
-                      {
-                        href: "/saved-jobs",
-                        icon: BookmarkCheck,
-                        label: "Saved Jobs",
-                      },
-                      { href: "/settings", icon: Settings, label: "Settings" },
-                    ].map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        <item.icon className="w-4 h-4 text-gray-400" />{" "}
-                        {item.label}
-                      </Link>
-                    ))}
-
-                    <div className="border-t border-gray-100 mt-1 pt-1">
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                      >
-                        <LogOut className="w-4 h-4" /> Sign Out
-                      </button>
-                    </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 pl-1.5 pr-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs cursor-pointer"
+                >
+                  <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center text-xs font-black">
+                    {initials}
                   </div>
-                </>
-              )}
+                  <span className="hidden sm:inline truncate max-w-[100px]">{displayName}</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {profileOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setProfileOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-4 py-3 border-b border-gray-100 mb-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">
+                          {user.full_name || user.name || "Candidate"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {user.phone || user.email}
+                        </p>
+                      </div>
+
+                      <Link
+                        href="/user/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <User className="w-4 h-4 text-gray-400" /> My Profile
+                      </Link>
+
+                      <Link
+                        href="/my-applications"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <Settings className="w-4 h-4 text-gray-400" /> My Applications
+                      </Link>
+
+                      <Link
+                        href="/savedjobs"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <BookmarkCheck className="w-4 h-4 text-gray-400" /> Saved Jobs
+                      </Link>
+
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-bold text-red-600 hover:bg-red-50 w-full text-left cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4" /> Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
+            /* Guest Auth: ONLY ONE clean button (no extra buttons) */
             <Link
               href={authButtonConfig.href}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs"
             >
               {authButtonConfig.label}
             </Link>
           )}
 
+          {/* Mobile Menu Hamburger Button */}
           <button
+            type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl"
+            className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+            aria-label="Toggle navigation"
           >
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* LOCATION POPUP MODAL */}
-      {locationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-md my-auto rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 max-h-[90vh] flex flex-col">
-            
+      {/* MOBILE DRAWER NAVIGATION */}
+      {menuOpen && (
+        <div className="lg:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top duration-200">
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl mb-2">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold text-gray-800">
+                {selectedCityName} {selectedAreaName !== "Select Area" ? `· ${selectedAreaName}` : ""}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                handleOpenModal();
+              }}
+              className="text-xs font-bold text-blue-600 cursor-pointer"
+            >
+              Change
+            </button>
+          </div>
+
+          <nav className="flex flex-col space-y-1">
+            {navLinks.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className={`px-3.5 py-2.5 rounded-xl text-sm font-semibold transition ${
+                  isActive(l.href)
+                    ? "bg-blue-50 text-blue-600 font-bold"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Mobile Guest Auth: Only ONE button */}
+          {!user && (
+            <div className="pt-2 border-t border-gray-100">
+              <Link
+                href={authButtonConfig.href}
+                onClick={() => setMenuOpen(false)}
+                className="w-full block py-2.5 bg-blue-600 text-white text-center rounded-xl text-sm font-bold shadow-xs"
+              >
+                {authButtonConfig.label}
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LOCATION POPUP MODAL (RENDERED VIA PORTAL DIRECTLY ON DOCUMENT.BODY: NEVER HIDDEN UNDER MAIN PAGE) */}
+      {mounted && locationModalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+          onClick={() => setLocationModalOpen(false)}
+        >
+          <div
+            className="relative bg-white w-full max-w-lg my-auto rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[92vh] flex flex-col z-10 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-                Select Location
-              </h3>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-blue-600 rotate-45" />
+                <h3 className="text-base font-bold text-gray-900">
+                  Select Your City & Area
+                </h3>
+              </div>
               <button
+                type="button"
                 onClick={() => setLocationModalOpen(false)}
-                className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
-              
-              {/* Google Current Location Button */}
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {/* 1. GPS Auto-Detect Button */}
               <button
-                onClick={handleUseCurrentLocation}
+                type="button"
+                onClick={() => requestCurrentLocation(true)}
                 disabled={detectingLocation}
-                className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 text-sm sm:text-base"
+                className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl text-blue-700 font-bold hover:bg-blue-100 transition cursor-pointer disabled:opacity-50 text-sm"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   {detectingLocation ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                   ) : (
-                    <Locate className="w-5 h-5 shrink-0" />
+                    <Locate className="w-4 h-4 text-blue-600" />
                   )}
-                  <span className="truncate">
-                    {detectingLocation
-                      ? "Fetching Precise Location..."
-                      : "Use My Current Location"}
+                  <span>
+                    {detectingLocation ? "Detecting Precise GPS Location..." : "Use My Current Location"}
                   </span>
                 </div>
-                <ChevronDown className="w-4 h-4 -rotate-90 shrink-0" />
+                <span className="text-[11px] font-semibold text-blue-600 uppercase">GPS</span>
               </button>
 
-              {/* Fetched Geolocation Display Card */}
+              {/* Detected Geolocation Card */}
               {geoDetectedData && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs sm:text-sm text-emerald-800">
-                  <span className="font-bold">Detected: </span>
-                  {geoDetectedData.city}, {geoDetectedData.area}
+                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs sm:text-sm text-emerald-800">
+                  <div>
+                    <span className="font-bold">Detected: </span>
+                    {geoDetectedData.city} {geoDetectedData.area ? `· ${geoDetectedData.area}` : ""}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => applyAndSaveLocation(geoDetectedData.city, geoDetectedData.area)}
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
+                  >
+                    Confirm
+                  </button>
                 </div>
               )}
 
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink mx-3 text-xs text-gray-400 font-bold uppercase">OR</span>
-                <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
-              {/* Dynamic State Dropdown */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  State
-                </label>
-                <div className="relative">
-                  <select
-                    value={tempStateUuid}
-                    onChange={handleStateChange}
-                    className="w-full appearance-none px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select State</option>
-                    {statesList.map((state) => (
-                      <option key={state.uuid} value={state.uuid}>
-                        {state.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Dynamic City Dropdown */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  City
-                </label>
-              
-                <div className="relative">
-                  <select
-                    value={tempCityUuid}
-                    onChange={handleCityChange}
-                    disabled={!tempStateUuid || loadingCities}
-                    className="w-full appearance-none px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    <option value="">
-                      {loadingCities ? "Loading cities..." : "Select City"}
-                    </option>
-                    {citiesList.map((city) => (
-                      <option key={city.uuid} value={city.uuid}>
-                        {city.name}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingCities ? (
-                    <Loader2 className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 animate-spin" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  )}
-                </div>
-              </div>
-
-              {/* Dynamic Area Dropdown */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Area / Town
-                </label>
-                <div className="relative">
-                  <select
-                    value={tempAreaName}
-                    onChange={(e) => {
-                      setTempAreaName(e.target.value);
-                      setGeoDetectedData(null);
-                    }}
-                    disabled={!tempCityUuid || loadingTowns}
-                    className="w-full appearance-none px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    <option value="">
-                      {loadingTowns ? "Loading areas..." : "Select Area"}
-                    </option>
-                    {townsList.map((town, idx) => (
-                      <option key={idx} value={town.town_name}>
-                        {town.town_name}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingTowns ? (
-                    <Loader2 className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 animate-spin" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  )}
-                </div>
-              </div>
-
-              {/* Error Toast Message */}
               {locationError && (
-                <div className="p-3 bg-red-500 text-white text-xs sm:text-sm font-medium rounded-xl text-center shadow-md">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl">
                   {locationError}
                 </div>
               )}
 
-              {/* SAVE BUTTON */}
-              {isSaveAvailable && (
+              {/* Tabs: Live Area Search vs Popular Localities vs State/City Dropdown */}
+              <div className="flex border-b border-gray-100 gap-2 text-xs font-bold">
                 <button
-                  onClick={handleApplyLocation}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm sm:text-base rounded-2xl transition-colors shadow-lg mt-2"
+                  type="button"
+                  onClick={() => setActiveTab("search")}
+                  className={`pb-2 px-1 border-b-2 transition cursor-pointer ${
+                    activeTab === "search"
+                      ? "border-blue-600 text-blue-600 font-extrabold"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
                 >
-                  Save Location
+                  Area Search (Google)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("popular")}
+                  className={`pb-2 px-1 border-b-2 transition cursor-pointer ${
+                    activeTab === "popular"
+                      ? "border-blue-600 text-blue-600 font-extrabold"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  Popular Localities
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("manual")}
+                  className={`pb-2 px-1 border-b-2 transition cursor-pointer ${
+                    activeTab === "manual"
+                      ? "border-blue-600 text-blue-600 font-extrabold"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  State & City List
+                </button>
+              </div>
+
+              {/* TAB 1: Live Area Search with Google Places Autocomplete */}
+              {activeTab === "search" && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={areaSearchInput}
+                      onChange={(e) => setAreaSearchInput(e.target.value)}
+                      placeholder="Type colony, area or locality (e.g. Vaishali Nagar, Malviya Nagar)..."
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    {loadingGoogle && (
+                      <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                    )}
+                  </div>
+
+                  {googlePredictions.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto space-y-1 border border-gray-100 rounded-2xl p-1 bg-white">
+                      {googlePredictions.map((pred) => (
+                        <button
+                          key={pred.place_id}
+                          type="button"
+                          onClick={() => handleSelectPrediction(pred)}
+                          className="w-full flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-blue-50 text-left transition cursor-pointer group"
+                        >
+                          <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-blue-600">
+                              {pred.structured_formatting?.main_text || pred.description}
+                            </p>
+                            <p className="text-[11px] text-gray-400 truncate">
+                              {pred.structured_formatting?.secondary_text || ""}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : areaSearchInput.length >= 2 && !loadingGoogle ? (
+                    <p className="text-xs text-gray-400 text-center py-4">
+                      No matching areas found. Try typing a nearby landmark or city name.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      💡 Start typing any area in India to get live Google Places suggestions.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: Popular Localities Chips */}
+              {activeTab === "popular" && (
+                <div className="space-y-3">
+                  {/* City Selector Buttons */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {POPULAR_CITIES.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setActiveCityTab(c)}
+                        className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                          activeCityTab === c
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                            : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Localities for active city */}
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Popular Areas in {activeCityTab}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(POPULAR_LOCALITIES_BY_CITY[activeCityTab] || []).map((locality) => (
+                        <button
+                          key={locality}
+                          type="button"
+                          onClick={() => handleSelectLocality(activeCityTab, locality)}
+                          className="px-3 py-2 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 border border-gray-200 hover:border-blue-200 rounded-xl text-xs font-semibold text-gray-700 transition cursor-pointer"
+                        >
+                          {locality}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: State & City Dropdown fallback */}
+              {activeTab === "manual" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+                      State
+                    </label>
+                    <select
+                      value={tempStateUuid}
+                      onChange={handleStateChange}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm bg-gray-50 outline-none"
+                    >
+                      <option value="">Select State</option>
+                      {statesList.map((st) => (
+                        <option key={st.uuid} value={st.uuid}>
+                          {st.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+                      City
+                    </label>
+                    <select
+                      value={tempCityUuid}
+                      onChange={handleCityChange}
+                      disabled={!tempStateUuid || loadingCities}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm bg-gray-50 outline-none disabled:opacity-50"
+                    >
+                      <option value="">
+                        {loadingCities ? "Loading cities..." : "Select City"}
+                      </option>
+                      {citiesList.map((c) => (
+                        <option key={c.uuid} value={c.uuid}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {tempCityName && (
+                    <button
+                      type="button"
+                      onClick={handleApplyManualLocation}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs mt-2 cursor-pointer"
+                    >
+                      Set Location to {tempCityName}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

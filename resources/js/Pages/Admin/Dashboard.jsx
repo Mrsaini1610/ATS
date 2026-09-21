@@ -89,9 +89,9 @@ export default function Dashboard({
     <>
       <Head title={`${role.replace("_", " ").toUpperCase()} Dashboard - ATS`} />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3.5 sm:p-5 lg:p-6 space-y-5 sm:space-y-6">
         {/* Welcome Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
               Welcome back, {admin?.name ? admin.name.split(" ")[0] : "User"}! 👋
@@ -102,14 +102,14 @@ export default function Dashboard({
                 : "Here's what's happening on ATS Recruitment Platform today."}
             </p>
           </div>
-          <div className="text-right hidden sm:block">
+          <div className="text-left sm:text-right">
             <p className="text-xs font-bold text-gray-500">🇮🇳 ATS Technologies</p>
             <p className="text-xs font-semibold text-gray-400 mt-0.5">{currentMonthYear}</p>
           </div>
         </div>
 
         {/* Stats Grid - Role based conditions */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {canManagePlatform && (
             <>
               <StatCard
@@ -185,7 +185,7 @@ export default function Dashboard({
         </div>
 
         {/* Middle Tables Grid */}
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
           {/* Pending Approvals: Only Super Admin & Admin */}
           {canManagePlatform && (
             <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">

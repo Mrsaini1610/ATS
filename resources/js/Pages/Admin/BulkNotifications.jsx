@@ -181,23 +181,23 @@ export default function BulkNotifications({
     <>
       <Head title="Bulk Notifications - WorkIndia Admin" />
 
-      <div className="p-6">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {toast && (
-          <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {toast}
+          <div className="fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm max-w-[90vw]">
+            <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" /> <span className="truncate">{toast}</span>
           </div>
         )}
 
         <div className="mb-5">
-          <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
-            <Megaphone className="w-5 h-5 text-blue-600" /> Bulk Notifications
+          <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 flex items-center gap-2 tracking-tight">
+            <Megaphone className="w-5 h-5 text-blue-600 shrink-0" /> Bulk Notifications
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             Send targeted messages to candidates via WhatsApp or Email
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           {/* ── Filters Panel ── */}
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
@@ -410,7 +410,7 @@ export default function BulkNotifications({
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
                 Send via Channel
               </p>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setChannel("whatsapp")}
@@ -514,7 +514,7 @@ export default function BulkNotifications({
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 {channel === "whatsapp" && (
                   <button
                     type="button"

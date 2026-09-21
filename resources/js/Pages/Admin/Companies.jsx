@@ -15,8 +15,9 @@ import {
   MapPin,
   ChevronRight,
   Users,
+  AlertCircle,
+  Compass,
 } from "lucide-react";
-import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const COLORS = [
   "bg-blue-600",
@@ -32,7 +33,7 @@ const COMPANY_SIZES = [
   "11 - 50 employees",
   "51 - 200 employees",
   "201 - 500 employees",
-  "500+ employees"
+  "500+ employees",
 ];
 
 export default function Companies({ companies = [] }) {
@@ -61,6 +62,35 @@ export default function Companies({ companies = [] }) {
     status: "active",
   });
 
+  const validateName = (name) => {
+    const val = (name || "").trim();
+    if (!val) return "Company name is required.";
+    if (val.length < 2) return "Company name must be at least 2 characters.";
+    return null;
+  };
+
+  const validateAddress = (address) => {
+    const val = (address || "").trim();
+    if (!val) return "Complete company address is required.";
+    if (val.length < 5) return "Please enter a detailed company address (min 5 characters).";
+    return null;
+  };
+
+  const validateWebsite = (website) => {
+    const val = (website || "").trim();
+    if (!val) return null;
+    const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/;
+    if (!urlPattern.test(val)) {
+      return "Please enter a valid website URL (e.g. https://company.com).";
+    }
+    return null;
+  };
+
+  const validateCompanySize = (size) => {
+    if (!size) return "Company size is required.";
+    return null;
+  };
+
   const openAddModal = () => {
     clearErrors();
     reset();
@@ -82,7 +112,12 @@ export default function Companies({ companies = [] }) {
 
   const openEditModal = (comp) => {
     clearErrors();
-    const isImg = comp.logo && (comp.logo.startsWith("http") || comp.logo.includes(".") || comp.logo.includes("/") || comp.logo.startsWith("company-logos/"));
+    const isImg =
+      comp.logo &&
+      (comp.logo.startsWith("http") ||
+        comp.logo.includes(".") ||
+        comp.logo.includes("/") ||
+        comp.logo.startsWith("company-logos/"));
     setLogoType(isImg ? "image" : "initials");
 
     setData({
@@ -90,8 +125,8 @@ export default function Companies({ companies = [] }) {
       website: comp.website || "",
       location: comp.location || "",
       address: comp.address || comp.location || "",
-      latitude: comp.latitude || null,
-      longitude: comp.longitude || null,
+      latitude: comp.latitude ? Number(comp.latitude) : null,
+      longitude: comp.longitude ? Number(comp.longitude) : null,
       company_size: comp.company_size || "1 - 10 employees",
       logo: comp.logo || "",
       description: comp.description || "",
@@ -106,41 +141,116 @@ export default function Companies({ companies = [] }) {
     clearErrors();
   };
 
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setData((prev) => ({
+      ...prev,
+      name: val,
+      logo: logoType === "initials" ? val.slice(0, 2).toUpperCase() : prev.logo,
+    }));
+    const err = validateName(val);
+    if (err) setError("name", err);
+    else clearErrors("name");
+  };
+
   const handleAddressChange = (address) => {
-    setData((prev) => ({ ...prev, address, latitude: null, longitude: null }));
+    setData((prev) => ({ ...prev, address }));
+    const err = validateAddress(address);
+    if (err) setError("address", err);
+    else clearErrors("address");
+  };
+
+  const handleLatLngChange = ({ latitude, longitude }) => {
+    setData((prev) => ({
+      ...prev,
+      latitude: latitude != null ? Number(Number(latitude).toFixed(7)) : null,
+      longitude: longitude != null ? Number(Number(longitude).toFixed(7)) : null,
+    }));
+    clearErrors("latitude");
+    clearErrors("longitude");
+  };
+
+  const handleWebsiteChange = (e) => {
+    const val = e.target.value;
+    setData("website", val);
+    const err = validateWebsite(val);
+    if (err) setError("website", err);
+    else clearErrors("website");
+  };
+
+  const handleCompanySizeChange = (e) => {
+    const val = e.target.value;
+    setData("company_size", val);
+    const err = validateCompanySize(val);
+    if (err) setError("company_size", err);
+    else clearErrors("company_size");
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    clearErrors();
+
+    let hasErr = false;
+    const nameErr = validateName(data.name);
+    if (nameErr) {
+      setError("name", nameErr);
+      hasErr = true;
+    }
+    const addrErr = validateAddress(data.address);
+    if (addrErr) {
+      setError("address", addrErr);
+      hasErr = true;
+    }
+    const webErr = validateWebsite(data.website);
+    if (webErr) {
+      setError("website", webErr);
+      hasErr = true;
+    }
+    const sizeErr = validateCompanySize(data.company_size);
+    if (sizeErr) {
+      setError("company_size", sizeErr);
+      hasErr = true;
+    }
+
+    if (hasErr) return;
+
     if (modal.mode === "add") {
       post(route("admin.companies.store"), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
       });
     } else {
-      router.post(route("admin.companies.update", modal.uuid), {
-        _method: 'PUT',
-        name: data.name,
-        website: data.website,
-        location: data.location,
-        address: data.address,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        company_size: data.company_size,
-        logo: data.logo,
-        description: data.description,
-        status: data.status,
-      }, {
-        preserveScroll: true,
-        onSuccess: () => closeModal(),
-      });
+      router.post(
+        route("admin.companies.update", modal.uuid),
+        {
+          _method: "PUT",
+          name: data.name,
+          website: data.website,
+          location: data.location,
+          address: data.address,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          company_size: data.company_size,
+          logo: data.logo,
+          description: data.description,
+          status: data.status,
+        },
+        {
+          preserveScroll: true,
+          onSuccess: () => closeModal(),
+        }
+      );
     }
   };
 
   const handleToggleStatus = (uuid) => {
-    router.post(route("admin.companies.toggle-status", uuid), {}, {
-      preserveScroll: true,
-    });
+    router.post(
+      route("admin.companies.toggle-status", uuid),
+      {},
+      {
+        preserveScroll: true,
+      }
+    );
   };
 
   const confirmDelete = () => {
@@ -165,56 +275,61 @@ export default function Companies({ companies = [] }) {
     <>
       <Head title="Registered Companies - ATS Admin" />
 
-      <div className="p-6 pb-32">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-32">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
           </div>
         )}
 
+        {/* Add / Edit Company Modal */}
         {modal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
-              <div className="flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col border border-gray-100 overflow-hidden">
+              {/* Fixed Header with ❌ Close Button */}
+              <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 bg-white shrink-0 z-10">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-base">
                   <Building2 className="w-5 h-5 text-blue-600" />
                   {modal.mode === "add" ? "Add New Company" : "Edit Company Details"}
                 </h3>
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer transition"
+                  title="Close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Scrollable Form Body */}
+              <div className="overflow-y-auto p-4 sm:p-6 flex-1">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Company Name */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Company Name *
+                    Company Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={data.name}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setData((prev) => ({
-                        ...prev,
-                        name: val,
-                        logo: logoType === "initials" ? val.slice(0, 2).toUpperCase() : prev.logo,
-                      }));
-                    }}
+                    onChange={handleNameChange}
                     placeholder="e.g. Apex Global Tech"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
+                      errors.name
+                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
+                        : "border-gray-200 focus:ring-blue-500"
+                    }`}
                     autoFocus
                   />
                   {errors.name && (
-                    <p className="text-xs text-red-500 mt-1">{errors.name}</p>
+                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> {errors.name}
+                    </p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       City / Location
@@ -222,7 +337,7 @@ export default function Companies({ companies = [] }) {
                     <input
                       type="text"
                       value={data.location}
-                      onChange={(e) => updateAdminField(setData, setError, clearErrors, "location", e.target.value, data)}
+                      onChange={(e) => setData("location", e.target.value)}
                       placeholder="e.g. Jaipur, Rajasthan"
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     />
@@ -230,39 +345,96 @@ export default function Companies({ companies = [] }) {
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Company Size
+                      Company Size <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={data.company_size}
-                      onChange={(e) => setData("company_size", e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      onChange={handleCompanySizeChange}
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
                     >
-                      {COMPANY_SIZES.map((size) => (
-                        <option key={size} value={size}>{size}</option>
-                      ))}
+                      <option value="1 - 10 employees">1 - 10 employees</option>
+                      <option value="11 - 50 employees">11 - 50 employees</option>
+                      <option value="51 - 200 employees">51 - 200 employees</option>
+                      <option value="201 - 500 employees">201 - 500 employees</option>
+                      <option value="500+ employees">500+ employees</option>
                     </select>
                   </div>
                 </div>
 
+                {/* Company Address with GPS auto-coordinates */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Complete Company Address *
+                    Company Address <span className="text-red-500">*</span>
                   </label>
                   <LocationInput
                     value={data.address}
-                    onChange={handleAddressChange}
-                    onLatLngChange={({ latitude, longitude }) =>
-                      setData((prev) => ({ ...prev, latitude, longitude }))
-                    }
-                    placeholder="Enter complete company address..."
+                    onChange={(addr, lat, lng) => {
+                      setData((prev) => ({
+                        ...prev,
+                        address: addr,
+                        ...(lat !== null && { latitude: lat }),
+                        ...(lng !== null && { longitude: lng }),
+                      }));
+                      const err = validateAddress(addr);
+                      if (err) setError("address", err);
+                      else clearErrors("address");
+                    }}
+                    placeholder="Enter street, landmark, area, city..."
+                    hasError={Boolean(errors.address)}
                   />
-                  {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    <input value={data.latitude ?? ""} readOnly placeholder="Latitude auto-filled" className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100" />
-                    <input value={data.longitude ?? ""} readOnly placeholder="Longitude auto-filled" className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100" />
+                  {errors.address && (
+                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> {errors.address}
+                    </p>
+                  )}
+
+                  {/* Auto-filled Coordinates Display */}
+                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        Coordinates (Latitude & Longitude)
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {data.latitude && data.longitude
+                          ? "Auto-filled and will save to database"
+                          : "Type address above to auto-detect"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Latitude
+                        </label>
+                        <input
+                          type="text"
+                          value={data.latitude ?? ""}
+                          onChange={(e) =>
+                            setData("latitude", e.target.value ? Number(e.target.value) : null)
+                          }
+                          placeholder="e.g. 26.8530"
+                          className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Longitude
+                        </label>
+                        <input
+                          type="text"
+                          value={data.longitude ?? ""}
+                          onChange={(e) =>
+                            setData("longitude", e.target.value ? Number(e.target.value) : null)
+                          }
+                          placeholder="e.g. 75.8047"
+                          className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* Logo Format and Input */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -274,7 +446,7 @@ export default function Companies({ companies = [] }) {
                         const type = e.target.value;
                         setLogoType(type);
                         if (type === "initials") {
-                          setData("logo", data.name.slice(0, 2).toUpperCase());
+                          setData("logo", (data.name || "").slice(0, 2).toUpperCase());
                         } else {
                           setData("logo", "");
                         }
@@ -293,7 +465,7 @@ export default function Companies({ companies = [] }) {
                     {logoType === "initials" ? (
                       <input
                         type="text"
-                        value={typeof data.logo === 'string' ? data.logo : ''}
+                        value={typeof data.logo === "string" ? data.logo : ""}
                         onChange={(e) =>
                           setData("logo", e.target.value.toUpperCase().slice(0, 2))
                         }
@@ -314,19 +486,30 @@ export default function Companies({ companies = [] }) {
                   </div>
                 </div>
 
+                {/* Website URL */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Website URL
+                    Website URL (Optional)
                   </label>
                   <input
                     type="text"
                     value={data.website}
-                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "website", e.target.value, data)}
+                    onChange={handleWebsiteChange}
                     placeholder="https://company.com"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
+                      errors.website
+                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
+                        : "border-gray-200 focus:ring-blue-500"
+                    }`}
                   />
+                  {errors.website && (
+                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> {errors.website}
+                    </p>
+                  )}
                 </div>
 
+                {/* Description */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Description / About
@@ -334,12 +517,13 @@ export default function Companies({ companies = [] }) {
                   <textarea
                     rows={3}
                     value={data.description}
-                    onChange={(e) => updateAdminField(setData, setError, clearErrors, "description", e.target.value, data)}
+                    onChange={(e) => setData("description", e.target.value)}
                     placeholder="Brief description about company and business domain..."
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
+                {/* Listing Status */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Listing Status
@@ -358,14 +542,14 @@ export default function Companies({ companies = [] }) {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium"
+                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={processing}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60"
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60 transition"
                   >
                     {processing ? "Saving..." : "Save Company"}
                   </button>
@@ -373,8 +557,10 @@ export default function Companies({ companies = [] }) {
               </form>
             </div>
           </div>
+        </div>
         )}
 
+        {/* Delete Confirmation Modal */}
         {deleteUuid && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center border border-gray-100 animate-scale-in">
@@ -403,43 +589,52 @@ export default function Companies({ companies = [] }) {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-5">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Companies</h1>
+            <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
+              <Building2 className="w-6 h-6 text-blue-600" /> Registered Companies
+            </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {companies.length} companies registered
+              {companies.length} partner companies · Address & GPS coordinates auto-synced
             </p>
           </div>
 
-          {can("create_companies") && (
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4" /> Add Company
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search companies, city, website..."
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs w-64 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            {can("create_companies") && (
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Add Company
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="relative mb-5 w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search company by name, location, website..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="flex gap-5 items-start">
-          {/* Flexbox layout container to keep exact card dimensions and wrap nicely */}
-          <div className={`flex-1 flex flex-wrap gap-4 ${selectedCompany ? "max-w-[calc(100%-380px)]" : "w-full"}`}>
+        {/* Companies Grid */}
+        <div className="flex gap-6 items-start">
+          <div className="flex-1 flex flex-wrap gap-4">
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
               const isSelected = selectedCompany?.uuid === company.uuid;
-              const isImageUrl = company.logo && (company.logo.startsWith("http") || company.logo.includes(".") || company.logo.includes("/") || company.logo.startsWith("company-logos/"));
+              const isImageUrl =
+                company.logo &&
+                (company.logo.startsWith("http") ||
+                  company.logo.includes(".") ||
+                  company.logo.includes("/") ||
+                  company.logo.startsWith("company-logos/"));
 
               return (
                 <div
@@ -448,7 +643,9 @@ export default function Companies({ companies = [] }) {
                   className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[calc(50%-8px)] ${
                     selectedCompany ? "xl:w-[calc(50%-8px)]" : "xl:w-[calc(33.333%-11px)]"
                   } ${
-                    isSelected ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/25" : "border-gray-100 hover:border-blue-200"
+                    isSelected
+                      ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/25"
+                      : "border-gray-100 hover:border-blue-200"
                   }`}
                 >
                   <div>
@@ -456,9 +653,21 @@ export default function Companies({ companies = [] }) {
                       {isImageUrl ? (
                         <div className="w-12 h-12 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                           <img
-                            src={company.logo.startsWith("http") ? company.logo : `/storage/${company.logo}`}
+                            src={
+                              company.logo.startsWith("http")
+                                ? company.logo
+                                : `/storage/${company.logo}`
+                            }
                             alt={company.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                parent.className = `w-12 h-12 ${randomColor} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs`;
+                                parent.innerText = (company.name || "C").slice(0, 2).toUpperCase();
+                              }
+                            }}
                           />
                         </div>
                       ) : (
@@ -478,86 +687,96 @@ export default function Companies({ companies = [] }) {
                                 : "bg-gray-100 text-gray-500"
                             }`}
                           >
-                            {company.status === "active" ? "Active" : "Inactive"}
+                            {company.status}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">
-                          {company.slug}
-                        </p>
+                        {company.website && (
+                          <a
+                            href={
+                              company.website.startsWith("http")
+                                ? company.website
+                                : `https://${company.website}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                          >
+                            <Globe className="w-3 h-3" />
+                            {company.website.replace(/^https?:\/\//, "")}
+                          </a>
+                        )}
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 text-xs text-gray-500 mb-4">
-                      <p className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="truncate">{company.location || "Location not set"}</span>
-                      </p>
+                    <div className="space-y-1.5 mb-4">
+                      {company.location && (
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{company.location}</span>
+                        </p>
+                      )}
+                      {company.address && (
+                        <p className="text-[11px] text-gray-400 flex items-center gap-1.5 line-clamp-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                          <span className="truncate">{company.address}</span>
+                        </p>
+                      )}
+                      {company.latitude && company.longitude && (
+                        <p className="text-[10px] font-mono text-emerald-600 flex items-center gap-1">
+                          <Compass className="w-3 h-3" />
+                          GPS: {Number(company.latitude).toFixed(4)}, {Number(company.longitude).toFixed(4)}
+                        </p>
+                      )}
                       {company.company_size && (
-                        <p className="flex items-center gap-1.5">
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate">{company.company_size}</span>
+                          <span>{company.company_size}</span>
                         </p>
                       )}
-                      {company.website && (
-                        <p className="flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <a
-                            href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 hover:underline truncate"
-                          >
-                            {company.website}
-                          </a>
-                        </p>
-                      )}
-                      <p className="flex items-center gap-1.5">
-                        <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span>{company.jobs_count ?? 0} active jobs</span>
-                      </p>
                     </div>
-
-                    {company.description && (
-                      <p className="text-xs text-gray-400 leading-relaxed mb-4 line-clamp-2">
-                        {company.description}
-                      </p>
-                    )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
-                    <span className="text-xs font-semibold text-blue-600 flex items-center gap-0.5 shrink-0">
-                      View <ChevronRight className="w-3.5 h-3.5" />
+                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Briefcase className="w-3 h-3" />
+                      {company.jobs_count || 0} active {company.jobs_count === 1 ? "job" : "jobs"}
                     </span>
 
-                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {can("edit_companies") && <button
-                        type="button"
-                        onClick={() => handleToggleStatus(company.uuid)}
-                        className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition ${
-                          company.status === "active"
-                            ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                            : "bg-green-50 text-green-700 hover:bg-green-100"
-                        } cursor-pointer`}
-                      >
-                        {company.status === "active" ? "Deactivate" : "Activate"}
-                      </button>}
-                      {can("edit_companies") && <button
-                        type="button"
-                        onClick={() => openEditModal(company)}
-                        className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
-                        title="Edit"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>}
-                      {can("delete_companies") && <button
-                        type="button"
-                        onClick={() => setDeleteUuid(company.uuid)}
-                        className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>}
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {can("status_companies") && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(company.uuid)}
+                          className={`text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                            company.status === "active"
+                              ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                              : "text-green-600 bg-green-50 hover:bg-green-100"
+                          }`}
+                        >
+                          {company.status === "active" ? "Pause" : "Activate"}
+                        </button>
+                      )}
+                      {can("edit_companies") && (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(company)}
+                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
+                          title="Edit"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {can("delete_companies") && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteUuid(company.uuid)}
+                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -576,17 +795,34 @@ export default function Companies({ companies = [] }) {
             <div className="w-full lg:w-80 xl:w-96 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs shrink-0 mb-12">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
                 <div className="flex items-center gap-3 min-w-0">
-                  {selectedCompany.logo && (selectedCompany.logo.startsWith("http") || selectedCompany.logo.includes(".") || selectedCompany.logo.includes("/") || selectedCompany.logo.startsWith("company-logos/")) ? (
+                  {selectedCompany.logo &&
+                  (selectedCompany.logo.startsWith("http") ||
+                    selectedCompany.logo.includes(".") ||
+                    selectedCompany.logo.includes("/") ||
+                    selectedCompany.logo.startsWith("company-logos/")) ? (
                     <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                       <img
-                        src={selectedCompany.logo.startsWith("http") ? selectedCompany.logo : `/storage/${selectedCompany.logo}`}
+                        src={
+                          selectedCompany.logo.startsWith("http")
+                            ? selectedCompany.logo
+                            : `/storage/${selectedCompany.logo}`
+                        }
                         alt={selectedCompany.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.className =
+                              "w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0";
+                            parent.innerText = (selectedCompany.name || "C").slice(0, 2).toUpperCase();
+                          }
+                        }}
                       />
                     </div>
                   ) : (
                     <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
-                      {selectedCompany.logo || selectedCompany.name.slice(0, 2).toUpperCase()}
+                      {selectedCompany.logo || (selectedCompany.name || "C").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
@@ -594,13 +830,22 @@ export default function Companies({ companies = [] }) {
                     <p className="text-xs text-gray-500">Active Job Postings</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCompany(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-200/60 rounded-lg cursor-pointer shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCompany(null)}
+                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCompany(null)}
+                    className="p-1.5 text-gray-400 hover:bg-gray-200/60 rounded-lg cursor-pointer shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-y-auto flex-1 p-5 space-y-3">

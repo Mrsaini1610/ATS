@@ -112,17 +112,17 @@ export default function Skills({ skills = [] }) {
     <>
       <Head title="Skill Management - ATS Admin" />
 
-      <div className="p-6">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
+            <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" /> <span className="truncate">{flash.success}</span>
           </div>
         )}
 
         {/* Modal: Add/Edit Skill */}
         {modal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900">
                   {modal.mode === "add" ? "Add New Skill" : "Edit Skill"}
@@ -213,10 +213,10 @@ export default function Skills({ skills = [] }) {
         )}
 
         {/* Top Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Skills</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">Skills</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
               {skills.length} skills · {skills.filter((s) => s.active).length} active tags
             </p>
           </div>
@@ -225,7 +225,7 @@ export default function Skills({ skills = [] }) {
             <button
               type="button"
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" /> Add Skill
             </button>
@@ -233,18 +233,18 @@ export default function Skills({ skills = [] }) {
         </div>
 
         {/* Search & Categories Tabs */}
-        <div className="flex gap-3 mb-5 flex-wrap">
-          <div className="relative flex-1 min-w-56">
+        <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
+          <div className="relative w-full sm:w-72 md:w-80 shrink-0">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search skills by title or category..."
+              placeholder="Search skills or category..."
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none w-full flex-1">
             {allCats.map((c) => (
               <button
                 type="button"
@@ -263,7 +263,7 @@ export default function Skills({ skills = [] }) {
         </div>
 
         {/* Skills Cards Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((skill) => (
             <div
               key={skill.id}

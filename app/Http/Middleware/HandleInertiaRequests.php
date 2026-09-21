@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
+use Inertia\Inertia;
 use App\Models\Admin;
 
 class HandleInertiaRequests extends Middleware
@@ -46,10 +47,52 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'csrf_token' => csrf_token(),
-            'flash' => [
-                'success' => fn () => $request->session()->pull('success'),
-                'error'   => fn () => $request->session()->pull('error'),
-            ],
+            'flash' => Inertia::always(function () use ($request) {
+                $session = $request->hasSession() ? $request->session() : null;
+                $success = $session ? ($session->get('success') ?? $session->get('status')) : null;
+                $error   = $session ? $session->get('error') : null;
+                $warning = $session ? $session->get('warning') : null;
+                $info    = $session ? $session->get('info') : null;
+
+                // Fallback: check if flasher envelopes exist in session
+                if ($session && $session->has('flasher::envelopes')) {
+                    try {
+                        $rawEnvelopes = $session->get('flasher::envelopes', []);
+                        if (is_array($rawEnvelopes)) {
+                            foreach ($rawEnvelopes as $raw) {
+                                $env = null;
+                                if ($raw instanceof \Flasher\Prime\Notification\Envelope) {
+                                    $env = $raw;
+                                } elseif (is_string($raw)) {
+                                    $env = @unserialize($raw);
+                                }
+                                if ($env instanceof \Flasher\Prime\Notification\Envelope) {
+                                    $t = $env->getType();
+                                    $m = $env->getMessage();
+                                    if ($t === 'success' && empty($success)) $success = $m;
+                                    elseif ($t === 'error' && empty($error)) $error = $m;
+                                    elseif ($t === 'warning' && empty($warning)) $warning = $m;
+                                    elseif ($t === 'info' && empty($info)) $info = $m;
+                                }
+                            }
+                        }
+                        $session->forget('flasher::envelopes');
+                    } catch (\Throwable $e) {
+                        // ignore gracefully
+                    }
+                }
+
+                return [
+                    'success' => $success,
+                    'error'   => $error,
+                    'warning' => $warning,
+                    'info'    => $info,
+                    '_key'    => ($success || $error || $warning || $info) ? uniqid('flash_', true) : null,
+                ];
+            }),
+            'messages' => Inertia::always(function () use ($request) {
+                return ['envelopes' => []];
+            }),
         ]);
     }
 }

@@ -36,11 +36,15 @@ const ALL_PERMISSIONS = [
 ];
 
 const PERM_GROUPS = [
-  { label: "Job Management", perms: ["create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
+  { label: "Job Moderation", perms: ["view_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
   { label: "Applications", perms: ["view_applications", "update_application_status"] },
-  { label: "Company & Content", perms: ["create_companies", "edit_companies", "create_categories", "create_skills"] },
-  { label: "Team & Users", perms: ["create_team_member", "manage_permissions", "add_users", "view_users", "call_users"] },
-  { label: "Tasks & Interviews", perms: ["assign_tasks", "view_tasks", "complete_tasks", "schedule_interviews", "update_interviews"] },
+  { label: "Companies", perms: ["view_companies", "create_companies", "edit_companies", "status_companies", "delete_companies"] },
+  { label: "Categories & Subcategories", perms: ["view_categories", "create_categories", "edit_categories", "status_categories", "delete_categories", "view_subcategories", "create_subcategories", "edit_subcategories", "status_subcategories", "delete_subcategories"] },
+  { label: "Skills", perms: ["view_skills", "create_skills", "edit_skills", "status_skills", "delete_skills"] },
+  { label: "Candidates / Users", perms: ["view_users", "add_users", "status_users"] },
+  { label: "Tasks", perms: ["view_tasks", "assign_tasks", "status_tasks"] },
+  { label: "Interviews", perms: ["view_interviews", "schedule_interviews", "status_interviews"] },
+  { label: "Staff & Team", perms: ["view_team_member", "create_team_member", "edit_team_member", "status_team_member", "delete_team_member"] },
 ];
 
 export default function AdminProfile({ userStats = {}, permissions = [] }) {
@@ -100,18 +104,18 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
     <>
       <Head title="My Profile - WorkIndia Admin" />
 
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-3.5 sm:p-5 lg:p-6 max-w-3xl mx-auto pb-25">
         {/* Flash Message Banner */}
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
+            <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" /> <span className="truncate">{flash.success}</span>
           </div>
         )}
 
         {/* Change password modal */}
         {showPwModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600" /> Change Password
@@ -176,18 +180,24 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Confirm New Password</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Confirm New Password
+                  </label>
                   <input
                     type="password"
                     value={passwordForm.data.new_password_confirmation}
-                    onChange={(e) => passwordForm.setData("new_password_confirmation", e.target.value)}
+                    onChange={(e) => updateAdminField(passwordForm.setData, passwordForm.setError, passwordForm.clearErrors, "new_password_confirmation", e.target.value, passwordForm.data)}
                     placeholder="••••••••"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-                  {passwordForm.errors.new_password_confirmation && <p className="text-xs text-red-500 mt-1">{passwordForm.errors.new_password_confirmation}</p>}
+                  {passwordForm.data.new_password &&
+                    passwordForm.data.new_password_confirmation &&
+                    passwordForm.data.new_password !== passwordForm.data.new_password_confirmation && (
+                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    )}
                 </div>
 
-                <div className="flex gap-3 mt-5">
+                <div className="flex gap-3 pt-3">
                   <button
                     type="button"
                     onClick={() => setShowPwModal(false)}
@@ -208,19 +218,19 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
           </div>
         )}
 
-        <h1 className="text-xl font-extrabold text-gray-900 mb-6">My Profile</h1>
+        <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight mb-5 sm:mb-6">My Profile</h1>
 
         {/* Profile Card */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5 shadow-xs">
-          <div className="flex items-start gap-5">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-6 mb-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold shrink-0 shadow-md shadow-blue-500/20">
               {initials}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 w-full">
               {editing ? (
                 <form onSubmit={handleSaveProfile} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 text-left">Full Name</label>
                     <input
                       value={profileForm.data.name}
                       onChange={(e) => updateAdminField(profileForm.setData, profileForm.setError, profileForm.clearErrors, "name", e.target.value, profileForm.data)}
@@ -231,14 +241,14 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 text-left">Phone</label>
                     <input
                       value={profileForm.data.phone}
                       onChange={(e) => updateAdminField(profileForm.setData, profileForm.setError, profileForm.clearErrors, "phone", e.target.value, profileForm.data)}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1 justify-center sm:justify-start">
                     <button
                       type="button"
                       onClick={() => setEditing(false)}
@@ -258,7 +268,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
               ) : (
                 <>
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="w-full sm:w-auto">
                       <h2 className="text-xl font-extrabold text-gray-900">{currentUser.name}</h2>
                       <span
                         className={`text-xs font-semibold px-2.5 py-1 rounded-full border inline-block mt-1 ${
@@ -270,12 +280,12 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
                     </div>
                     <button
                       onClick={() => setEditing(true)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer transition"
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer transition shrink-0"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="mt-3 space-y-1.5">
+                  <div className="mt-3 space-y-1.5 flex flex-col items-center sm:items-start">
                     <p className="text-sm text-gray-500 flex items-center gap-2">
                       <Mail className="w-4 h-4 text-gray-400" />
                       {currentUser.email}
@@ -296,7 +306,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
           </div>
 
           {/* Security */}
-          <div className="mt-5 pt-5 border-t border-gray-100 flex items-center justify-between">
+          <div className="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Lock className="w-4 h-4 text-gray-400" />
               <span>Password</span>
@@ -312,7 +322,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
           {[
             { label: "Tasks", value: userStats.tasksCount ?? 4, color: "bg-blue-50 text-blue-700", icon: "📋" },
             { label: "Applications", value: userStats.appsCount ?? 18, color: "bg-purple-50 text-purple-700", icon: "📄" },
@@ -329,7 +339,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
 
         {/* Permissions Display */}
         {currentUser.role !== "super_admin" && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-6 shadow-xs">
             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
               <Shield className="w-4 h-4 text-blue-600" /> My Permissions
               <span className="ml-auto text-xs text-gray-400 font-normal">
@@ -363,7 +373,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
         )}
 
         {currentUser.role === "super_admin" && (
-          <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-md">
+          <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl p-5 sm:p-6 text-white shadow-md">
             <div className="flex items-center gap-3 mb-2">
               <UserCog className="w-5 h-5 opacity-80" />
               <h3 className="font-bold text-lg">Super Administrator</h3>

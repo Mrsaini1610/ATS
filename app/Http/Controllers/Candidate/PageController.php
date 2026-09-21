@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\JobPost;
 use App\Models\Category;
+use App\Models\Company;
 use Illuminate\Support\Facades\DB;
 
 class PageController extends Controller
@@ -18,32 +19,33 @@ class PageController extends Controller
 
     // Check agar 'categories' table me status column hai tabhi condition lagayein
     if (\Illuminate\Support\Facades\Schema::hasColumn('categories', 'status')) {
-        $categoryQuery->where('categories.status', 1);
+        $categoryQuery->whereIn('categories.status', ['active', '1', 1]);
     }
 
     $categories = $categoryQuery
         ->withCount(['jobPosts' => function ($q) {
             // Explicitly table prefix job_posts.status use karein
-            $q->where('job_posts.status', 'active');
+            $q->whereIn('job_posts.status', ['active', 'approved']);
         }])
         ->orderBy('categories.name', 'asc')
         ->get()
         ->map(function ($item) {
             return [
                 'id'    => $item->id,
+                'uuid'  => $item->uuid,
                 'name'  => $item->name,
                 'slug'  => $item->slug,
                 'jobs'  => $item->job_posts_count,
 
                 // UI Defaults
-                'icon'   => '💼',
+                'icon'   => $item->icon ?: '💼',
                 'iconBg' => 'bg-blue-100',
                 'color'  => 'bg-blue-50 border-blue-200',
                 'trend'  => '+0%',
 
                 // Related Job Titles
                 'subcategories' => $item->jobPosts()
-                    ->where('job_posts.status', 'active')
+                    ->whereIn('job_posts.status', ['active', 'approved'])
                     ->pluck('title')
                     ->take(6)
                     ->values(),
@@ -51,7 +53,7 @@ class PageController extends Controller
         });
 
     // 2. Top Skills
-    $topSkills = JobPost::where('status', 'active')
+    $topSkills = JobPost::whereIn('status', ['active', 'approved'])
         ->whereNotNull('skills')
         ->pluck('skills')
         ->flatten()
@@ -73,33 +75,38 @@ class PageController extends Controller
 
     public function getCompany($company)
     {
-        // JobPost Model & Category Relationship
-        $jobs = JobPost::where('company', $company)
-            ->where('status', 'active')
+        // Check by name or uuid
+        $companyModel = Company::where('uuid', $company)->orWhere('name', $company)->first();
+
+        $jobs = JobPost::where(function ($q) use ($company, $companyModel) {
+                $q->where('company', $company);
+                if ($companyModel) {
+                    $q->orWhere('company_uuid', $companyModel->uuid)
+                      ->orWhere('company', $companyModel->name);
+                }
+            })
+            ->whereIn('status', ['active', 'approved'])
             ->with('category')
             ->get();
 
-        if ($jobs->isEmpty()) {
-            abort(404);
-        }
-
         $first = $jobs->first();
+        $compName = $companyModel ? $companyModel->name : ($first ? $first->company : $company);
+        $compLogo = $companyModel ? $companyModel->logo : ($first ? $first->company_image : null);
 
-        return Inertia::render('Candidate/Company', [
+        return Inertia::render('Candidate/Companies', [
             'company' => [
-                'name'       => $first->company,
-                'logo'       => $first->company_image,
-                'industry'   => $first->category?->name ?? 'General',
-                'hq'         => $first->company_address,
-                'phone'      => $first->contact_phone,
-                'email'      => $first->contact_email,
-                'website'    => '',
-                'tagline'    => $first->company_about ?? '',
-                'size'       => $first->company_size ?? 'Growing',
+                'name'       => $compName,
+                'logo'       => $compLogo,
+                'industry'   => $companyModel?->company_size ?: ($first?->category?->name ?? 'Corporate Services'),
+                'hq'         => $companyModel?->location ?: ($first?->company_address ?: 'India'),
+                'phone'      => $first?->contact_phone ?: '',
+                'email'      => $first?->contact_email ?: '',
+                'website'    => $companyModel?->website ?: '',
+                'tagline'    => $companyModel?->description ?: ($first?->company_about ?: 'Verified Employer on ATS WorkIndia'),
+                'size'       => $companyModel?->company_size ?: ($first?->company_size ?: 'Growing'),
                 'rating'     => '4.8',
                 'bgGradient' => 'from-blue-600 to-indigo-700',
-                // Model casts 'perks' as array, so direct access is safe
-                'perks'      => $first->perks ?? [],
+                'perks'      => $first?->perks ?? ['Health Insurance', 'Performance Bonus', 'Flexible Hours'],
                 'jobs'       => $jobs,
             ]
         ]);
@@ -107,20 +114,42 @@ class PageController extends Controller
 
     public function companies(Request $request)
     {
-        $companies = JobPost::query()
-            ->whereNotNull('company')
-            ->where('company', '!=', '')
-            ->where('status', 'active')
-            ->select([
-                'company',
-                DB::raw('COUNT(*) as jobs_count'),
-                DB::raw('MAX(company_image) as company_image'),
-            ])
-            ->groupBy('company')
-            ->orderBy('company')
-            ->get();
+        $companies = Company::where('status', 'active')
+            ->get()
+            ->map(function ($comp) {
+                $jobsCount = JobPost::where('company_uuid', $comp->uuid)
+                    ->orWhere('company', $comp->name)
+                    ->whereIn('status', ['active', 'approved'])
+                    ->count();
 
-        return Inertia::render('Public/Companies', [
+                return [
+                    'uuid'          => $comp->uuid,
+                    'name'          => $comp->name,
+                    'logo'          => $comp->logo,
+                    'company_image' => $comp->logo,
+                    'location'      => $comp->location ?: $comp->address ?: 'India',
+                    'industry'      => $comp->company_size ?: 'Corporate Services',
+                    'jobs_count'    => $jobsCount,
+                ];
+            });
+
+        if ($companies->isEmpty()) {
+            $companies = JobPost::query()
+                ->whereNotNull('company')
+                ->where('company', '!=', '')
+                ->whereIn('status', ['active', 'approved'])
+                ->select([
+                    'company as name',
+                    DB::raw('COUNT(*) as jobs_count'),
+                    DB::raw('MAX(company_image) as company_image'),
+                    DB::raw('MAX(location) as location'),
+                ])
+                ->groupBy('company')
+                ->orderBy('company')
+                ->get();
+        }
+
+        return Inertia::render('Candidate/CompaniesList', [
             'companies' => $companies,
         ]);
     }

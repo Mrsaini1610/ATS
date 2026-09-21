@@ -33,6 +33,7 @@ class CategoryController extends Controller
                         return [
                             'uuid'      => $sub->uuid ?? (string) $sub->id,
                             'name'      => $sub->name,
+                            'status'    => $sub->status ?? 'active',
                             'job_count' => $sub->job_posts_count ?? 0,
                         ];
                     }),
@@ -105,6 +106,18 @@ public function storeSubcategory(Request $request, Category $category)
         ]);
 
         return back()->with('success', 'Subcategory updated successfully.');
+    }
+
+    public function toggleStatusSubcategory($categoryUuid, $subUuid)
+    {
+        $category = Category::where('uuid', $categoryUuid)->firstOrFail();
+        /** @var Subcategory $subcategory */
+        $subcategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
+        $subcategory->update([
+            'status' => ($subcategory->status === 'active') ? 'inactive' : 'active',
+        ]);
+
+        return back()->with('success', 'Subcategory status successfully updated.');
     }
 
     public function update(Request $request, Category $category)

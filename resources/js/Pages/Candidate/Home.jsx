@@ -1,65 +1,66 @@
-import HomepageLayout from '@/Layouts/HomepageLayout';
+import React from "react";
+import HomepageLayout from "@/Layouts/HomepageLayout";
 import HeroSection from "@/Components/Home/HeroSection";
 import StatsSection from "@/Components/Home/StatsSection";
+import RecommendedJobsSection from "@/Components/Home/RecommendedJobsSection";
+import RecentJobsSection from "@/Components/Home/RecentJobsSection";
 import FeaturesSection from "@/Components/Home/FeaturesSection";
-import FeaturedJobsSection from "@/Components/Home/FeaturedJobsSection";
+import TopCompaniesSection from "@/Components/Home/TopCompaniesSection";
+import TrendingSkillsSection from "@/Components/Home/TrendingSkillsSection";
 import TestimonialsSection from "@/Components/Home/TestimonialsSection";
-import CTASection from "@/Components/Home/CTASection";  
-import { usePage } from "@inertiajs/react";
-import { Head } from '@inertiajs/react';
-
-// export default function Homepage() {
-// export default function Homepage({ stats, jobs }){
-//     return (
-//         <HomepageLayout>
-//             <Head title="Home" />
-
-//             {/* Hero Section */}
-//             <HeroSection />
-
-//             {/* Stats Section */}
-//             <StatsSection />
-
-//             {/* Quick Links / Features Section */}
-//             <FeaturesSection />
-
-//             {/* Featured Jobs Section */}
-//             <FeaturedJobsSection jobs={jobs} />
-
-//             {/* Testimonials Section (Optional) */}
-//             <TestimonialsSection />
-
-//             {/* CTA Banner Section */}
-//             <CTASection />
-//         </HomepageLayout>
-//     );
-// }
+import CTASection from "@/Components/Home/CTASection";
+import { usePage, Head } from "@inertiajs/react";
 
 export default function Homepage() {
-  const { auth, stats, jobs, categories, testimonials } = usePage().props;
+  const {
+    auth,
+    stats,
+    recentJobs = [],
+    recommendedJobs = [],
+    isLoggedIn = false,
+    candidateProfile = null,
+    categories = [],
+    topCompanies = [],
+    trendingSkills = [],
+    testimonials = [],
+  } = usePage().props;
 
   return (
-  
-        <HomepageLayout>
-     
-         <Head title="Home" />
-        {/* Hero Section */}
-        <HeroSection user={auth?.user} />
+    <HomepageLayout>
+      <Head title="WorkIndia ATS - Direct Hiring & Verified Jobs in India" />
 
+      {/* Hero Section with Live Search */}
+      <HeroSection user={auth?.user} />
 
-        <div className="px-4 sm:px-6 space-y-8 max-w-7xl mx-auto">
-
+      <div className="px-4 sm:px-6 space-y-10 sm:space-y-14 max-w-7xl mx-auto py-8">
         {/* Stats Strip */}
         <StatsSection stats={stats} />
-          {/* Quick Actions & Categories */}
-          <FeaturesSection categories={categories} />
 
-          {/* Featured Jobs Section */}
-          <FeaturedJobsSection jobs={jobs} />
+        {/* 1. Recommended Jobs Section (Profile-matched when logged in, teaser for guests) */}
+        <RecommendedJobsSection
+          recommendedJobs={recommendedJobs}
+          isLoggedIn={isLoggedIn}
+          candidateProfile={candidateProfile}
+        />
 
-          {/* Testimonials */}
-          <TestimonialsSection testimonials={testimonials} />
-        </div>
+        {/* 2. Recent Jobs Openings */}
+        <RecentJobsSection recentJobs={recentJobs} />
+
+        {/* 3. Browse by Category */}
+        <FeaturesSection categories={categories} />
+
+        {/* 4. Top Companies Hiring */}
+        <TopCompaniesSection topCompanies={topCompanies} />
+
+        {/* 5. Top Trending Skills */}
+        <TrendingSkillsSection trendingSkills={trendingSkills} />
+
+        {/* 6. Testimonials */}
+        <TestimonialsSection testimonials={testimonials} />
+
+        {/* 7. Call To Action Banner */}
+        <CTASection />
+      </div>
     </HomepageLayout>
-      );
+  );
 }

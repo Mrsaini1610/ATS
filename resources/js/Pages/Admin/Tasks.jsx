@@ -9,6 +9,7 @@ import {
   MapPin,
   Users,
   ClipboardList,
+  Briefcase,
 } from "lucide-react";
 import { updateAdminField } from "@/Components/Admin/liveValidation";
 
@@ -25,11 +26,18 @@ const STATUS_COLOR = {
   overdue: "bg-red-50 text-red-600",
 };
 
-export default function Tasks({ tasks = [], teamMembers = [] }) {
+export default function Tasks({
+  tasks = [],
+  teamMembers = [],
+  unassignedJobs = [],
+  jobLocations = [],
+}) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
   const isTeamMember = currentUser?.role === "team_member"; 
-  const canAssign = currentUser?.role === "super_admin" || currentUser?.role === "admin";
+  const permissions = currentUser?.permissions || [];
+  const can = (permission) => currentUser?.role === "super_admin" || permissions.includes(permission);
+  const canAssign = currentUser?.role === "super_admin" || can("assign_tasks");
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
@@ -41,13 +49,71 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
     priority: "medium",
     dueDate: "",
     area: "",
+    jobPostId: "",
     targetCount: "",
     notes: "",
   });
 
-  const activeTeamMembers = teamMembers.filter(
-    (m) => (m.role === "team_member" || m.role === "admin") 
-  );
+  // Sort team members so members with 0 tasks appear at the top, followed by lowest task count
+  const activeTeamMembers = [...teamMembers]
+    .filter((m) => m.role === "team_member" || m.role === "admin")
+    .sort((a, b) => {
+      const countA = Number(a.assigned_tasks_count ?? 0);
+      const countB = Number(b.assigned_tasks_count ?? 0);
+      if (countA !== countB) {
+        return countA - countB;
+      }
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+  // Unique list of areas / cities from jobLocations and unassignedJobs
+  const allLocations = Array.from(
+    new Set(
+      [
+        ...(jobLocations || []),
+        ...unassignedJobs.map((j) => j.location).filter(Boolean),
+      ]
+        .map((loc) => loc.trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  // Filter unassigned jobs based on chosen area/city if selected
+  const filteredUnassignedJobs = unassignedJobs.filter((job) => {
+    if (!data.area) return true;
+    return (job.location || "").toLowerCase().includes(data.area.toLowerCase());
+  });
+
+  const handleJobSelect = (jobId) => {
+    setData((prev) => {
+      const selectedJob = unassignedJobs.find((j) => String(j.id) === String(jobId));
+      if (!selectedJob) {
+        return { ...prev, jobPostId: "" };
+      }
+      return {
+        ...prev,
+        jobPostId: jobId,
+        area: selectedJob.location || prev.area,
+        title: prev.title && prev.title.trim() !== "" 
+          ? prev.title 
+          : `${selectedJob.title}${selectedJob.company ? ` - ${selectedJob.company}` : ""}`,
+      };
+    });
+    clearErrors("jobPostId");
+  };
+
+  const handleAreaSelect = (areaVal) => {
+    setData((prev) => {
+      const updated = { ...prev, area: areaVal };
+      if (areaVal && prev.jobPostId) {
+        const job = unassignedJobs.find((j) => String(j.id) === String(prev.jobPostId));
+        if (job && job.location && !job.location.toLowerCase().includes(areaVal.toLowerCase())) {
+          updated.jobPostId = "";
+        }
+      }
+      return updated;
+    });
+  };
 
   const openAddModal = () => {
     clearErrors();
@@ -90,7 +156,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
     <>
       <Head title="Task Management - ATS Admin" />
 
-      <div className="p-6 pb-25">
+      <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {flash?.success && (
           <div className="mb-5 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium">
             <CheckCircle2 className="w-4 h-4 text-green-400" /> {flash.success}
@@ -99,8 +165,8 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
 
         {/* New Task Modal */}
         {modalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
               <div className="flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
                 <h3 className="font-bold text-gray-900">Assign New Task</h3>
                 <button
@@ -112,7 +178,64 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveTask} className="space-y-3.5">
+              <form onSubmit={handleSaveTask} className="space-y-4">
+                {/* 1. Unassigned Job Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Select Target Job Post (Optional / Recommended)
+                    </label>
+                    <span className="text-[11px] text-blue-600 font-medium">
+                      {filteredUnassignedJobs.length} available
+                    </span>
+                  </div>
+                  <select
+                    value={data.jobPostId}
+                    onChange={(e) => handleJobSelect(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Manual Task / No Job Linked --</option>
+                    {filteredUnassignedJobs.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        {job.title} — {job.company || "Direct"} ({job.location || "Location not set"})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Selecting a job will auto-fill area and suggested task title.
+                  </p>
+                </div>
+
+                {/* 2. Target Area / Location */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Target Area / City
+                    </label>
+                    <input
+                      type="text"
+                      value={data.area}
+                      onChange={(e) => handleAreaSelect(e.target.value)}
+                      placeholder="e.g. Malviya Nagar / Jaipur"
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Target Company Name
+                    </label>
+                    <input
+                      type="text"
+                      value={data.company}
+                      onChange={(e) => setData("company", e.target.value)}
+                      placeholder="e.g. Acme Tech Solutions"
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Task Title */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Task Title *
@@ -121,7 +244,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                     type="text"
                     value={data.title}
                     onChange={(e) => updateAdminField(setData, setError, clearErrors, "title", e.target.value, data)}
-                    placeholder="e.g. Call verified leads queue for Jaipur branch"
+                    placeholder="e.g. Candidate calling & interview booking"
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
                   />
@@ -130,18 +253,18 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Description
+                    Task Description
                   </label>
                   <textarea
                     value={data.description}
                     onChange={(e) => setData("description", e.target.value)}
-                    rows={3}
-                    placeholder="Provide detailed instructions and scope..."
+                    rows={2}
+                    placeholder="Describe specific actions needed from the team member..."
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Assign To *
@@ -152,11 +275,14 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select staff member</option>
-                      {activeTeamMembers.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.role?.replace("_", " ")})
-                        </option>
-                      ))}
+                      {activeTeamMembers.map((m) => {
+                        const count = Number(m.assigned_tasks_count ?? 0);
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {count === 0 ? "⭐ " : ""}{m.name} ({count} {count === 1 ? "task" : "tasks"}) - {m.role?.replace("_", " ")}
+                          </option>
+                        );
+                      })}
                     </select>
                     {errors.assignedTo && (
                       <p className="text-xs text-red-500 mt-1">{errors.assignedTo}</p>
@@ -179,7 +305,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Due Date
@@ -194,29 +320,16 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Area / Zone
+                      Target Count
                     </label>
                     <input
-                      type="text"
-                      value={data.area}
-                      onChange={(e) => setData("area", e.target.value)}
-                      placeholder="e.g. Jaipur"
+                      type="number"
+                      value={data.targetCount}
+                      onChange={(e) => setData("targetCount", e.target.value)}
+                      placeholder="e.g. 50 calls / 10 reviews"
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Target Count
-                  </label>
-                  <input
-                    type="number"
-                    value={data.targetCount}
-                    onChange={(e) => setData("targetCount", e.target.value)}
-                    placeholder="e.g. 50 calls / 10 reviews"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  />
                 </div>
 
                 <div>
@@ -254,7 +367,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">
               {isTeamMember ? "My Assigned Tasks" : "Task Management"}
@@ -269,7 +382,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
             <button
               type="button"
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" /> Assign Task
             </button>
@@ -387,7 +500,7 @@ export default function Tasks({ tasks = [], teamMembers = [] }) {
               </div>
 
               {/* Status Action Buttons */}
-              {task.status !== "done" && (
+              {can("status_tasks") && task.status !== "done" && (
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                   {task.status === "pending" && (
                     <button
