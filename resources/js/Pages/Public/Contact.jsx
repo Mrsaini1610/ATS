@@ -1,7 +1,6 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { ThemeProvider } from '@/Contexts/ThemeContext';
 import HomepageLayout from '@/Layouts/HomepageLayout';
-import Footer from '@/Components/Layout/Footer';
 
 export default function Contact() {
     const { flash } = usePage().props;
@@ -91,7 +90,6 @@ export default function Contact() {
                         </div>
                     </form>
                 </div>
-                <Footer />
             </HomepageLayout>
         </ThemeProvider>
     );

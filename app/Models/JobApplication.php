@@ -76,6 +76,11 @@ class JobApplication extends Model
         return $this->belongsTo(JobPost::class, 'job_id');
     }
 
+    public function job()
+    {
+        return $this->belongsTo(JobPost::class, 'job_id');
+    }
+
     public function assignedCallingMember()
     {
         return $this->belongsTo(Admin::class, 'assigned_calling_team_member_id');

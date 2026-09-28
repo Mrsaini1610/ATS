@@ -19,6 +19,7 @@ class UserResume extends Model
         'file_path',
         'file_type',
         'is_default',
+        'is_delete',
     ];
 
     protected $casts = [

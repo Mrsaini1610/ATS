@@ -15,14 +15,40 @@ class JobApplicationController extends Controller
     public function index(Request $request): Response
     {
         $admin = auth('admin')->user();
+        $canViewAll = $admin && ($admin->isSuperAdmin() || in_array('view_all_applications', $admin->permissionList(), true));
+        $scope = $request->query('scope', $canViewAll ? 'all' : 'your');
+        if (! $canViewAll) {
+            $scope = 'your';
+        }
 
         $query = JobApplication::query()
             ->with(['jobPost.companyRelation', 'assignedCallingMember', 'candidate'])
             ->latest();
 
-        // Calling team members can only view applications assigned to them
-        if ($admin && $admin->role === 'team_member') {
-            $query->where('assigned_calling_team_member_id', $admin->id);
+        if ($scope === 'your') {
+            if ($admin->isAdmin()) {
+                $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
+                $clusterIds = array_merge([$admin->id], $teamMemberIds);
+                $clusterJobIds = \App\Models\JobPost::whereIn('created_by', $clusterIds)
+                    ->orWhereIn('assigned_to', $clusterIds)
+                    ->pluck('id')
+                    ->toArray();
+
+                $query->where(function ($q) use ($clusterJobIds, $clusterIds) {
+                    $q->whereIn('job_id', $clusterJobIds)
+                      ->orWhereIn('assigned_calling_team_member_id', $clusterIds);
+                });
+            } else {
+                $myJobIds = \App\Models\JobPost::where('created_by', $admin->id)
+                    ->orWhere('assigned_to', $admin->id)
+                    ->pluck('id')
+                    ->toArray();
+
+                $query->where(function ($q) use ($myJobIds, $admin) {
+                    $q->whereIn('job_id', $myJobIds)
+                      ->orWhere('assigned_calling_team_member_id', $admin->id);
+                });
+            }
         }
 
         $applications = $query->get()->map(function ($app) {
@@ -45,13 +71,24 @@ class JobApplicationController extends Controller
             ];
         });
 
-        $teamMembers = Admin::whereIn('role', ['team_member', 'admin'])
-            ->where('status', 1)
-            ->get(['id', 'name', 'role', 'phone', 'email']);
+        if ($admin->isSuperAdmin()) {
+            $teamMembers = Admin::whereIn('role', ['team_member', 'admin'])
+                ->where('status', 1)
+                ->get(['id', 'name', 'role', 'phone', 'email']);
+        } elseif ($admin->isAdmin()) {
+            $teamMembers = Admin::where('created_by', $admin->id)
+                ->where('role', 'team_member')
+                ->where('status', 1)
+                ->get(['id', 'name', 'role', 'phone', 'email']);
+        } else {
+            $teamMembers = collect([]);
+        }
 
         return Inertia::render('Admin/Applications', [
             'applications' => $applications,
             'teamMembers'  => $teamMembers,
+            'canViewAll'   => $canViewAll,
+            'scope'        => $scope,
         ]);
     }
 

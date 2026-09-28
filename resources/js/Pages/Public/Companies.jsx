@@ -1,7 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ThemeProvider } from '@/Contexts/ThemeContext';
 import HomepageLayout from '@/Layouts/HomepageLayout';
-import Footer from '@/Components/Layout/Footer';
 
 export default function Companies({ companies }) {
     return (
@@ -80,7 +79,6 @@ export default function Companies({ companies }) {
                         </div>
                     )}
                 </div>
-                <Footer />
             </HomepageLayout>
         </ThemeProvider>
     );

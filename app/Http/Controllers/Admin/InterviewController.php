@@ -14,10 +14,57 @@ class InterviewController extends Controller
 {
     public function index(Request $request): Response
     {
-        $interviews = Interview::query()
+        $admin = auth('admin')->user();
+        $canViewAll = $admin && ($admin->isSuperAdmin() || in_array('view_all_interviews', $admin->permissionList(), true));
+        $scope = $request->query('scope', $canViewAll ? 'all' : 'your');
+        if (! $canViewAll) {
+            $scope = 'your';
+        }
+
+        $query = Interview::query()
             ->with('application')
-            ->latest('interview_date')
-            ->get()
+            ->latest('interview_date');
+
+        if ($scope === 'your') {
+            if ($admin->isAdmin()) {
+                $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
+                $clusterIds = array_merge([$admin->id], $teamMemberIds);
+                $clusterNames = Admin::whereIn('id', $clusterIds)->pluck('name')->toArray();
+                $clusterJobIds = JobPost::whereIn('created_by', $clusterIds)
+                    ->orWhereIn('assigned_to', $clusterIds)
+                    ->pluck('id')
+                    ->toArray();
+                $clusterAppIds = \App\Models\JobApplication::whereIn('job_id', $clusterJobIds)
+                    ->orWhereIn('assigned_calling_team_member_id', $clusterIds)
+                    ->pluck('id')
+                    ->toArray();
+
+                $query->where(function ($q) use ($clusterIds, $clusterNames, $clusterAppIds) {
+                    $q->whereIn('scheduled_by', array_map('strval', $clusterIds))
+                      ->orWhereIn('scheduled_by', $clusterNames)
+                      ->orWhereIn('interviewer', $clusterNames)
+                      ->orWhereIn('application_id', $clusterAppIds);
+                });
+            } else {
+                $myJobIds = JobPost::where('created_by', $admin->id)
+                    ->orWhere('assigned_to', $admin->id)
+                    ->pluck('id')
+                    ->toArray();
+                $myAppIds = \App\Models\JobApplication::whereIn('job_id', $myJobIds)
+                    ->orWhere('assigned_calling_team_member_id', $admin->id)
+                    ->pluck('id')
+                    ->toArray();
+
+                $query->where(function ($q) use ($admin, $myAppIds) {
+                    $q->where('scheduled_by', (string) $admin->id)
+                      ->orWhere('scheduled_by', $admin->name)
+                      ->orWhere('interviewer', $admin->name)
+                      ->orWhereIn('application_id', $myAppIds);
+                });
+            }
+        }
+
+        $interviews = $query->get()
             ->map(function ($iv) {
                 return [
                     'id'             => $iv->id,
@@ -26,7 +73,7 @@ class InterviewController extends Controller
                     'candidateName'  => $iv->candidate_name,
                     'candidatePhone' => $iv->candidate_phone ?? '—',
                     'jobTitle'       => $iv->job_title ?? 'General Role',
-                    'company'        => $iv->company ?? 'WorkIndia Client',
+                    'company'        => $iv->company ?? 'ATS Client',
                     'scheduledBy'    => $iv->scheduled_by ?? 'Admin',
                     'interviewer'    => $iv->interviewer ?? $iv->scheduled_by ?? 'Admin',
                     'round'          => $iv->round ?? 'HR Screening',
@@ -41,19 +88,44 @@ class InterviewController extends Controller
                 ];
             });
 
-        $teamMembers = Admin::where('status', 1)
-            ->select('id', 'uuid', 'name', 'role', 'phone', 'email')
-            ->orderBy('name')
-            ->get();
-
-        $jobs = JobPost::select('id', 'uuid', 'title', 'company', 'location')
-            ->orderBy('title')
-            ->get();
+        // Team members for scheduling interview
+        if ($admin->isSuperAdmin()) {
+            $teamMembers = Admin::where('status', 1)
+                ->select('id', 'uuid', 'name', 'role', 'phone', 'email')
+                ->orderBy('name')
+                ->get();
+            $jobs = JobPost::select('id', 'uuid', 'title', 'company', 'location')
+                ->orderBy('title')
+                ->get();
+        } elseif ($admin->isAdmin()) {
+            $teamMembers = Admin::where('created_by', $admin->id)
+                ->where('role', 'team_member')
+                ->where('status', 1)
+                ->select('id', 'uuid', 'name', 'role', 'phone', 'email')
+                ->orderBy('name')
+                ->get();
+            $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
+            $clusterIds = array_merge([$admin->id], $teamMemberIds);
+            $jobs = JobPost::whereIn('created_by', $clusterIds)
+                ->orWhereIn('assigned_to', $clusterIds)
+                ->select('id', 'uuid', 'title', 'company', 'location')
+                ->orderBy('title')
+                ->get();
+        } else {
+            $teamMembers = collect([$admin]);
+            $jobs = JobPost::where('created_by', $admin->id)
+                ->orWhere('assigned_to', $admin->id)
+                ->select('id', 'uuid', 'title', 'company', 'location')
+                ->orderBy('title')
+                ->get();
+        }
 
         return Inertia::render('Admin/Interviews', [
             'interviews'  => $interviews,
             'teamMembers' => $teamMembers,
             'jobs'        => $jobs,
+            'canViewAll'  => $canViewAll,
+            'scope'       => $scope,
         ]);
     }
 

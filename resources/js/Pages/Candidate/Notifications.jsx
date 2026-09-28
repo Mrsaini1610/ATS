@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link } from "@inertiajs/react";
+import React, { useState, useEffect } from "react";
+import { Link, Head, router, usePage } from "@inertiajs/react";
+import HomepageLayout from "@/Layouts/HomepageLayout";
 import {
   Bell,
   BellOff,
@@ -12,272 +13,421 @@ import {
   Award,
   Trash2,
   Check,
+  Calendar,
+  Sparkles,
+  ArrowRight,
+  BookmarkCheck,
+  ShieldCheck,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
+import axios from "axios";
 
-const INITIAL = [
-  {
-    id: 1,
-    type: "shortlisted",
-    title: "You've been Shortlisted! 🎉",
-    body: "Razorpay has shortlisted you for the UI/UX Designer role. Check your email for next steps.",
-    time: "2 hours ago",
-    read: false,
+const TYPE_CONFIG = {
+  shortlisted: {
     icon: Star,
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
+    iconBg: "bg-emerald-50 border-emerald-100",
+    iconColor: "text-emerald-600",
+    badge: "Shortlisted",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
   },
-  {
-    id: 2,
-    type: "job_match",
-    title: "New Job Match: Flutter Developer",
-    body: "CRED is hiring a Flutter Developer in Bengaluru matching your profile — ₹16L-26L. Apply now before it closes!",
-    time: "4 hours ago",
-    read: false,
-    icon: Briefcase,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-  },
-  {
-    id: 3,
-    type: "application",
-    title: "Application Viewed",
-    body: "TechMahindra has viewed your application for Senior React Developer. Stay tuned!",
-    time: "Yesterday",
-    read: false,
-    icon: CheckCircle2,
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-  },
-  {
-    id: 4,
-    type: "message",
-    title: "Message from PhonePe HR",
-    body: "Hi, we reviewed your profile and would like to schedule a technical screening call. Are you available this week?",
-    time: "Yesterday",
-    read: false,
-    icon: MessageSquare,
-    iconBg: "bg-indigo-100",
+  interview: {
+    icon: Calendar,
+    iconBg: "bg-indigo-50 border-indigo-100",
     iconColor: "text-indigo-600",
+    badge: "Interview",
+    badgeClass: "bg-indigo-50 text-indigo-700 border-indigo-200",
   },
-  {
-    id: 5,
-    type: "saved_alert",
-    title: "Saved Job Expiring Soon",
-    body: "Your saved job 'Data Scientist at PhonePe' will close applications in 2 days. Don't miss it!",
-    time: "2 days ago",
-    read: true,
-    icon: Clock,
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
-  },
-  {
-    id: 6,
-    type: "job_match",
-    title: "5 New Jobs in IT & Software",
-    body: "New openings from Infosys, Wipro and Meesho match your profile. Browse them before others do.",
-    time: "2 days ago",
-    read: true,
-    icon: TrendingUp,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-  },
-  {
-    id: 7,
-    type: "tip",
-    title: "Profile Tip: Add Work Experience",
-    body: "Candidates with complete work history get 3x more interview calls. Update your profile now.",
-    time: "3 days ago",
-    read: true,
-    icon: Award,
-    iconBg: "bg-yellow-100",
-    iconColor: "text-yellow-600",
-  },
-  {
-    id: 8,
-    type: "application",
-    title: "Application Submitted Successfully",
-    body: "Your application for 'DevOps Engineer' at Infosys, Pune has been submitted. Ref #JP-2026-0748.",
-    time: "4 days ago",
-    read: true,
+  application: {
     icon: CheckCircle2,
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
+    iconBg: "bg-blue-50 border-blue-100",
+    iconColor: "text-blue-600",
+    badge: "Application",
+    badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
   },
-  {
-    id: 9,
-    type: "job_match",
-    title: "Remote Python Role — ₹20L+",
-    body: "Meesho is hiring a Python Backend Developer remotely. Full remote, stock options included!",
-    time: "5 days ago",
-    read: true,
+  job_match: {
     icon: Briefcase,
-    iconBg: "bg-violet-100",
-    iconColor: "text-violet-600",
+    iconBg: "bg-sky-50 border-sky-100",
+    iconColor: "text-sky-600",
+    badge: "Job Match",
+    badgeClass: "bg-sky-50 text-sky-700 border-sky-200",
   },
-  {
-    id: 10,
-    type: "tip",
-    title: "Weekend Career Tip",
-    body: "Did you know? Adding a portfolio link to your profile increases recruiter reach by 60%. Add yours today.",
-    time: "6 days ago",
-    read: true,
-    icon: Star,
-    iconBg: "bg-pink-100",
-    iconColor: "text-pink-600",
+  saved_alert: {
+    icon: BookmarkCheck,
+    iconBg: "bg-amber-50 border-amber-100",
+    iconColor: "text-amber-600",
+    badge: "Saved Job",
+    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
   },
-];
+  tip: {
+    icon: Award,
+    iconBg: "bg-purple-50 border-purple-100",
+    iconColor: "text-purple-600",
+    badge: "Career Tip",
+    badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+  message: {
+    icon: MessageSquare,
+    iconBg: "bg-teal-50 border-teal-100",
+    iconColor: "text-teal-600",
+    badge: "Message",
+    badgeClass: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+  system: {
+    icon: Bell,
+    iconBg: "bg-gray-50 border-gray-200",
+    iconColor: "text-gray-600",
+    badge: "Alert",
+    badgeClass: "bg-gray-100 text-gray-700 border-gray-200",
+  },
+};
 
-const TABS = ["All", "Unread", "Jobs", "Applications", "Tips"];
-
-export default function Notifications() {
-  const [notifications, setNotifications] = useState(INITIAL);
+export default function Notifications({
+  initialNotifications = [],
+  initialUnreadCount = 0,
+  initialCounts = {},
+}) {
+  const { flash } = usePage().props;
+  const [notifications, setNotifications] = useState(initialNotifications);
   const [activeTab, setActiveTab] = useState("All");
+  const [processingId, setProcessingId] = useState(null);
+
+  // Keep state synced when props refresh
+  useEffect(() => {
+    setNotifications(initialNotifications);
+  }, [initialNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const counts = {
+    All: notifications.length,
+    Unread: unreadCount,
+    Jobs: notifications.filter((n) =>
+      ["job_match", "saved_alert"].includes(n.type)
+    ).length,
+    Applications: notifications.filter((n) =>
+      ["application", "shortlisted", "interview", "message"].includes(n.type)
+    ).length,
+    Tips: notifications.filter((n) => n.type === "tip").length,
+  };
+
+  const tabs = [
+    { key: "All", label: "All", count: counts.All },
+    { key: "Unread", label: "Unread", count: counts.Unread },
+    { key: "Applications", label: "Applications", count: counts.Applications },
+    { key: "Jobs", label: "Job Alerts", count: counts.Jobs },
+    { key: "Tips", label: "Tips & Growth", count: counts.Tips },
+  ];
+
   const filtered = notifications.filter((n) => {
     if (activeTab === "Unread") return !n.read;
-    if (activeTab === "Jobs") return n.type === "job_match" || n.type === "saved_alert";
+    if (activeTab === "Jobs")
+      return ["job_match", "saved_alert"].includes(n.type);
     if (activeTab === "Applications")
-      return n.type === "application" || n.type === "shortlisted" || n.type === "message";
+      return ["application", "shortlisted", "interview", "message"].includes(
+        n.type
+      );
     if (activeTab === "Tips") return n.type === "tip";
     return true;
   });
 
-  const markRead = (id) =>
-    setNotifications((p) => p.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  const markAllRead = () => setNotifications((p) => p.map((n) => ({ ...n, read: true })));
-  const deleteN = (id) => setNotifications((p) => p.filter((n) => n.id !== id));
-  const clearAll = () => setNotifications([]);
+  // Mark single notification as read & optionally navigate
+  const handleNotificationClick = (item, shouldNavigate = true) => {
+    if (!item.read) {
+      // Optimistic UI update
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+      );
+
+      // Async backend call
+      const readUrl = typeof route === "function"
+        ? route("notifications.read", item.id)
+        : `/notifications/${item.id}/read`;
+
+      axios.post(readUrl).catch((err) => {
+        console.error("Failed to mark notification read", err);
+      });
+    }
+
+    if (shouldNavigate && item.action_url) {
+      router.visit(item.action_url);
+    }
+  };
+
+  // Mark all notifications as read
+  const handleMarkAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    const markAllUrl = typeof route === "function"
+      ? route("notifications.read-all")
+      : "/notifications/read-all";
+
+    router.post(markAllUrl, {}, {
+      preserveScroll: true,
+      preserveState: true,
+    });
+  };
+
+  // Delete single notification
+  const handleDelete = (e, item) => {
+    e.stopPropagation();
+    setProcessingId(item.id);
+
+    // Optimistic removal
+    setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+
+    const destroyUrl = typeof route === "function"
+      ? route("notifications.destroy", item.id)
+      : `/notifications/${item.id}`;
+
+    router.delete(destroyUrl, {
+      preserveScroll: true,
+      preserveState: true,
+      onFinish: () => setProcessingId(null),
+    });
+  };
+
+  // Clear all notifications
+  const handleClearAll = () => {
+    if (!window.confirm("Are you sure you want to clear all notifications?")) {
+      return;
+    }
+
+    setNotifications([]);
+
+    const clearUrl = typeof route === "function"
+      ? route("notifications.clear")
+      : "/notifications";
+
+    router.delete(clearUrl, {
+      preserveScroll: true,
+      preserveState: true,
+    });
+  };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            Notifications
+    <HomepageLayout>
+      <Head title="Notifications - ATS.com Candidate Portal" />
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        
+        {/* Flash Message Banner */}
+        {flash?.success && (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm text-emerald-800 flex items-center gap-2.5 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{flash.success}</span>
+          </div>
+        )}
+
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-5 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                Notifications
+              </h1>
+              {unreadCount > 0 && (
+                <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-bold bg-blue-600 text-white rounded-full shadow-2xs">
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              Live updates on your job applications, interview schedules, and personalized job alerts
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
             {unreadCount > 0 && (
-              <span className="text-sm bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                {unreadCount}
-              </span>
+              <button
+                type="button"
+                onClick={handleMarkAllRead}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700 shadow-2xs transition-all cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5 text-blue-600" />
+                <span>Mark all read</span>
+              </button>
             )}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Stay updated on your job search</p>
-        </div>
-        <div className="flex gap-2">
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-xl text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" /> Mark all read
-            </button>
-          )}
-          {notifications.length > 0 && (
-            <button
-              onClick={clearAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 text-red-500 rounded-xl text-xs hover:bg-red-100 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Clear all
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-5">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setActiveTab(t)}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              activeTab === t
-                ? "bg-blue-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:border-blue-300"
-            }`}
-          >
-            {t}
-            {t === "Unread" && unreadCount > 0 && ` (${unreadCount})`}
-          </button>
-        ))}
-      </div>
-
-      {/* List */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <BellOff className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="font-medium text-gray-500">No notifications here</p>
-          <p className="text-sm text-gray-400 mt-1">
-            We'll notify you when something important happens
-          </p>
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-50 text-xs font-semibold text-red-600 shadow-2xs transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear all</span>
+              </button>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((n) => {
-            const IconComponent = n.icon;
+
+        {/* Tab Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key;
             return (
-              <div
-                key={n.id}
-                onClick={() => markRead(n.id)}
-                className={`relative bg-white rounded-2xl border p-4 cursor-pointer transition-all hover:shadow-sm group ${
-                  !n.read ? "border-blue-200 bg-blue-50/30" : "border-gray-100"
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
-                {/* Unread dot */}
-                {!n.read && (
-                  <span className="absolute top-4 right-12 w-2 h-2 bg-blue-600 rounded-full" />
+                <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      isActive
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
                 )}
-
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`w-10 h-10 ${n.iconBg} rounded-xl flex items-center justify-center shrink-0`}
-                  >
-                    <IconComponent className={`w-5 h-5 ${n.iconColor}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm leading-snug ${
-                        n.read ? "font-medium text-gray-700" : "font-semibold text-gray-900"
-                      }`}
-                    >
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
-                    <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {n.time}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteN(n.id);
-                    }}
-                    className="shrink-0 p-1.5 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              </button>
             );
           })}
         </div>
-      )}
 
-      {/* Settings link */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bell className="w-5 h-5 text-gray-500" />
-          <div>
-            <p className="text-sm font-medium text-gray-800">Notification Preferences</p>
-            <p className="text-xs text-gray-400">Manage what alerts you receive</p>
+        {/* Notifications List */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-gray-100 shadow-2xs">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3.5">
+              <BellOff className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900">
+              {activeTab === "Unread"
+                ? "You're All Caught Up!"
+                : "No Notifications Found"}
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+              {activeTab === "Unread"
+                ? "There are no unread notifications right now. Check back soon for application updates!"
+                : "You don't have any notifications in this category yet. When recruiters respond or new jobs match, they will appear here."}
+            </p>
+            <div className="mt-5">
+              <Link
+                href="/job-search"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-2xs"
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Explore Live Jobs</span>
+              </Link>
+            </div>
           </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filtered.map((item) => {
+              const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.system;
+              const IconComp = config.icon;
+              const isUnread = !item.read;
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleNotificationClick(item, true)}
+                  className={`relative group bg-white rounded-2xl border p-4 sm:p-5 transition-all cursor-pointer hover:shadow-xs flex items-start gap-3.5 sm:gap-4 ${
+                    isUnread
+                      ? "border-blue-200 bg-blue-50/20"
+                      : "border-gray-100/90 hover:border-gray-200"
+                  }`}
+                >
+                  {/* Left: Type Icon */}
+                  <div
+                    className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border flex items-center justify-center shrink-0 ${config.iconBg} ${config.iconColor}`}
+                  >
+                    <IconComp className="w-5 h-5" />
+                  </div>
+
+                  {/* Middle: Content */}
+                  <div className="flex-1 min-w-0 pr-6">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${config.badgeClass}`}
+                      >
+                        {config.badge}
+                      </span>
+                      <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {item.time}
+                      </span>
+                      {isUnread && (
+                        <span className="inline-block w-2 h-2 rounded-full bg-blue-600" />
+                      )}
+                    </div>
+
+                    <h4
+                      className={`text-sm tracking-tight leading-snug ${
+                        isUnread
+                          ? "font-bold text-gray-900"
+                          : "font-semibold text-gray-800"
+                      }`}
+                    >
+                      {item.title}
+                    </h4>
+
+                    <p className="text-xs text-gray-600 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                      {item.body}
+                    </p>
+
+                    {/* Action link */}
+                    {item.action_url && (
+                      <div className="mt-2.5 flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition">
+                        <span>View Details</span>
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Actions: Delete */}
+                  <div className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="Delete notification"
+                      disabled={processingId === item.id}
+                      onClick={(e) => handleDelete(e, item)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Quick Links Card */}
+        <div className="mt-10 p-5 bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-purple-50/40 rounded-3xl border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Briefcase className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">
+                Track Application Status Directly
+              </h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                View shortlists, interview invites, and recruiter status in My Applications
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/my-applications"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/80 shadow-2xs transition shrink-0"
+          >
+            <span>My Applications</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
-        <Link href="/settings" className="text-xs text-blue-600 hover:underline font-medium">
-          Manage →
-        </Link>
+
       </div>
-    </div>
+    </HomepageLayout>
   );
 }

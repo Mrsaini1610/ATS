@@ -326,7 +326,12 @@ function AssignModal({ app, teamMembers = [], onAssign, onClose }) {
 }
 
 /* ── Main Component ── */
-export default function Applications({ applications = [], teamMembers = [] }) {
+export default function Applications({
+  applications = [],
+  teamMembers = [],
+  canViewAll = false,
+  scope = "your",
+}) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
 
@@ -452,6 +457,46 @@ export default function Applications({ applications = [], teamMembers = [] }) {
             </p>
           </div>
         </div>
+
+        {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
+        {canViewAll && (
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl w-fit mb-5">
+            <button
+              type="button"
+              onClick={() =>
+                router.get(
+                  route("admin.applications.index"),
+                  { scope: "all" },
+                  { preserveState: true, preserveScroll: true }
+                )
+              }
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "all"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              All Applications
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                router.get(
+                  route("admin.applications.index"),
+                  { scope: "your" },
+                  { preserveState: true, preserveScroll: true }
+                )
+              }
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "your"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Your Applications
+            </button>
+          </div>
+        )}
 
         {/* Status Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 mb-4">

@@ -141,7 +141,12 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
   );
 }
 
-export default function Jobs({ jobs = [], teamMembers = [] }) {
+export default function Jobs({
+  jobs = [],
+  teamMembers = [],
+  canViewAll = false,
+  scope = "your",
+}) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const canManage = admin?.role === "super_admin" || admin?.role === "admin";
@@ -155,6 +160,12 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
   const [remark, setRemark] = useState("");
   const [assigningJob, setAssigningJob] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const isAssignedToCurrent = selectedJob && (
+    (selectedJob.assigned_team_member_id && String(selectedJob.assigned_team_member_id) === String(admin?.id)) ||
+    (admin?.uuid && selectedJob.assigned_team_member_uuid && String(selectedJob.assigned_team_member_uuid) === String(admin?.uuid))
+  );
+  const canModerateJob = canManage || isAssignedToCurrent;
 
   // Keep selectedJob in sync with updated jobs prop
   useEffect(() => {
@@ -306,6 +317,46 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
             </Link>
           )}
         </div>
+
+        {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
+        {canViewAll && (
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl w-fit mb-5">
+            <button
+              type="button"
+              onClick={() =>
+                router.get(
+                  route("admin.jobs.index"),
+                  { scope: "all" },
+                  { preserveState: true, preserveScroll: true }
+                )
+              }
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "all"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              All Jobs
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                router.get(
+                  route("admin.jobs.index"),
+                  { scope: "your" },
+                  { preserveState: true, preserveScroll: true }
+                )
+              }
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "your"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Your Jobs
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
           {[["all", "All"], ...Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label])].map(([key, label]) => (
@@ -645,7 +696,7 @@ export default function Jobs({ jobs = [], teamMembers = [] }) {
                 )}
               </div>
 
-              {canManage && (
+              {canModerateJob && (
                 <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/50">
                   {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
                     <button

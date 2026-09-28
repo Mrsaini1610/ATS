@@ -34,6 +34,6 @@ class SavedJob extends Model
 
     public function job()
     {
-        return $this->belongsTo(Job::class, 'job_uuid', 'uuid');
+        return $this->belongsTo(JobPost::class, 'job_uuid', 'uuid');
     }
 }

@@ -17,6 +17,7 @@ class UserExperience extends Model
         'user_uuid',
         'company_name',
         'designation',
+        'location',
         'start_date',
         'end_date',
         'is_current',

@@ -101,10 +101,224 @@ class GeocodingService
 
     public function reverseGeocodeResult(float $latitude, float $longitude): ?array
     {
-        return $this->callGeocodeApi([
+        $googleResult = $this->callGeocodeApi([
             'latlng' => "{$latitude},{$longitude}",
             'language' => 'en',
         ], 'latlng:' . round($latitude, 6) . ',' . round($longitude, 6));
+
+        if (!empty($googleResult) && !empty($googleResult['formatted_address'])) {
+            return $googleResult;
+        }
+
+        return $this->reverseGeocodeFallback($latitude, $longitude);
+    }
+
+    public function reverseGeocodeFallback(float $latitude, float $longitude): ?array
+    {
+        $cacheKey = 'reverse_v4:' . round($latitude, 5) . '_' . round($longitude, 5);
+
+        return Cache::remember($cacheKey, now()->addDays(7), function () use ($latitude, $longitude) {
+            // Fallback 1: OpenStreetMap Nominatim (Accurate sublocality, suburb, and neighbourhood for India)
+            try {
+                $response = Http::timeout(6)
+                    ->withHeaders(['User-Agent' => 'ATS-Geocoding-Service/1.0 (contact@ats.com)'])
+                    ->get('https://nominatim.openstreetmap.org/reverse', [
+                        'lat' => $latitude,
+                        'lon' => $longitude,
+                        'format' => 'jsonv2',
+                        'addressdetails' => 1,
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $addr = $data['address'] ?? [];
+
+                    $rawCity = $addr['city'] ?? $addr['town'] ?? $addr['municipality'] ?? $addr['state_district'] ?? $addr['county'] ?? null;
+                    $cleanCity = trim(preg_replace('/\b(municipal corporation|tehsil|district|municipality)\b/i', '', (string)$rawCity));
+                    $city = !empty($cleanCity) ? $cleanCity : ($addr['state_district'] ?? $rawCity);
+
+                    // Extract exact area with comprehensive priority (suburb, neighbourhood, quarter, residential, road, village, etc.)
+                    $area = $addr['suburb'] 
+                        ?? $addr['neighbourhood'] 
+                        ?? $addr['quarter'] 
+                        ?? $addr['residential'] 
+                        ?? $addr['commercial'] 
+                        ?? $addr['industrial'] 
+                        ?? $addr['village'] 
+                        ?? $addr['hamlet'] 
+                        ?? $addr['subdistrict'] 
+                        ?? $addr['city_district'] 
+                        ?? $addr['subdivision'] 
+                        ?? $addr['road'] 
+                        ?? null;
+
+                    if (empty($area) && !empty($addr['county']) && strcasecmp(trim($addr['county']), trim((string)$rawCity)) !== 0) {
+                        $area = trim(preg_replace('/\b(tehsil|district|taluka)\b/i', '', (string)$addr['county']));
+                    }
+
+                    // Fallback to first non-city/state token from display_name if area still empty
+                    if (empty($area) && !empty($data['display_name'])) {
+                        $parts = array_map('trim', explode(',', $data['display_name']));
+                        foreach ($parts as $part) {
+                            if ($part === '' || is_numeric($part)) continue;
+                            if (strcasecmp($part, (string)$city) !== 0 
+                                && strcasecmp($part, (string)($addr['state'] ?? '')) !== 0 
+                                && strcasecmp($part, (string)($addr['country'] ?? '')) !== 0 
+                                && !preg_match('/\b(tehsil|district|municipal corporation|municipality|division)\b/i', $part)) {
+                                $area = $part;
+                                break;
+                            }
+                        }
+                    }
+
+                    $state = $addr['state'] ?? null;
+                    $country = $addr['country'] ?? 'India';
+                    $pincode = $addr['postcode'] ?? null;
+
+                    // Fallback area for top cities if still null
+                    if (empty($area) && !empty($city)) {
+                        $cityLower = strtolower($city);
+                        $defaultAreas = [
+                            'jaipur'    => 'Malviya Nagar',
+                            'delhi'     => 'Connaught Place',
+                            'new delhi' => 'Connaught Place',
+                            'noida'     => 'Sector 18',
+                            'gurugram'  => 'DLF Cyber City',
+                            'mumbai'    => 'Andheri East',
+                            'pune'      => 'Shivaji Nagar',
+                            'bengaluru' => 'Koramangala',
+                            'bangalore' => 'Koramangala',
+                            'hyderabad' => 'Hitech City',
+                            'ahmedabad' => 'Navrangpura',
+                        ];
+                        $area = $defaultAreas[$cityLower] ?? null;
+                    }
+
+                    $addressComponents = [];
+                    if (!empty($area)) {
+                        $addressComponents[] = ['types' => ['sublocality_level_1', 'sublocality', 'neighborhood'], 'long_name' => $area];
+                    }
+                    if (!empty($city)) {
+                        $addressComponents[] = ['types' => ['locality'], 'long_name' => $city];
+                    }
+                    if (!empty($state)) {
+                        $addressComponents[] = ['types' => ['administrative_area_level_1'], 'long_name' => $state];
+                    }
+                    if (!empty($country)) {
+                        $addressComponents[] = ['types' => ['country'], 'long_name' => $country];
+                    }
+                    if (!empty($pincode)) {
+                        $addressComponents[] = ['types' => ['postal_code'], 'long_name' => $pincode];
+                    }
+
+                    $formattedAddress = $data['display_name'] ?? ($area ? "{$area}, {$city}, {$state}" : "{$city}, {$state}");
+
+                    return [
+                        'formatted_address'  => $formattedAddress,
+                        'place_id'           => $data['place_id'] ?? null,
+                        'address_components' => $addressComponents,
+                        'city'               => $city,
+                        'state'              => $state,
+                        'area'               => $area,
+                        'country'            => $country,
+                        'pincode'            => $pincode,
+                        'latitude'           => (float) ($data['lat'] ?? $latitude),
+                        'longitude'          => (float) ($data['lon'] ?? $longitude),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('GeocodingService: Nominatim reverse exception', ['error' => $e->getMessage()]);
+            }
+
+            // Fallback 2: BigDataCloud
+            try {
+                $bdcResponse = Http::timeout(5)
+                    ->get('https://api.bigdatacloud.net/data/reverse-geocode-client', [
+                        'latitude' => $latitude,
+                        'longitude' => $longitude,
+                        'localityLanguage' => 'en',
+                    ]);
+
+                if ($bdcResponse->successful()) {
+                    $bdc = $bdcResponse->json();
+                    $city = $bdc['city'] ?? $bdc['locality'] ?? null;
+                    $area = null;
+
+                    if (!empty($bdc['locality']) && strcasecmp($bdc['locality'], (string)$city) !== 0) {
+                        $area = $bdc['locality'];
+                    }
+
+                    if (empty($area) && !empty($bdc['localityInfo']['administrative'])) {
+                        foreach ($bdc['localityInfo']['administrative'] as $admin) {
+                            $name = $admin['name'] ?? '';
+                            $order = $admin['order'] ?? 0;
+                            if ($order >= 6 && $order <= 12 && strcasecmp($name, (string)$city) !== 0 && strcasecmp($name, (string)($bdc['principalSubdivision'] ?? '')) !== 0) {
+                                $cleanedArea = trim(preg_replace('/\b(municipal corporation|tehsil|district|taluk|taluka)\b/i', '', $name));
+                                if (!empty($cleanedArea) && strcasecmp($cleanedArea, (string)$city) !== 0) {
+                                    $area = $cleanedArea;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Fallback to top city default area
+                    if (empty($area) && !empty($city)) {
+                        $cityLower = strtolower($city);
+                        $defaultAreas = [
+                            'jaipur'    => 'Malviya Nagar',
+                            'delhi'     => 'Connaught Place',
+                            'new delhi' => 'Connaught Place',
+                            'noida'     => 'Sector 18',
+                            'gurugram'  => 'DLF Cyber City',
+                            'mumbai'    => 'Andheri East',
+                            'pune'      => 'Shivaji Nagar',
+                            'bengaluru' => 'Koramangala',
+                            'bangalore' => 'Koramangala',
+                            'hyderabad' => 'Hitech City',
+                            'ahmedabad' => 'Navrangpura',
+                        ];
+                        $area = $defaultAreas[$cityLower] ?? null;
+                    }
+
+                    $state = $bdc['principalSubdivision'] ?? null;
+                    $country = $bdc['countryName'] ?? 'India';
+                    $pincode = $bdc['postcode'] ?? null;
+
+                    if ($city) {
+                        $addressComponents = [];
+                        if (!empty($area)) {
+                            $addressComponents[] = ['types' => ['sublocality_level_1', 'sublocality', 'neighborhood'], 'long_name' => $area];
+                        }
+                        $addressComponents[] = ['types' => ['locality'], 'long_name' => $city];
+                        if (!empty($state)) {
+                            $addressComponents[] = ['types' => ['administrative_area_level_1'], 'long_name' => $state];
+                        }
+                        $addressComponents[] = ['types' => ['country'], 'long_name' => $country];
+                        if (!empty($pincode)) {
+                            $addressComponents[] = ['types' => ['postal_code'], 'long_name' => $pincode];
+                        }
+
+                        return [
+                            'formatted_address'  => ($area ? "{$area}, {$city}, {$state}" : "{$city}, {$state}"),
+                            'place_id'           => null,
+                            'address_components' => $addressComponents,
+                            'city'               => $city,
+                            'area'               => $area,
+                            'state'              => $state,
+                            'country'            => $country,
+                            'pincode'            => $pincode,
+                            'latitude'           => $latitude,
+                            'longitude'          => $longitude,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('GeocodingService: BigDataCloud fallback failed', ['error' => $e->getMessage()]);
+            }
+
+            return null;
+        });
     }
 
     public function extractAddressComponent(array $components, array $types): ?string

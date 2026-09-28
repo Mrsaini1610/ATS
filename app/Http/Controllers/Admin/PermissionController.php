@@ -36,8 +36,21 @@ class PermissionController extends Controller
             'permissions.*' => 'string',
         ]);
 
+        $permissions = array_values($validated['permissions']);
+
+        if ($admin->role === 'team_member') {
+            $staffPerms = [
+                'view_team_member',
+                'create_team_member',
+                'edit_team_member',
+                'status_team_member',
+                'delete_team_member',
+            ];
+            $permissions = array_values(array_diff($permissions, $staffPerms));
+        }
+
         $admin->update([
-            'permissions' => array_values($validated['permissions']),
+            'permissions' => $permissions,
         ]);
 
         return redirect()->back()->with('success', 'Permissions updated successfully.');

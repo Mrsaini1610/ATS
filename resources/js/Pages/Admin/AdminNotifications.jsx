@@ -79,7 +79,7 @@ export default function AdminNotifications({ notifications = [] }) {
 
   return (
     <>
-      <Head title="Notifications - WorkIndia Admin" />
+      <Head title="Notifications - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6 max-w-3xl mx-auto pb-25">
         {/* Header */}

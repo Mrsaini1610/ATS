@@ -243,7 +243,7 @@ const handleVerifyOtp = async (e) => {
           className="hidden lg:flex lg:w-[55%] relative overflow-hidden flex-col justify-between p-10"
           style={{
             background:
-              "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 45%, #2563eb 70%, #0891b2 100%)",
+              "linear-gradient(135deg, #051a4d 0%, #07266b 35%, #0c3da4 70%, #226df6 100%)",
           }}
         >
           {/* Background pattern */}
@@ -514,7 +514,7 @@ const handleVerifyOtp = async (e) => {
                     Enter 6-Digit Code
                   </label>
                   <div
-                    className="flex gap-2 justify-center"
+                    className="flex gap-1.5 sm:gap-2 justify-center"
                     onPaste={handleOtpPaste}
                   >
                     {otp.map((digit, i) => (
@@ -533,8 +533,7 @@ const handleVerifyOtp = async (e) => {
                         onKeyDown={(e) =>
                           handleOtpKeyDown(i, e)
                         }
-                        className={`w-11 text-center text-xl font-bold border-2 rounded-xl focus:outline-none transition-all bg-white ${digit ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-900"}`}
-                        style={{ height: "3.25rem" }}
+                        className={`w-9 sm:w-11 h-11 sm:h-13 text-center text-base sm:text-xl font-bold border-2 rounded-xl focus:outline-none transition-all bg-white ${digit ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-900"}`}
                       />
                     ))}
                   </div>

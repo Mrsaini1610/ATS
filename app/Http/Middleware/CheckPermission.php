@@ -16,9 +16,11 @@ class CheckPermission
     public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         $user = auth('admin')->user();
-        $assignedPermissions = $user?->permissionList() ?? [];
+        $assignedPermissions = array_map('trim', $user?->permissionList() ?? []);
         $allowed = $user?->role === 'super_admin' || collect($permissions)
             ->flatMap(fn ($permission) => explode(',', $permission))
+            ->map(fn ($permission) => trim($permission))
+            ->filter()
             ->contains(fn ($permission) => in_array($permission, $assignedPermissions, true));
 
         if (!$user || !$allowed) {

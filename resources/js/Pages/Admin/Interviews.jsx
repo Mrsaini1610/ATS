@@ -38,7 +38,7 @@ const STATUS_CFG = {
 
 const MODE_ICON = { phone: Phone, video: Video, in_person: MapPin };
 
-export default function Interviews({ interviews = [], teamMembers = [], jobs = [] }) {
+export default function Interviews({ interviews = [], teamMembers = [], jobs = [], canViewAll = false, scope = "your" }) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
   const permissions = currentUser?.permissions || [];
@@ -705,6 +705,30 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
             </button>
           )}
         </div>
+
+        {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
+        {canViewAll && (
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl w-fit mb-6">
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.interviews.index"), { scope: "all" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              All Interviews
+            </button>
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.interviews.index"), { scope: "your" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "your" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Your Interviews
+            </button>
+          </div>
+        )}
 
         {/* Metric Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

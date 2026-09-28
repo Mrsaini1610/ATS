@@ -13,56 +13,115 @@ use Inertia\Inertia;
 
 class AdminJobController extends Controller
 {
-    public function index()
+    private function getAssignableTeamMembers(?Admin $user)
     {
-        $jobs = JobPost::with(['creator:id,name', 'assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
-            ->latest()
-            ->get()
-            ->map(function ($job) {
-                $salary = ($job->min_lpa && $job->max_lpa)
-                    ? "₹{$job->min_lpa} - ₹{$job->max_lpa} LPA"
-                    : ($job->min_lpa ? "₹{$job->min_lpa} LPA" : "Not Disclosed");
+        if (! $user) {
+            return collect([]);
+        }
 
-                return [
-                    'id'                        => $job->id,
-                    'uuid'                      => $job->uuid,
-                    'title'                     => $job->title,
-                    'company'                   => $job->companyRelation?->name ?? $job->company ?? 'N/A',
-                    'location'                  => $job->location ?? 'Remote',
-                    'salary'                    => $salary,
-                    'status'                    => $job->status ?? 'pending',
-                    'work_mode'                 => $job->job_type,
-                    'type'                      => $job->job_type ?? 'Full Time',
-                    'exp'                       => $job->experience ?? '0-1 yr',
-                    'openings'                  => $job->openings ?? 1,
-                    'applicants'                => $job->applicants ?? 0,
-                    'is_hot'                    => $job->badge === 'hot' || $job->badge === 'featured',
-                    'posted_at'                 => $job->created_at ? $job->created_at->format('d M Y') : 'Recent',
-                    'posted_by'                 => $job->creator?->name ?? 'System',
-                    'category'                  => $job->category?->name ?? 'General',
-                    'desc'                      => $job->description ?? '',
-                    'remark'                    => $job->rejection_reason,
-                    'skills'                    => is_array($job->skills) ? $job->skills : [],
-                    'languages'                 => is_array($job->languages) ? $job->languages : [],
-                    'responsibilities'          => is_array($job->key_responsibilities) ? $job->key_responsibilities : [],
-                    'requirements'              => is_array($job->qualifications) ? $job->qualifications : [],
-                    'benefits'                  => is_array($job->perks) ? $job->perks : [],
-                    'assigned_team_member_uuid' => $job->assignedMember ? (string) ($job->assignedMember->uuid ?? $job->assignedMember->id) : null,
-                    'assigned_team_member_id'   => $job->assigned_to,
-                    'assigned_team_member_name' => $job->assignedMember?->name,
-                ];
-            });
+        if ($user->isSuperAdmin()) {
+            return Admin::where('role', '!=', 'super_admin')
+                ->where('status', 1)
+                ->select('id', 'uuid', 'name', 'email', 'phone', 'role')
+                ->orderBy('name')
+                ->get();
+        }
 
-        $teamMembers = Admin::select('id', 'uuid', 'name', 'email', 'phone', 'role')->get();
+        if ($user->isAdmin()) {
+            return Admin::where('created_by', $user->id)
+                ->where('role', 'team_member')
+                ->where('status', 1)
+                ->select('id', 'uuid', 'name', 'email', 'phone', 'role')
+                ->orderBy('name')
+                ->get();
+        }
+
+        // Team members cannot assign to anyone
+        return collect([]);
+    }
+
+    public function index(Request $request)
+    {
+        $user = auth('admin')->user();
+
+        $canViewAll = $user->isSuperAdmin() || in_array('view_all_jobs', $user->permissionList(), true);
+        $scope = $request->query('scope', $canViewAll ? ($user->isSuperAdmin() ? 'all' : 'your') : 'your');
+        if (! $canViewAll) {
+            $scope = 'your';
+        }
+
+        $query = JobPost::with(['creator:id,name', 'assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
+            ->latest();
+
+        if ($scope === 'your') {
+            if ($user->isAdmin()) {
+                $clusterUserIds = Admin::where('created_by', $user->id)->pluck('id')->push($user->id)->all();
+                $query->where(function ($q) use ($clusterUserIds) {
+                    $q->whereIn('created_by', $clusterUserIds)
+                      ->orWhereIn('assigned_to', $clusterUserIds);
+                });
+            } elseif ($user->isTeamMember()) {
+                $query->where(function ($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->orWhere('assigned_to', $user->id);
+                });
+            } else {
+                $query->where(function ($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->orWhere('assigned_to', $user->id);
+                });
+            }
+        }
+
+        $jobs = $query->get()->map(function ($job) {
+            $salary = ($job->min_lpa && $job->max_lpa)
+                ? "₹{$job->min_lpa} - ₹{$job->max_lpa} LPA"
+                : ($job->min_lpa ? "₹{$job->min_lpa} LPA" : "Not Disclosed");
+
+            return [
+                'id'                        => $job->id,
+                'uuid'                      => $job->uuid,
+                'title'                     => $job->title,
+                'company'                   => $job->companyRelation?->name ?? $job->company ?? 'N/A',
+                'location'                  => $job->location ?? 'Remote',
+                'salary'                    => $salary,
+                'status'                    => $job->status ?? 'pending',
+                'work_mode'                 => $job->job_type,
+                'type'                      => $job->job_type ?? 'Full Time',
+                'exp'                       => $job->experience ?? '0-1 yr',
+                'openings'                  => $job->openings ?? 1,
+                'applicants'                => $job->applicants ?? 0,
+                'is_hot'                    => $job->badge === 'hot' || $job->badge === 'featured',
+                'posted_at'                 => $job->created_at ? $job->created_at->format('d M Y') : 'Recent',
+                'posted_by'                 => $job->creator?->name ?? 'System',
+                'category'                  => $job->category?->name ?? 'General',
+                'desc'                      => $job->description ?? '',
+                'remark'                    => $job->rejection_reason,
+                'skills'                    => is_array($job->skills) ? $job->skills : [],
+                'languages'                 => is_array($job->languages) ? $job->languages : [],
+                'responsibilities'          => is_array($job->key_responsibilities) ? $job->key_responsibilities : [],
+                'requirements'              => is_array($job->qualifications) ? $job->qualifications : [],
+                'benefits'                  => is_array($job->perks) ? $job->perks : [],
+                'assigned_team_member_uuid' => $job->assignedMember ? (string) ($job->assignedMember->uuid ?? $job->assignedMember->id) : null,
+                'assigned_team_member_id'   => $job->assigned_to,
+                'assigned_team_member_name' => $job->assignedMember?->name,
+            ];
+        });
+
+        $teamMembers = $this->getAssignableTeamMembers($user);
 
         return Inertia::render('Admin/Jobs', [
             'jobs'        => $jobs,
             'teamMembers' => $teamMembers,
+            'canViewAll'  => $canViewAll,
+            'scope'       => $scope,
         ]);
     }
 
     public function create()
     {
+        $user = auth('admin')->user();
+
         $categories = Category::with('subcategories')
             ->where('status', 'active')
             ->get()
@@ -81,9 +140,10 @@ class AdminJobController extends Controller
             'demand' => 'high'
         ]);
 
-        $teamMembers = Admin::select('id', 'name', 'email', 'phone', 'role')->get()->map(fn($m) => [
+        $teamMembers = $this->getAssignableTeamMembers($user)->map(fn($m) => [
             'id' => $m->id,
-            'name' => $m->name,
+            'uuid' => $m->uuid,
+            'name' => $m->name . ($user->isSuperAdmin() ? ' (' . str_replace('_', ' ', ucwords($m->role, '_')) . ')' : ''),
             'email' => $m->email,
             'phone' => $m->phone,
             'role' => $m->role,
@@ -98,18 +158,52 @@ class AdminJobController extends Controller
         ]);
     }
 
-public function store(Request $request)
+    public function store(Request $request)
     {
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
             'company_uuid' => 'required|exists:companies,uuid',
             'location'     => 'required|string|max:255',
             'desc'         => 'required|string',
-            'salaryMin'    => 'required|numeric',
-            'salaryMax'    => 'required|numeric',
+            'salaryMin'    => 'required|numeric|min:0',
+            'salaryMax'    => 'required|numeric|min:0|gte:salaryMin',
+            'openings'     => 'nullable|integer|min:1',
         ]);
 
+        $user = auth('admin')->user();
         $company = Company::where('uuid', $validated['company_uuid'])->first();
+
+        // Assignee permission check
+        $assignedTo = null;
+        $requestedAssignee = $request->input('assignedToId') ?: ($request->input('assigned_to') ?: null);
+        if (!empty($requestedAssignee)) {
+            if ($user->isTeamMember()) {
+                $assignedTo = null;
+            } elseif ($user->isAdmin()) {
+                $targetMember = Admin::where(function ($q) use ($requestedAssignee) {
+                    $q->where('id', $requestedAssignee)->orWhere('uuid', $requestedAssignee);
+                })->where('created_by', $user->id)->where('role', 'team_member')->first();
+                $assignedTo = $targetMember?->id;
+            } else {
+                $targetMember = Admin::where('id', $requestedAssignee)->orWhere('uuid', $requestedAssignee)->first();
+                $assignedTo = $targetMember?->id;
+            }
+        }
+
+        // Process skills, allowing manually typed custom skills
+        $rawSkills = $request->input('skills', []);
+        $skills = [];
+        if (is_array($rawSkills)) {
+            foreach ($rawSkills as $sk) {
+                $trimmed = trim((string) $sk);
+                if ($trimmed !== '') {
+                    $skills[] = $trimmed;
+                    // Persist newly added custom skill to skills table
+                    Skill::firstOrCreate(['name' => $trimmed], ['status' => 1]);
+                }
+            }
+            $skills = array_values(array_unique($skills));
+        }
 
         JobPost::create([
             'title'                => $validated['title'],
@@ -123,8 +217,8 @@ public function store(Request $request)
             'category_id'          => $request->input('categoryId') ?: null,
             'sub_category_id'      => $request->input('subCategoryId') ?: null,
             'description'          => $validated['desc'],
-            'min_salary'           => $validated['salaryMin'], // <-- Updated to min_salary
-            'max_salary'           => $validated['salaryMax'], // <-- Updated to max_salary
+            'min_salary'           => max(0, (float) $validated['salaryMin']),
+            'max_salary'           => max(0, (float) $validated['salaryMax']),
             'job_type'             => $request->input('type', 'Full Time'),
             'salary_type'          => $request->input('salaryType', 'monthly'),
             'bonus_offered'        => $request->input('bonusOffered', 'no'),
@@ -132,19 +226,19 @@ public function store(Request $request)
             'shift_timing'         => $request->input('shiftTiming', '9:30 AM - 6:30 PM'),
             'interview_details'    => $request->input('interviewDetails', ''),
             'experience'           => $request->input('exp', 'Any'),
-            'min_age'              => $request->input('minAge') ?: null,
-            'max_age'              => $request->input('maxAge') ?: null,
-            'openings'             => $request->input('openings', 1),
+            'min_age'              => $request->input('minAge') ? max(0, (int) $request->input('minAge')) : null,
+            'max_age'              => $request->input('maxAge') ? max(0, (int) $request->input('maxAge')) : null,
+            'openings'             => max(1, (int) ($validated['openings'] ?? $request->input('openings', 1))),
             'last_date'            => $request->input('lastDate') ?: null,
             'badge'                => $request->input('isHot') ? 'hot' : 'standard',
-            'skills'               => $request->input('skills', []),
+            'skills'               => $skills,
             'languages'            => $request->input('languages', []),
             'qualifications'       => $request->input('qualifications', []),
             'assets'               => $request->input('assets', []),
             'contact_person'       => $request->input('contactPersonName'),
             'contact_phone'        => $request->input('contactPhone'),
             'contact_email'        => $request->input('contactEmail'),
-            'assigned_to'          => $request->input('assignedToId') ?: ($request->input('assigned_to') ?: null),
+            'assigned_to'          => $assignedTo,
             'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
             'created_by'           => auth('admin')->id(),
         ]);
@@ -159,7 +253,20 @@ public function store(Request $request)
             'remark' => 'nullable|string|max:1000',
         ]);
 
+        $user = auth('admin')->user();
         $job = JobPost::where('uuid', $uuid)->firstOrFail();
+
+        // Assigned member has auto rights to update status, as does Super Admin or authorized staff
+        $canModerate = $user->isSuperAdmin()
+            || ($job->assigned_to && $job->assigned_to == $user->id)
+            || in_array('approve_jobs', $user->permissionList(), true)
+            || in_array('reject_jobs', $user->permissionList(), true)
+            || in_array('hold_jobs', $user->permissionList(), true)
+            || in_array('deactivate_jobs', $user->permissionList(), true);
+
+        if (! $canModerate) {
+            abort(403, 'Unauthorized: You do not have permission to moderate this job.');
+        }
 
         $updateData = [
             'status' => $validated['status'],
@@ -179,6 +286,11 @@ public function store(Request $request)
 
     public function assignTeam(Request $request, $uuid)
     {
+        $user = auth('admin')->user();
+        if ($user->isTeamMember()) {
+            abort(403, 'Team members are not allowed to assign posts.');
+        }
+
         $validated = $request->validate([
             'team_member_uuid' => 'nullable',
         ]);
@@ -190,6 +302,12 @@ public function store(Request $request)
             $admin = Admin::where('uuid', $validated['team_member_uuid'])
                 ->orWhere('id', $validated['team_member_uuid'])
                 ->first();
+
+            if ($user->isAdmin() && $admin) {
+                if ($admin->created_by !== $user->id || $admin->role !== 'team_member') {
+                    abort(403, 'You can only assign to your own team members.');
+                }
+            }
             $adminId = $admin?->id;
         }
 

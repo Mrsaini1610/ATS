@@ -4,7 +4,6 @@ import { Briefcase, ArrowRight, Clock, MapPin, DollarSign, Bookmark, BookmarkChe
 import { ThemeProvider } from '@/Contexts/ThemeContext';
 import { useTheme } from '@/Contexts/ThemeContext';
 import HomepageLayout from '@/Layouts/HomepageLayout';
-import Footer from '@/Components/Layout/Footer';
 
 // Job Card Component (Copy from Member/JobListings)
 const CandidateJobCard = ({ job, onViewDetails, onApply, isDark, isAuthenticated, onSaveJob, savedJobs }) => {
@@ -89,7 +88,7 @@ const CandidateJobCard = ({ job, onViewDetails, onApply, isDark, isAuthenticated
                         }`}
                         title={isSaved ? 'Remove from saved jobs' : isAuthenticated ? 'Save job' : 'Sign in to save jobs'}
                     >
-                        {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                        {isSaved ? <BookmarkCheck className="w-4 h-4 fill-emerald-600 text-emerald-600" /> : <Bookmark className="w-4 h-4" />}
                     </button>
                 </div>
 
@@ -648,7 +647,6 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
                     onApply={handleApply}
                 />
                 </div>
-                <Footer />
             </HomepageLayout>
         </>
     );

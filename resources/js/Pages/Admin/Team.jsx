@@ -17,11 +17,11 @@ import {
 const PERMISSION_GROUPS = [
   {
     label: "Job Moderation",
-    perms: ["view_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"],
+    perms: ["view_jobs", "view_all_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"],
   },
   {
     label: "Candidate Applications",
-    perms: ["view_applications", "update_application_status"],
+    perms: ["view_applications", "view_all_applications", "update_application_status"],
   },
   {
     label: "Companies",
@@ -42,15 +42,15 @@ const PERMISSION_GROUPS = [
   },
   {
     label: "Candidates / Users",
-    perms: ["view_users", "add_users", "status_users"],
+    perms: ["view_users", "view_all_users", "add_users", "status_users"],
   },
   {
     label: "Tasks",
-    perms: ["view_tasks", "assign_tasks", "status_tasks"],
+    perms: ["view_tasks", "view_all_tasks", "assign_tasks", "status_tasks"],
   },
   {
     label: "Interviews",
-    perms: ["view_interviews", "schedule_interviews", "status_interviews"],
+    perms: ["view_interviews", "view_all_interviews", "schedule_interviews", "status_interviews"],
   },
   {
     label: "Staff & Team",
@@ -58,35 +58,122 @@ const PERMISSION_GROUPS = [
   },
 ];
 
+const DEFAULT_ADMIN_PERMS = [
+  "view_jobs",
+  "view_applications",
+  "view_users",
+  "add_users",
+  "view_companies",
+  "view_categories",
+  "view_subcategories",
+  "view_skills",
+  "view_interviews",
+  "view_tasks",
+  "view_team_member",
+];
+
+const PERMISSION_LABELS = {
+  view_jobs: "View Jobs",
+  view_all_jobs: "View All (All Jobs)",
+  create_jobs: "Create Job",
+  approve_jobs: "Approve Job",
+  reject_jobs: "Reject Job",
+  hold_jobs: "Hold Job",
+  deactivate_jobs: "Deactivate Job",
+
+  view_applications: "View Applications",
+  view_all_applications: "View All (All Applications)",
+  update_application_status: "Update Status",
+
+  view_companies: "View Companies",
+  create_companies: "Create Company",
+  edit_companies: "Edit Company",
+  status_companies: "Status Company",
+  delete_companies: "Delete Company",
+
+  view_categories: "View Categories",
+  create_categories: "Create Category",
+  edit_categories: "Edit Category",
+  status_categories: "Status Category",
+  delete_categories: "Delete Category",
+
+  view_subcategories: "View Subcategories",
+  create_subcategories: "Create Subcategory",
+  edit_subcategories: "Edit Subcategory",
+  status_subcategories: "Status Subcategory",
+  delete_subcategories: "Delete Subcategory",
+
+  view_skills: "View Skills",
+  create_skills: "Create Skill",
+  edit_skills: "Edit Skill",
+  status_skills: "Status Skill",
+  delete_skills: "Delete Skill",
+
+  view_users: "View Users",
+  view_all_users: "View All (All Candidates)",
+  add_users: "Add User",
+  status_users: "Status User",
+
+  view_tasks: "View Tasks",
+  view_all_tasks: "View All (All Tasks)",
+  assign_tasks: "Assign Task",
+  status_tasks: "Status Task",
+
+  view_interviews: "View Interviews",
+  view_all_interviews: "View All (All Interviews)",
+  schedule_interviews: "Schedule Interview",
+  status_interviews: "Status Interview",
+
+  view_team_member: "View Staff & Team",
+  create_team_member: "Create Staff",
+  edit_team_member: "Edit Staff",
+  status_team_member: "Status Staff",
+  delete_team_member: "Delete Staff",
+};
+
 const VIEW_PERMISSION_BY_ACTION = {
+  view_all_jobs: "view_jobs",
   create_jobs: "view_jobs",
   approve_jobs: "view_jobs",
   reject_jobs: "view_jobs",
   hold_jobs: "view_jobs",
   deactivate_jobs: "view_jobs",
+
+  view_all_applications: "view_applications",
   update_application_status: "view_applications",
+
   create_companies: "view_companies",
   edit_companies: "view_companies",
   status_companies: "view_companies",
   delete_companies: "view_companies",
+
   create_categories: "view_categories",
   edit_categories: "view_categories",
   status_categories: "view_categories",
   delete_categories: "view_categories",
+
   create_subcategories: "view_subcategories",
   edit_subcategories: "view_subcategories",
   status_subcategories: "view_subcategories",
   delete_subcategories: "view_subcategories",
+
   create_skills: "view_skills",
   edit_skills: "view_skills",
   status_skills: "view_skills",
   delete_skills: "view_skills",
+
+  view_all_users: "view_users",
   add_users: "view_users",
   status_users: "view_users",
+
+  view_all_tasks: "view_tasks",
   assign_tasks: "view_tasks",
   status_tasks: "view_tasks",
+
+  view_all_interviews: "view_interviews",
   schedule_interviews: "view_interviews",
   status_interviews: "view_interviews",
+
   create_team_member: "view_team_member",
   edit_team_member: "view_team_member",
   status_team_member: "view_team_member",
@@ -214,7 +301,7 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
           <div className="flex flex-wrap gap-1.5">
             {member.permissions.map((p) => (
               <span key={p} className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg">
-                {p.replace(/_/g, " ")}
+                {PERMISSION_LABELS[p] || p.replace(/_/g, " ")}
               </span>
             ))}
           </div>
@@ -317,7 +404,7 @@ export default function Team({ members = [] }) {
       email: "",
       phone: "",
       password: "",
-      role: "",
+      role: isSuperAdmin ? "" : "team_member",
       permissions: [],
       force_action: "",
     });
@@ -425,7 +512,7 @@ export default function Team({ members = [] }) {
     }
 
     if (modal.mode === "add") {
-      router.post(route("admin.super.staff.store"), submissionData, {
+      router.post(route("admin.team.store"), submissionData, {
         preserveScroll: true,
         onSuccess: (page) => {
           // Check agar backend se duplicate soft-deleted confirmation maangi gayi hai
@@ -446,7 +533,7 @@ export default function Team({ members = [] }) {
         },
       });
     } else {
-      put(route("admin.super.staff.update", modal.data.id), {
+      put(route("admin.team.update", modal.data.id), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
       });
@@ -454,12 +541,12 @@ export default function Team({ members = [] }) {
   };
 
   const toggleActive = (id) => {
-    router.post(route("admin.super.staff.toggle-status", id), {}, { preserveScroll: true });
+    router.post(route("admin.team.toggle-status", id), {}, { preserveScroll: true });
   };
 
   const deleteMember = (id, name) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
-      router.delete(route("admin.super.staff.destroy", id), { preserveScroll: true });
+      router.delete(route("admin.team.destroy", id), { preserveScroll: true });
     }
   };
 
@@ -545,7 +632,7 @@ export default function Team({ members = [] }) {
                       value={data.email}
                       onChange={handleEmailChange}
                       onBlur={handleEmailBlur}
-                      placeholder="rohit@workindia.in"
+                      placeholder="rohit@atsjobs.in"
                       className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
                         errors.email
                           ? "border-red-500 focus:ring-red-400 bg-red-50/20"
@@ -595,27 +682,43 @@ export default function Team({ members = [] }) {
                     <label className="block text-xs font-semibold text-gray-500 mb-1">
                       Role *
                     </label>
-                    <select
-                      value={data.role}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setData("role", val);
-                        if (val) {
-                          clearErrors("role");
-                        } else {
-                          setError("role", "Please select a role.");
-                        }
-                      }}
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm bg-white outline-none transition focus:ring-2 ${
-                        errors.role
-                          ? "border-red-500 focus:ring-red-400 bg-red-50/20"
-                          : "border-gray-200 focus:ring-blue-500"
-                      }`}
-                    >
-                      <option value="">Select Role</option>
-                      <option value="team_member">Team Member</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                    {isSuperAdmin ? (
+                      <select
+                        value={data.role}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setData("role", val);
+                          if (val === "admin") {
+                            setData((prev) => ({
+                              ...prev,
+                              role: val,
+                              permissions: Array.from(new Set([...(prev.permissions || []), ...DEFAULT_ADMIN_PERMS])),
+                            }));
+                          }
+                          if (val) {
+                            clearErrors("role");
+                          } else {
+                            setError("role", "Please select a role.");
+                          }
+                        }}
+                        className={`w-full px-3 py-2.5 border rounded-xl text-sm bg-white outline-none transition focus:ring-2 ${
+                          errors.role
+                            ? "border-red-500 focus:ring-red-400 bg-red-50/20"
+                            : "border-gray-200 focus:ring-blue-500"
+                        }`}
+                      >
+                        <option value="">Select Role</option>
+                        <option value="team_member">Team Member</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value="Team Member"
+                        disabled
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-100 text-gray-700 cursor-not-allowed font-medium"
+                      />
+                    )}
                     {errors.role && <p className="text-xs text-red-500 mt-1 font-medium">{errors.role}</p>}
                   </div>
 
@@ -673,6 +776,20 @@ export default function Team({ members = [] }) {
                   </p>
                   <div className="space-y-4">
                     {PERMISSION_GROUPS.map((group) => {
+                      if (data.role === "team_member" && group.label === "Staff & Team") {
+                        return null;
+                      }
+
+                      // If current logged-in user is Admin, only show permissions that this Admin has
+                      const currentAdminPerms = auth?.admin?.permissions || [];
+                      const visiblePerms = isSuperAdmin
+                        ? group.perms
+                        : group.perms.filter((p) => currentAdminPerms.includes(p));
+
+                      if (visiblePerms.length === 0) {
+                        return null;
+                      }
+
                       const hasCategoryView = (data.permissions || []).includes("view_categories");
                       const isGroupBlocked = group.isSubcategoryGroup && !hasCategoryView;
 
@@ -685,7 +802,7 @@ export default function Team({ members = [] }) {
                             )}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {group.perms.map((perm) => {
+                            {visiblePerms.map((perm) => {
                               const checked = (data.permissions || []).includes(perm);
                               const isBlocked = SUBCATEGORY_PERMISSIONS.includes(perm) && !hasCategoryView;
 
@@ -703,7 +820,7 @@ export default function Team({ members = [] }) {
                                       : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 cursor-pointer"
                                   }`}
                                 >
-                                  {perm.replace(/_/g, " ")}
+                                  {PERMISSION_LABELS[perm] || perm.replace(/_/g, " ")}
                                 </button>
                               );
                             })}
@@ -740,10 +857,10 @@ export default function Team({ members = [] }) {
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Team</h1>
             <p className="text-sm text-gray-500">
-              {admins.length} admins · {teamMembers.length} team members
+              {isSuperAdmin ? `${admins.length} admins · ` : ""}{teamMembers.length} team members
             </p>
           </div>
-          {isSuperAdmin && (
+          {(isSuperAdmin || currentUser?.role === "admin" || (currentUser?.permissions || []).includes("create_team_member")) && (
             <button
               type="button"
               onClick={openAddModal}
@@ -754,30 +871,32 @@ export default function Team({ members = [] }) {
           )}
         </div>
 
-        {/* Admins Section */}
-        <div className="mb-6">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <Users className="w-3.5 h-3.5" /> ADMINS
-          </p>
-          {admins.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs font-medium shadow-xs">
-              No admins found.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-              {admins.map((m) => (
-                <MemberCard
-                  key={m.id}
-                  member={m}
-                  onEdit={() => openEditModal(m)}
-                  onToggle={() => toggleActive(m.id)}
-                  onDelete={() => deleteMember(m.id, m.name)}
-                  canEdit={isSuperAdmin}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Admins Section - Only visible to Super Admin */}
+        {isSuperAdmin && (
+          <div className="mb-6">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Users className="w-3.5 h-3.5" /> ADMINS
+            </p>
+            {admins.length === 0 ? (
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs font-medium shadow-xs">
+                No admins found.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                {admins.map((m) => (
+                  <MemberCard
+                    key={m.id}
+                    member={m}
+                    onEdit={() => openEditModal(m)}
+                    onToggle={() => toggleActive(m.id)}
+                    onDelete={() => deleteMember(m.id, m.name)}
+                    canEdit={isSuperAdmin}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Team Members Section */}
         <div>
@@ -797,7 +916,7 @@ export default function Team({ members = [] }) {
                   onEdit={() => openEditModal(m)}
                   onToggle={() => toggleActive(m.id)}
                   onDelete={() => deleteMember(m.id, m.name)}
-                  canEdit={isSuperAdmin}
+                  canEdit={isSuperAdmin || currentUser?.role === "admin"}
                 />
               ))}
             </div>

@@ -7,6 +7,10 @@ export default function RecommendedJobsSection({
   isLoggedIn = false,
   candidateProfile = null,
 }) {
+  if (!isLoggedIn) {
+    return null;
+  }
+
   return (
     <section className="relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
@@ -33,9 +37,7 @@ export default function RecommendedJobsSection({
         </Link>
       </div>
 
-      {/* Logged in state with matching jobs */}
-      {isLoggedIn ? (
-        recommendedJobs.length > 0 ? (
+      {recommendedJobs.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {recommendedJobs.map((job) => {
               const matchPercent = job.match_percent || 85;
@@ -104,12 +106,23 @@ export default function RecommendedJobsSection({
                         <Briefcase className="w-3.5 h-3.5 text-gray-400" />
                         {job.experience}
                       </span>
-                      <Link
-                        href={`/job-search`}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
-                      >
-                        Apply Now
-                      </Link>
+                      {job.is_applied ? (
+                        <Link
+                          href="/my-applications"
+                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition shadow-2xs"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Applied</span>
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/apply/${job.uuid || job.id}`}
+                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                        >
+                          <span>Apply Now</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -132,42 +145,7 @@ export default function RecommendedJobsSection({
               Update Profile
             </Link>
           </div>
-        )
-      ) : (
-        /* Guest Teaser Banner */
-        <div className="bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-2 text-center md:text-left">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-blue-200 border border-white/20 text-xs font-bold backdrop-blur-xs">
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> Smart Profile Matcher
-              </span>
-              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                Get Jobs Tailored Specifically For Your Profile
-              </h3>
-              <p className="text-xs sm:text-sm text-blue-200 max-w-xl leading-relaxed">
-                Our matching engine analyzes your <strong>Job Title</strong>, <strong>Technical Skills</strong>, <strong>Experience Level</strong>, and <strong>Preferred Area/City</strong> to recommend the highest-paying, verified jobs.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-              <Link
-                href="/login"
-                className="px-6 py-3 bg-white hover:bg-blue-50 text-blue-900 rounded-xl text-sm font-extrabold transition shadow-lg text-center"
-              >
-                Sign In to View Matches
-              </Link>
-              <Link
-                href="/register"
-                className="px-6 py-3 bg-blue-600/60 hover:bg-blue-600 text-white border border-white/20 rounded-xl text-sm font-bold transition text-center"
-              >
-                Create Free Profile
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
     </section>
   );
 }

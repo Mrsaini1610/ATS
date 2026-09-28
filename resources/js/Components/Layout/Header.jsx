@@ -10,6 +10,7 @@ import {
   BookmarkCheck,
   User,
   Settings,
+  Briefcase,
   Navigation,
   Locate,
   Loader2,
@@ -152,7 +153,39 @@ export default function Header() {
     }
   }, [GOOGLE_MAPS_API_KEY]);
 
-  // Handle Google Places predictions on typing
+  // Fallback search when Google Places is blocked or unconfigured
+  const searchAreasFallback = async (query) => {
+    setLoadingGoogle(true);
+    try {
+      const osmRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}+India&format=jsonv2&addressdetails=1&limit=6&countrycodes=in`
+      );
+      if (osmRes.ok) {
+        const items = await osmRes.json();
+        const mapped = items.map((item) => {
+          const rawCity = item.address?.city || item.address?.town || item.address?.state_district || "Jaipur";
+          const cleanCity = rawCity.replace(/\b(municipal corporation|tehsil|district|municipality)\b/gi, "").trim() || rawCity;
+          const area = item.name || item.address?.suburb || item.address?.neighbourhood || "";
+          return {
+            place_id: item.place_id,
+            description: item.display_name,
+            structured_formatting: {
+              main_text: area,
+              secondary_text: `${cleanCity}, ${item.address?.state || ""}`,
+            },
+            terms: [{ value: area }, { value: cleanCity }],
+          };
+        });
+        setGooglePredictions(mapped);
+      }
+    } catch (err) {
+      setGooglePredictions([]);
+    } finally {
+      setLoadingGoogle(false);
+    }
+  };
+
+  // Handle Google Places predictions on typing with fallback
   useEffect(() => {
     if (!areaSearchInput.trim() || areaSearchInput.length < 2) {
       setGooglePredictions([]);
@@ -170,17 +203,19 @@ export default function Header() {
               types: ["sublocality", "neighborhood", "locality"],
             },
             (predictions, status) => {
-              setLoadingGoogle(false);
-              if (status === "OK" && predictions) {
+              if (status === "OK" && predictions && predictions.length > 0) {
+                setLoadingGoogle(false);
                 setGooglePredictions(predictions);
               } else {
-                setGooglePredictions([]);
+                searchAreasFallback(areaSearchInput);
               }
             }
           );
         } catch (e) {
-          setLoadingGoogle(false);
+          searchAreasFallback(areaSearchInput);
         }
+      } else {
+        searchAreasFallback(areaSearchInput);
       }
     }, 280);
 
@@ -195,7 +230,7 @@ export default function Header() {
       if (res.data?.success && res.data?.data) {
         const data = res.data.data;
         const cityName = data?.city || data?.state || "Jaipur";
-        const areaName = data?.area || data?.formatted_address || "";
+        const areaName = data?.area || "";
         return { city: cityName, area: areaName };
       }
     } catch (err) {
@@ -446,11 +481,8 @@ export default function Header() {
   const displayName = user?.full_name ? user.full_name.split(" ")[0] : (user?.name ? user.name.split(" ")[0] : "Candidate");
   const initials = displayName ? displayName.substring(0, 2).toUpperCase() : "CA";
 
-  // Auth Button: ONLY ONE dynamic button (no extra buttons)
-  const isLoginPage = url.startsWith("/login");
-  const authButtonConfig = isLoginPage
-    ? { label: "Sign Up", href: "/register" }
-    : { label: "Sign In", href: "/login" };
+  // Auth Button: Unified Sign In / Register
+  const authButtonConfig = { label: "Sign In", href: "/login" };
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -458,7 +490,9 @@ export default function Header() {
     { href: "/categories", label: "Categories" },
     { href: "/companies", label: "Companies" },
     { href: "/services", label: "Services" },
+    { href: "/mobile-app", label: "Mobile App" },
     { href: "/about", label: "About" },
+    { href: "/contact", label: "Contact" },
   ];
 
   return (
@@ -468,18 +502,18 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
           <img
             src="/images/logo.png"
-            alt="ATS Logo"
+            alt="ATS.com"
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
-            className="h-8 w-auto object-contain"
+            className="h-9 w-9 object-contain rounded-xl transition-transform group-hover:scale-105"
           />
-          <div className="flex items-baseline gap-1">
-            <span className="text-lg font-black text-gray-900 tracking-tight">
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-xl font-black text-gray-900 tracking-tight">
               ATS
             </span>
-            <span className="text-xs text-blue-600 font-bold uppercase tracking-wider hidden sm:inline">
-              Jobs
+            <span className="text-sm font-extrabold text-blue-600">
+              .com
             </span>
           </div>
         </Link>
@@ -512,12 +546,12 @@ export default function Header() {
 
         {/* Right: Desktop Navigation & Auth */}
         <div className="flex items-center gap-2 ml-auto">
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1">
             {navLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`px-2.5 xl:px-3 py-1.5 rounded-xl text-xs xl:text-sm font-semibold transition-all ${
                   isActive(l.href)
                     ? "bg-blue-50 text-blue-600 font-bold"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -537,7 +571,11 @@ export default function Header() {
                 title="Notifications"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
+                {(auth?.unread_notifications_count > 0) && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                    {auth.unread_notifications_count > 9 ? "9+" : auth.unread_notifications_count}
+                  </span>
+                )}
               </Link>
 
               <div className="relative">
@@ -570,7 +608,7 @@ export default function Header() {
                       </div>
 
                       <Link
-                        href="/user/profile"
+                        href="/profile"
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
                       >
@@ -582,7 +620,7 @@ export default function Header() {
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50"
                       >
-                        <Settings className="w-4 h-4 text-gray-400" /> My Applications
+                        <Briefcase className="w-4 h-4 text-gray-400" /> My Applications
                       </Link>
 
                       <Link
@@ -926,13 +964,54 @@ export default function Header() {
                     </select>
                   </div>
 
+                  {tempCityUuid && (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-gray-500 uppercase block">
+                          Area / Locality
+                        </label>
+                        {loadingTowns && (
+                          <span className="text-[11px] text-blue-600 font-semibold animate-pulse">
+                            Loading areas...
+                          </span>
+                        )}
+                      </div>
+
+                      {townsList.length > 0 && (
+                        <select
+                          value={tempAreaName}
+                          onChange={(e) => setTempAreaName(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm bg-gray-50 outline-none"
+                        >
+                          <option value="">Select Area / Locality</option>
+                          {townsList.map((t, idx) => {
+                            const name = t.town_name || t.name || t;
+                            return (
+                              <option key={idx} value={name}>
+                                {name}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+
+                      <input
+                        type="text"
+                        value={tempAreaName}
+                        onChange={(e) => setTempAreaName(e.target.value)}
+                        placeholder="Or type specific area (e.g. Sodala, Malviya Nagar)..."
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500 text-gray-800"
+                      />
+                    </div>
+                  )}
+
                   {tempCityName && (
                     <button
                       type="button"
                       onClick={handleApplyManualLocation}
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs mt-2 cursor-pointer"
                     >
-                      Set Location to {tempCityName}
+                      Set Location to {tempAreaName ? `${tempAreaName}, ${tempCityName}` : tempCityName}
                     </button>
                   )}
                 </div>

@@ -13,11 +13,14 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'uuid', 'category_id', 'username', 'full_name', 'email', 'phone', 'password',
+        'uuid', 'category_id', 'username', 'full_name', 'email', 'phone', 'password', 'created_by',
         'gender', 'dob', 'total_experience_years', 'current_ctc', 'expected_ctc',
-        'notice_period_days', 'bio', 'profile_picture', 'skills',
-        'address', 'city', 'state', 'pincode', 'latitude', 'longitude',
-        'is_online', 'last_active'
+        'notice_period_days', 'bio', 'profile_picture', 'skills', 'languages',
+        'address', 'city', 'area', 'state', 'pincode', 'job_title', 'education', 'is_profile_complete',
+        'latitude', 'longitude', 'is_online', 'last_active',
+        'web_latitude', 'web_longitude', 'web_is_online', 'web_last_active',
+        'app_latitude', 'app_longitude', 'app_is_online', 'app_last_active',
+        'linkedin', 'github', 'portfolio', 'job_type', 'work_mode', 'is_open_to_work',
     ];
 
     protected $hidden = [
@@ -26,15 +29,52 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'skills'      => 'array',
-        'is_online'   => 'boolean',
-        'last_active' => 'datetime',
-        'dob'         => 'date',
-        'latitude'    => 'decimal:8',
-        'longitude'   => 'decimal:8',
+        'skills'              => 'array',
+        'languages'           => 'array',
+        'is_online'           => 'boolean',
+        'last_active'         => 'datetime',
+        'dob'                 => 'date',
+        'latitude'            => 'decimal:8',
+        'longitude'           => 'decimal:8',
+        'web_is_online'       => 'boolean',
+        'web_last_active'     => 'datetime',
+        'web_latitude'        => 'decimal:8',
+        'web_longitude'       => 'decimal:8',
+        'app_is_online'       => 'boolean',
+        'app_last_active'     => 'datetime',
+        'app_latitude'        => 'decimal:8',
+        'app_longitude'       => 'decimal:8',
+        'is_profile_complete' => 'boolean',
+        'is_open_to_work'     => 'boolean',
     ];
 
-    protected $appends = ['profile_picture_url'];
+    protected $appends = ['profile_picture_url', 'name'];
+
+    public function getNameAttribute()
+    {
+        return $this->full_name;
+    }
+
+    public function setNameAttribute($value)
+    {
+        $this->attributes['full_name'] = $value;
+    }
+
+    /**
+     * Check if candidate profile is complete
+     */
+    public function isProfileComplete(): bool
+    {
+        if ($this->is_profile_complete) {
+            return true;
+        }
+
+        return !empty($this->full_name)
+            && !str_starts_with($this->full_name, 'Candidate ')
+            && !empty($this->email)
+            && !empty($this->city)
+            && !empty($this->dob);
+    }
 
     protected static function booted()
     {
@@ -80,12 +120,12 @@ class User extends Authenticatable
 
     public function resumes()
     {
-        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid');
+        return $this->hasMany(UserResume::class, 'user_uuid', 'uuid')->where('is_delete', 0);
     }
 
     public function defaultResume()
     {
-        return $this->hasOne(UserResume::class, 'user_uuid', 'uuid')->where('is_default', true);
+        return $this->hasOne(UserResume::class, 'user_uuid', 'uuid')->where('is_default', true)->where('is_delete', 0);
     }
 
     public function certificates()
@@ -100,5 +140,15 @@ class User extends Authenticatable
     public function jobApplications()
     {
         return $this->hasMany(JobApplication::class, 'candidate_id', 'id');
+    }
+
+    public function candidateNotifications()
+    {
+        return $this->hasMany(UserNotification::class, 'user_id', 'id');
+    }
+
+    public function unreadNotificationsCount(): int
+    {
+        return $this->candidateNotifications()->whereNull('read_at')->count();
     }
 }

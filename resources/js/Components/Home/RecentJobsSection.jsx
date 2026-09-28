@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
-import { Clock, MapPin, Briefcase, Sparkles, ArrowRight, Flame } from "lucide-react";
+import { Clock, MapPin, Briefcase, Sparkles, ArrowRight, Flame, CheckCircle2 } from "lucide-react";
 
 export default function RecentJobsSection({ recentJobs = [] }) {
   return (
@@ -101,12 +101,23 @@ export default function RecentJobsSection({ recentJobs = [] }) {
                       <Briefcase className="w-3.5 h-3.5 text-gray-400" />
                       {job.experience}
                     </span>
-                    <Link
-                      href="/job-search"
-                      className="px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold transition-colors"
-                    >
-                      View Details
-                    </Link>
+                    {job.is_applied ? (
+                      <Link
+                        href="/my-applications"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition shadow-2xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Applied</span>
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/apply/${job.uuid || job.id}`}
+                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition shadow-xs"
+                      >
+                        <span>Apply Now</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

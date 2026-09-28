@@ -102,7 +102,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
 
   return (
     <>
-      <Head title="My Profile - WorkIndia Admin" />
+      <Head title="My Profile - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6 max-w-3xl mx-auto pb-25">
         {/* Flash Message Banner */}
@@ -379,7 +379,7 @@ export default function AdminProfile({ userStats = {}, permissions = [] }) {
               <h3 className="font-bold text-lg">Super Administrator</h3>
             </div>
             <p className="text-purple-200 text-sm">
-              You have full access to all WorkIndia admin features. All {ALL_PERMISSIONS.length} permissions are granted by default.
+              You have full access to all ATS admin features. All {ALL_PERMISSIONS.length} permissions are granted by default.
             </p>
           </div>
         )}

@@ -25,12 +25,12 @@ import {
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase, permissions: ["view_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
-  { href: "/admin/applications", label: "Applications", icon: ClipboardList, permissions: ["view_applications", "update_application_status"] },
-  { href: "/admin/users", label: "Users", icon: Users, permissions: ["view_users", "add_users", "status_users"] },
-  { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["view_interviews", "schedule_interviews", "status_interviews"] },
-  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, permissions: ["view_tasks", "assign_tasks", "status_tasks"] },
-  { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["view_team_member", "create_team_member", "edit_team_member", "status_team_member", "delete_team_member"] },
+  { href: "/admin/jobs", label: "Job Posts", icon: Briefcase, permissions: ["view_jobs", "view_all_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs"] },
+  { href: "/admin/applications", label: "Applications", icon: ClipboardList, permissions: ["view_applications", "view_all_applications", "update_application_status"] },
+  { href: "/admin/users", label: "Users", icon: Users, permissions: ["view_users", "view_all_users", "add_users", "status_users"] },
+  { href: "/admin/interviews", label: "Interviews", icon: Calendar, permissions: ["view_interviews", "view_all_interviews", "schedule_interviews", "status_interviews"] },
+  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList, permissions: ["view_tasks", "view_all_tasks", "assign_tasks", "status_tasks"] },
+  { href: "/admin/team", label: "Staff & Team", icon: UserCog, permissions: ["view_team_member", "create_team_member", "edit_team_member", "status_team_member", "delete_team_member"], roles: ["super_admin", "admin"] },
   { href: "/admin/bulk", label: "Bulk Messages", icon: Megaphone, permissions: ["send_bulk_messages"] },
   { href: "/admin/companies", label: "Companies", icon: Building2, permissions: ["view_companies", "create_companies", "edit_companies", "status_companies", "delete_companies"] },
   { href: "/admin/categories", label: "Categories", icon: Tags, permissions: ["view_categories", "create_categories", "edit_categories", "status_categories", "delete_categories", "view_subcategories", "create_subcategories", "edit_subcategories", "status_subcategories", "delete_subcategories"] },

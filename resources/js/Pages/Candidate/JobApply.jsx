@@ -13,7 +13,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
 
   // Static Fallback agar backend se data directly bind na ho rha ho test time par
 //   const submitted = props.flash?.submitted;
-  const job = jobDataFromBackend ||  {
+  const job = jobDataFromBackend || {
     id: "1",
     title: "Senior React Developer",
     company: "TechCorp Partner",
@@ -24,6 +24,16 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
     color: "bg-blue-600",
     requirements: ["3+ years React experience", "TypeScript proficiency", "Node.js knowledge", "Git & Agile workflow"]
   };
+
+  const rawRequirements = job.requirements || job.qualifications || job.skills || [];
+  const requirementsList = Array.isArray(rawRequirements)
+    ? rawRequirements
+    : typeof rawRequirements === "string"
+      ? (rawRequirements.includes("\n")
+          ? rawRequirements.split("\n")
+          : rawRequirements.split(",")
+        ).map((s) => s.trim()).filter(Boolean)
+      : [];
 
     const [step, setStep] = useState(0);
     const [showForm, setShowForm] = useState(loggedIn);
@@ -180,30 +190,36 @@ const handleNext = (e) => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-24 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-11 h-11 ${job.color || 'bg-blue-600'} rounded-xl flex items-center justify-center text-white font-bold text-sm`}>
-                  {job.logo}
+                <div className={`w-11 h-11 ${job.color || 'bg-gradient-to-br from-blue-600 to-indigo-700'} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden shadow-xs`}>
+                  {job.company_image ? (
+                    <img src={job.company_image} alt={job.company} className="w-full h-full object-cover" />
+                  ) : (
+                    job.logo || (job.company || "Job").slice(0, 2).toUpperCase()
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-xs sm:text-sm">{job.title}</h3>
-                  <p className="text-[11px] text-gray-400">{job.company}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-gray-900 text-xs sm:text-sm truncate">{job.title}</h3>
+                  <p className="text-[11px] text-blue-600 font-semibold truncate">{job.company}</p>
                 </div>
               </div>
               <div className="space-y-2 text-xs text-gray-600 mb-4 pt-2 border-t border-gray-50">
-                <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-gray-400" />{job.location}</div>
-                <div className="flex items-center gap-2"><DollarSign className="w-3.5 h-3.5 text-gray-400" />{job.salary}</div>
-                <div className="flex items-center gap-2"><Briefcase className="w-3.5 h-3.5 text-gray-400" />{job.type}</div>
+                <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" /><span className="truncate">{job.location || "Multiple Locations"}</span></div>
+                <div className="flex items-center gap-2 font-bold text-emerald-700"><DollarSign className="w-3.5 h-3.5 text-emerald-600 shrink-0" /><span>{job.salary || (job.min_salary && job.max_salary ? `₹${job.min_salary} - ₹${job.max_salary}` : "Competitive")}</span></div>
+                <div className="flex items-center gap-2"><Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" /><span>{job.job_type || job.type || "Full Time"}</span></div>
               </div>
-              <div className="pt-3 border-t border-gray-50">
-                <h4 className="text-[11px] font-bold text-gray-700 mb-2 uppercase tracking-wider">Core Requirements</h4>
-                <ul className="space-y-1.5">
-                  {job.requirements.map((r) => (
-                    <li key={r} className="flex items-start gap-1.5 text-xs text-gray-500">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
-                      <span>{r}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {requirementsList.length > 0 && (
+                <div className="pt-3 border-t border-gray-50">
+                  <h4 className="text-[11px] font-bold text-gray-700 mb-2 uppercase tracking-wider">Core Requirements</h4>
+                  <ul className="space-y-1.5">
+                    {requirementsList.map((r, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5 text-xs text-gray-500">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 
@@ -416,20 +432,34 @@ const handleNext = (e) => {
           </div>
         </div>
       </div>
-    <CandidateLoginPopup
-        open={loginPopup}
-        onClose={() => setLoginPopup(false)}
-        jobId={job.id}
-        onLoginSuccess={() => {
-            setLoginPopup(false);
-
-            router.reload({
-                onSuccess: () => {
-                    setShowForm(true);
-                },
-            });
-        }}
-    />
+      {loginPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <User className="w-7 h-7 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Login Required</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              Please sign in to your candidate account to apply for <strong>{job.title}</strong>.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setLoginPopup(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <Link
+                href={`/login?redirect=/apply/${job.uuid || job.id}`}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition cursor-pointer shadow-xs inline-flex items-center justify-center"
+              >
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </HomepageLayout>
   );
 }

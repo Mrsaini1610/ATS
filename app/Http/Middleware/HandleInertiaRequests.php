@@ -36,6 +36,7 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user(),
+                'unread_notifications_count' => $request->user() ? \App\Models\UserNotification::where('user_id', $request->user()->id)->whereNull('read_at')->count() : 0,
                 'admin' => $adminUser ? [
                     'id'            => $adminUser->id,
                     'uuid'          => $adminUser->uuid,

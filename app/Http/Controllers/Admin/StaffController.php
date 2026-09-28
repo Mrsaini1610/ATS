@@ -15,9 +15,20 @@ class StaffController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Admin::query()
-            ->where('id', '!=', Auth::guard('admin')->id())
-            ->latest();
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || $currentUser->isTeamMember()) {
+            abort(403, 'Team members are not allowed to access Staff & Team.');
+        }
+
+        $query = Admin::query()->latest();
+
+        if ($currentUser->isAdmin()) {
+            // Admin only sees their own team members; never super admin or other admins
+            $query->where('created_by', $currentUser->id)->where('role', 'team_member');
+        } else {
+            // Super Admin sees all other staff
+            $query->where('id', '!=', $currentUser->id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -42,7 +53,7 @@ class StaffController extends Controller
                 'role'        => $member->role,
                 'roleLabel'   => str_replace('_', ' ', ucwords($member->role, '_')),
                 'active'      => (bool) $member->status,
-                'permissions' => $member->permissions ?? [],
+                'permissions' => $member->permissionList(),
                 'createdAt'   => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
             ];
         });
@@ -55,15 +66,33 @@ class StaffController extends Controller
 
     public function store(Request $request)
     {
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || $currentUser->isTeamMember()) {
+            abort(403, 'Team members are not allowed to create staff.');
+        }
+
+        $allowedRoles = $currentUser->isSuperAdmin() ? ['admin', 'team_member'] : ['team_member'];
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'username'    => 'required|string|max:255|unique:admins,username',
             'email'       => 'required|email|max:255|unique:admins,email',
             'phone'       => 'nullable|string|max:20',
             'password'    => 'required|string|min:6',
-            'role'        => ['required', Rule::in(['admin', 'team_member', 'super_admin'])],
+            'role'        => ['required', Rule::in($allowedRoles)],
             'permissions' => 'nullable|array',
         ]);
+
+        $role = $currentUser->isAdmin() ? 'team_member' : $validated['role'];
+        $permissions = $validated['permissions'] ?? [];
+        if ($currentUser->isAdmin()) {
+            $adminPerms = $currentUser->permissionList();
+            $permissions = array_values(array_intersect($permissions, $adminPerms));
+        }
+        if ($role === 'team_member') {
+            $staffPerms = ['view_team_member', 'create_team_member', 'edit_team_member', 'status_team_member', 'delete_team_member'];
+            $permissions = array_values(array_diff($permissions, $staffPerms));
+        }
 
         Admin::create([
             'name'                 => $validated['name'],
@@ -71,10 +100,10 @@ class StaffController extends Controller
             'email'                => $validated['email'],
             'phone'                => $validated['phone'] ?? null,
             'password'             => Hash::make($validated['password']),
-            'role'                 => $validated['role'],
-            'permissions'          => $validated['permissions'] ?? [],
+            'role'                 => $role,
+            'permissions'          => $permissions,
             'status'               => true,
-            'created_by'           => Auth::guard('admin')->id(),
+            'created_by'           => $currentUser->id,
             'must_change_password' => false,
         ]);
 
@@ -83,23 +112,45 @@ class StaffController extends Controller
 
     public function update(Request $request, Admin $admin)
     {
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || $currentUser->isTeamMember()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if ($currentUser->isAdmin() && ($admin->created_by !== $currentUser->id || $admin->role !== 'team_member')) {
+            abort(403, 'You can only update your own team members.');
+        }
+
+        $allowedRoles = $currentUser->isSuperAdmin() ? ['admin', 'team_member'] : ['team_member'];
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'username'    => ['required', 'string', 'max:255', Rule::unique('admins', 'username')->ignore($admin->id)],
             'email'       => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($admin->id)],
             'phone'       => 'nullable|string|max:20',
             'password'    => 'nullable|string|min:6',
-            'role'        => ['required', Rule::in(['admin', 'team_member', 'super_admin'])],
+            'role'        => ['required', Rule::in($allowedRoles)],
             'permissions' => 'nullable|array',
         ]);
+
+        $role = $currentUser->isAdmin() ? 'team_member' : $validated['role'];
+        $permissions = $validated['permissions'] ?? [];
+        if ($currentUser->isAdmin()) {
+            $adminPerms = $currentUser->permissionList();
+            $permissions = array_values(array_intersect($permissions, $adminPerms));
+        }
+        if ($role === 'team_member') {
+            $staffPerms = ['view_team_member', 'create_team_member', 'edit_team_member', 'status_team_member', 'delete_team_member'];
+            $permissions = array_values(array_diff($permissions, $staffPerms));
+        }
 
         $updateData = [
             'name'        => $validated['name'],
             'username'    => $validated['username'],
             'email'       => $validated['email'],
             'phone'       => $validated['phone'] ?? null,
-            'role'        => $validated['role'],
-            'permissions' => $validated['permissions'] ?? [],
+            'role'        => $role,
+            'permissions' => $permissions,
         ];
 
         if (!empty($validated['password'])) {
@@ -113,6 +164,15 @@ class StaffController extends Controller
 
     public function toggleStatus(Admin $admin)
     {
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || $currentUser->isTeamMember()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if ($currentUser->isAdmin() && ($admin->created_by !== $currentUser->id || $admin->role !== 'team_member')) {
+            abort(403, 'You can only manage your own team members.');
+        }
+
         if ($admin->role === 'super_admin') {
             return back()->with('error', 'Super Admin status cannot be toggled.');
         }
@@ -126,6 +186,15 @@ class StaffController extends Controller
 
     public function destroy(Admin $admin)
     {
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || $currentUser->isTeamMember()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if ($currentUser->isAdmin() && ($admin->created_by !== $currentUser->id || $admin->role !== 'team_member')) {
+            abort(403, 'You can only delete your own team members.');
+        }
+
         if ($admin->role === 'super_admin') {
             return back()->with('error', 'Super Admin cannot be deleted.');
         }

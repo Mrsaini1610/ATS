@@ -5,9 +5,9 @@ import { Shield, CheckCircle2, Users, Lock, AlertCircle } from "lucide-react";
 
 const ALL_PERMISSIONS = [
   // Job Management
-  "view_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
+  "view_jobs", "view_all_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
   // Applications
-  "view_applications", "update_application_status",
+  "view_applications", "view_all_applications", "update_application_status",
   // Companies
   "view_companies", "create_companies", "edit_companies", "status_companies", "delete_companies",
   // Categories
@@ -17,11 +17,11 @@ const ALL_PERMISSIONS = [
   // Skills
   "view_skills", "create_skills", "edit_skills", "status_skills", "delete_skills",
   // Candidates / Users
-  "view_users", "add_users", "status_users",
+  "view_users", "view_all_users", "add_users", "status_users",
   // Tasks
-  "view_tasks", "assign_tasks", "status_tasks",
+  "view_tasks", "view_all_tasks", "assign_tasks", "status_tasks",
   // Interviews
-  "view_interviews", "schedule_interviews", "status_interviews",
+  "view_interviews", "view_all_interviews", "schedule_interviews", "status_interviews",
   // Staff & Team
   "view_team_member", "create_team_member", "edit_team_member", "status_team_member", "delete_team_member",
 ];
@@ -31,13 +31,13 @@ const PERMISSION_GROUPS = [
     label: "Job Moderation",
     icon: "💼",
     perms: [
-      "view_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
+      "view_jobs", "view_all_jobs", "create_jobs", "approve_jobs", "reject_jobs", "hold_jobs", "deactivate_jobs",
     ],
   },
   {
     label: "Candidate Applications",
     icon: "📋",
-    perms: ["view_applications", "update_application_status"],
+    perms: ["view_applications", "view_all_applications", "update_application_status"],
   },
   {
     label: "Companies",
@@ -72,17 +72,17 @@ const PERMISSION_GROUPS = [
   {
     label: "Candidates / Users",
     icon: "👤",
-    perms: ["view_users", "add_users", "status_users"],
+    perms: ["view_users", "view_all_users", "add_users", "status_users"],
   },
   {
     label: "Tasks",
     icon: "📝",
-    perms: ["view_tasks", "assign_tasks", "status_tasks"],
+    perms: ["view_tasks", "view_all_tasks", "assign_tasks", "status_tasks"],
   },
   {
     label: "Interviews",
     icon: "📅",
-    perms: ["view_interviews", "schedule_interviews", "status_interviews"],
+    perms: ["view_interviews", "view_all_interviews", "schedule_interviews", "status_interviews"],
   },
   {
     label: "Staff & Team",
@@ -95,7 +95,8 @@ const PERMISSION_GROUPS = [
 
 const PERMISSION_LABELS = {
   // Jobs
-  view_jobs: "View Jobs",
+  view_jobs: "View Assigned / Own Jobs",
+  view_all_jobs: "Full Post Show (View All Posts)",
   create_jobs: "Create Job Post",
   approve_jobs: "Approve Job",
   reject_jobs: "Reject Job",
@@ -103,7 +104,8 @@ const PERMISSION_LABELS = {
   deactivate_jobs: "Activate / Deactivate Job",
 
   // Applications
-  view_applications: "View Applications",
+  view_applications: "View Team / Own Applications",
+  view_all_applications: "Full Applications Show (View All Applications)",
   update_application_status: "Update Status & Offers",
 
   // Companies
@@ -135,17 +137,20 @@ const PERMISSION_LABELS = {
   delete_skills: "Delete Skill",
 
   // Users
-  view_users: "View Registered Users",
+  view_users: "View Team / Own Registered Users",
+  view_all_users: "Full Candidates Show (View All Candidates)",
   add_users: "Add New User",
   status_users: "Activate / Deactivate User",
 
   // Tasks
-  view_tasks: "View Tasks",
+  view_tasks: "View Team / Own Tasks",
+  view_all_tasks: "Full Tasks Show (View All Tasks)",
   assign_tasks: "Assign New Task",
   status_tasks: "Update Task Status",
 
   // Interviews
-  view_interviews: "View Interviews",
+  view_interviews: "View Team / Own Interviews",
+  view_all_interviews: "Full Interviews Show (View All Interviews)",
   schedule_interviews: "Schedule Interview",
   status_interviews: "Update Status & Remarks",
 
@@ -163,12 +168,14 @@ const ROLE_COLOR = {
 };
 
 const VIEW_PERMISSION_BY_ACTION = {
+  view_all_jobs: "view_jobs",
   create_jobs: "view_jobs",
   approve_jobs: "view_jobs",
   reject_jobs: "view_jobs",
   hold_jobs: "view_jobs",
   deactivate_jobs: "view_jobs",
 
+  view_all_applications: "view_applications",
   update_application_status: "view_applications",
 
   create_companies: "view_companies",
@@ -191,12 +198,15 @@ const VIEW_PERMISSION_BY_ACTION = {
   status_skills: "view_skills",
   delete_skills: "view_skills",
 
+  view_all_users: "view_users",
   add_users: "view_users",
   status_users: "view_users",
 
+  view_all_tasks: "view_tasks",
   assign_tasks: "view_tasks",
   status_tasks: "view_tasks",
 
+  view_all_interviews: "view_interviews",
   schedule_interviews: "view_interviews",
   status_interviews: "view_interviews",
 
@@ -323,7 +333,7 @@ export default function Permissions({ members: propMembers = [] }) {
 
   return (
     <>
-      <Head title="Permission Management - WorkIndia Admin" />
+      <Head title="Permission Management - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         <div className="mb-6">
@@ -446,6 +456,27 @@ export default function Permissions({ members: propMembers = [] }) {
                 <div className="p-4 sm:p-6 space-y-6">
                   {PERMISSION_GROUPS.map((group) => {
                     const isGroupBlocked = group.isSubcategoryGroup && !hasCategoryView;
+                    const isTeamMember = selected?.role === "team_member";
+                    const isStaffGroup = group.label === "Staff & Team";
+
+                    if (isTeamMember && isStaffGroup) {
+                      return (
+                        <div key={group.label} className="p-4 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold text-gray-400 flex items-center gap-2">
+                              <span className="text-base opacity-50">{group.icon}</span>
+                              {group.label}
+                            </p>
+                            <span className="text-xs font-semibold text-gray-500 bg-gray-200/70 px-2 py-0.5 rounded-md">
+                              Restricted for Team Members
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Team members cannot be granted staff & team management permissions.
+                          </p>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div key={group.label} className={isGroupBlocked ? "opacity-60 transition" : ""}>

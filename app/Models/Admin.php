@@ -87,7 +87,58 @@ class Admin extends Authenticatable
             $permissions = $decoded;
         }
 
-        return is_array($permissions) ? array_values(array_filter($permissions, 'is_string')) : [];
+        $list = is_array($permissions) ? array_values(array_filter($permissions, 'is_string')) : [];
+
+        // 1. Admin role gets default view permissions
+        if ($this->role === 'admin') {
+            $defaultAdminPermissions = [
+                'view_jobs',
+                'view_applications',
+                'view_users',
+                'add_users',
+                'view_companies',
+                'view_categories',
+                'view_subcategories',
+                'view_skills',
+                'view_interviews',
+                'view_tasks',
+                'view_team_member',
+            ];
+            $list = array_values(array_unique(array_merge($list, $defaultAdminPermissions)));
+        }
+
+        // 2. Team member role can NEVER have staff/team management permissions
+        if ($this->role === 'team_member') {
+            $staffPerms = [
+                'view_team_member',
+                'create_team_member',
+                'edit_team_member',
+                'status_team_member',
+                'delete_team_member',
+            ];
+            $list = array_values(array_diff($list, $staffPerms));
+        }
+
+        // 3. If a job post is assigned to this member, auto grant view, edit/status, and task assignment rights
+        try {
+            if (!empty($this->id) && \App\Models\JobPost::where('assigned_to', $this->id)->exists()) {
+                $autoAssignedPerms = [
+                    'view_jobs',
+                    'view_tasks',
+                    'assign_tasks',
+                    'status_tasks',
+                    'approve_jobs',
+                    'reject_jobs',
+                    'hold_jobs',
+                    'deactivate_jobs',
+                ];
+                $list = array_values(array_unique(array_merge($list, $autoAssignedPerms)));
+            }
+        } catch (\Throwable $e) {
+            // Ignore if table not yet migrated
+        }
+
+        return $list;
     }
 
     // Relationships

@@ -35,22 +35,22 @@ const TEMPLATES = [
   {
     id: "job_alert",
     label: "Job Alert",
-    body: "🚀 New job opportunity matching your profile!\n\nPosition: [Job Title]\nCompany: [Company]\nLocation: [City]\nSalary: [Salary]\n\nApply now on WorkIndia!\n\nDownload App: workindia.in/app",
+    body: "🚀 New job opportunity matching your profile!\n\nPosition: [Job Title]\nCompany: [Company]\nLocation: [City]\nSalary: [Salary]\n\nApply now on ATS!\n\nPortal: atsjobs.in",
   },
   {
     id: "interview",
     label: "Interview Invite",
-    body: "📅 You have been shortlisted for an interview!\n\nCompany: [Company]\nRole: [Job Title]\nDate: [Date]\nMode: [Phone / Video / In-person]\n\nPlease confirm your availability by replying to this message.\n\n– WorkIndia Recruitment Team",
+    body: "📅 You have been shortlisted for an interview!\n\nCompany: [Company]\nRole: [Job Title]\nDate: [Date]\nMode: [Phone / Video / In-person]\n\nPlease confirm your availability by replying to this message.\n\n– ATS Recruitment Team",
   },
   {
     id: "follow_up",
     label: "Follow-up / Reminder",
-    body: "👋 Hi,\n\nWe noticed you recently registered on WorkIndia but haven't applied to any jobs yet.\n\nWe have active jobs matching your profile right now!\n\nOpen WorkIndia and explore: workindia.in/search\n\n– WorkIndia Team",
+    body: "👋 Hi,\n\nWe noticed you recently registered on ATS but haven't applied to any jobs yet.\n\nWe have active jobs matching your profile right now!\n\nOpen ATS and explore: atsjobs.in/job-listings\n\n– ATS Team",
   },
   {
     id: "welcome",
     label: "Welcome Message",
-    body: "🎉 Welcome to WorkIndia – India's job portal!\n\nYour profile is live. Get started:\n✅ Complete your profile\n✅ Search jobs in your city\n✅ Apply in one tap\n\nWorkindia.in | Active Jobs | Verified Candidates",
+    body: "🎉 Welcome to ATS – India's job portal!\n\nYour profile is live. Get started:\n✅ Complete your profile\n✅ Search jobs in your city\n✅ Apply in one tap\n\natsjobs.in | Active Jobs | Verified Candidates",
   },
   {
     id: "custom",
@@ -179,7 +179,7 @@ export default function BulkNotifications({
 
   return (
     <>
-      <Head title="Bulk Notifications - WorkIndia Admin" />
+      <Head title="Bulk Notifications - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
         {toast && (
@@ -554,7 +554,7 @@ export default function BulkNotifications({
 
               <p className="text-[11px] text-gray-400 text-center mt-3 leading-relaxed">
                 {channel === "whatsapp"
-                  ? "Dispatches WhatsApp broadcast via WorkIndia SMS/WhatsApp Gateway."
+                  ? "Dispatches WhatsApp broadcast via SMS/WhatsApp Gateway."
                   : "Dispatches mail queue through configured Laravel SMTP/Mail Service."}
               </p>
             </div>

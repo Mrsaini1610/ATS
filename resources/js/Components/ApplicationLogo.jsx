@@ -6,16 +6,16 @@ export default function ApplicationLogo(props) {
         <>
             <div className="block dark:hidden">
                 <img
-                    className="max-w-[20px] md:max-w-[30px] rounded-full"
+                    className="max-w-[32px] md:max-w-[40px] h-auto rounded-xl object-contain"
                     src={lightLogo}
-                    alt="Logo"
+                    alt="ATS.com"
                 />
             </div>
             <div className="hidden dark:block">
                 <img
-                    className="max-w-[20px] md:max-w-[30px] rounded-full"
+                    className="max-w-[32px] md:max-w-[40px] h-auto rounded-xl object-contain"
                     src={darkLogo}
-                    alt="Logo"
+                    alt="ATS.com"
                 />
             </div>
         </>

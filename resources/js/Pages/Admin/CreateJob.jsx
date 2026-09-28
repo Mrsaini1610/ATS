@@ -14,6 +14,7 @@ import {
   Clock,
   FileText,
   ChevronDown,
+  Sparkles,
 } from "lucide-react";
 
 const JOB_TYPES = ["Full Time", "Part Time", "Contract", "Freelance", "Internship"];
@@ -226,6 +227,23 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
     }
   }, [data, activeFields]);
 
+  useEffect(() => {
+    if (currentUser && !data.contactPersonName) {
+      const isTeam = currentUser.role === "team_member";
+      const roleLabel = currentUser.role === 'super_admin' ? 'Super Admin' : (currentUser.role === 'admin' ? 'Admin' : 'HR/Recruiter');
+      const formattedName = `${currentUser.name} (${roleLabel})`;
+      const cleanPhone = currentUser.phone ? currentUser.phone.replace("+91", "").replace(/\D/g, "").slice(-10) : "";
+
+      setData(prev => ({
+        ...prev,
+        contactPersonName: prev.contactPersonName || formattedName,
+        contactPhone: prev.contactPhone || cleanPhone,
+        contactEmail: prev.contactEmail || currentUser.email || "",
+        assignedToId: isTeam ? currentUser.id : prev.assignedToId,
+      }));
+    }
+  }, [currentUser]);
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -406,8 +424,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">No Of Openings *</label>
                   <input
                     type="number"
+                    min="1"
                     value={data.openings}
-                    onChange={(e) => setData("openings", e.target.value)}
+                    onKeyDown={(e) => { if (['-', '+', 'e', 'E', '.'].includes(e.key)) e.preventDefault(); }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setData("openings", val);
+                    }}
                     placeholder="e.g. 2"
                     className={fieldClass("openings", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50")}
                   />
@@ -430,12 +453,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
           {/* Candidate Requirement & Salary Type */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-indigo-50 p-4 sm:p-6 shadow-xs space-y-4">
             <h2 className="font-bold text-xs uppercase tracking-wider text-blue-600 border-b border-indigo-50 pb-3 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-blue-500" /> Candidate Requirement & Salary
+              <Sparkles className="w-4 h-4 text-blue-500" /> Candidate Requirement & Salary
             </h2>
 
             <div className="space-y-4">
+              {/* Experience selection */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Total Experience of Candidate *</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Experience Required *</label>
                 <div className="flex flex-wrap gap-2.5">
                   {EXP_OPTIONS.map((exp) => (
                     <button
@@ -463,7 +487,18 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Maximum Experience (Years) *</label>
-                      <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                      <input
+                        type="number"
+                        min="0"
+                        value={data.maxExp}
+                        onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setData("maxExp", val);
+                        }}
+                        placeholder="e.g. 5"
+                        className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
+                      />
                       {getFieldError("maxExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("maxExp")}</p>}
                     </div>
                   </div>
@@ -480,12 +515,34 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Minimum Experience (Years) *</label>
-                    <input type="number" value={data.minExp} onChange={(e) => setData("minExp", e.target.value)} placeholder="e.g. 1" className={fieldClass("minExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                    <input
+                      type="number"
+                      min="0"
+                      value={data.minExp}
+                      onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setData("minExp", val);
+                      }}
+                      placeholder="e.g. 1"
+                      className={fieldClass("minExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
+                    />
                     {getFieldError("minExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("minExp")}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Maximum Experience (Years) *</label>
-                    <input type="number" value={data.maxExp} onChange={(e) => setData("maxExp", e.target.value)} placeholder="e.g. 5" className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")} />
+                    <input
+                      type="number"
+                      min="0"
+                      value={data.maxExp}
+                      onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setData("maxExp", val);
+                      }}
+                      placeholder="e.g. 5"
+                      className={fieldClass("maxExp", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
+                    />
                     {getFieldError("maxExp") && <p className="text-xs text-red-500 mt-1">{getFieldError("maxExp")}</p>}
                   </div>
                 </div>
@@ -514,8 +571,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">In-hand salary (Min) *</label>
                     <input
                     type="number"
+                    min="0"
                     value={data.salaryMin}
-                    onChange={(e) => setData("salaryMin", e.target.value)}
+                    onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setData("salaryMin", val);
+                    }}
                     placeholder="e.g. 15000"
                     className={fieldClass("salaryMin", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
                   />
@@ -525,8 +587,13 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                   <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">In-hand salary (Max) *</label>
                   <input
                     type="number"
+                    min="0"
                     value={data.salaryMax}
-                    onChange={(e) => setData("salaryMax", e.target.value)}
+                    onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setData("salaryMax", val);
+                    }}
                     placeholder="e.g. 30000"
                     className={fieldClass("salaryMax", "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50")}
                   />
@@ -574,17 +641,45 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
                 )}
 
                 {activeFields.skills && (
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3 mt-2">
+                  <div className="space-y-2 mt-2">
                     <div className="relative">
                       <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="text"
                         value={skillSearch}
                         onChange={(e) => setSkillSearch(e.target.value)}
-                        placeholder="Search skills..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const custom = skillSearch.trim();
+                            if (custom && !data.skills.includes(custom)) {
+                              setData("skills", [...data.skills, custom]);
+                              setSkillSearch("");
+                            }
+                          }
+                        }}
+                        placeholder="Search skills or type custom skill and press Enter..."
                         className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+
+                    {skillSearch.trim() && !data.skills.includes(skillSearch.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const custom = skillSearch.trim();
+                          if (custom && !data.skills.includes(custom)) {
+                            setData("skills", [...data.skills, custom]);
+                            setSkillSearch("");
+                          }
+                        }}
+                        className="w-full py-2 px-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl flex items-center justify-between transition cursor-pointer border border-indigo-200"
+                      >
+                        <span>+ Add custom skill &ldquo;{skillSearch.trim()}&rdquo;</span>
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <div className="max-h-40 overflow-y-auto space-y-1.5 border border-gray-200 rounded-xl p-2 bg-white">
                       {filteredSkills.map((skill) => (
                         <button
@@ -636,8 +731,34 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
               <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100 space-y-3 mt-2">
                 <div className="flex justify-between items-center"><span className="text-xs font-bold text-teal-900 uppercase">Age Limit</span><button onClick={() => toggleField("age")} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button></div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="number" placeholder="Min Age" value={data.minAge} onChange={(e) => setData("minAge", e.target.value)} className={fieldClass("minAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
-                  <input type="number" placeholder="Max Age" value={data.maxAge} onChange={(e) => setData("maxAge", e.target.value)} className={fieldClass("maxAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")} />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Min Age"
+                    value={data.minAge}
+                    onKeyDown={(e) => {
+                      if (e.key === "-" || e.key === "e" || e.key === "+") e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setData("minAge", val);
+                    }}
+                    className={fieldClass("minAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Max Age"
+                    value={data.maxAge}
+                    onKeyDown={(e) => {
+                      if (e.key === "-" || e.key === "e" || e.key === "+") e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setData("maxAge", val);
+                    }}
+                    className={fieldClass("maxAge", "p-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-teal-500")}
+                  />
                 </div>
                 {getFieldError("minAge") && <p className="text-xs text-red-500">{getFieldError("minAge")}</p>}
                 {getFieldError("maxAge") && <p className="text-xs text-red-500">{getFieldError("maxAge")}</p>}
@@ -791,13 +912,17 @@ export default function CreateJob({ companies = [], categories = [], teamMembers
               <div className="relative">
                 <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">Contact Person Name & Designation *</label>
                 <div
-                  onClick={() => toggleDropdown("contactPerson")}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50/50 flex items-center justify-between cursor-pointer"
+                  onClick={() => {
+                    if (teamMembers.length > 0) {
+                      toggleDropdown("contactPerson");
+                    }
+                  }}
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm ${teamMembers.length === 0 ? "bg-gray-100 text-gray-500 cursor-not-allowed font-medium" : "bg-gray-50/50 cursor-pointer flex items-center justify-between"}`}
                 >
-                  <span className={data.contactPersonName ? "text-gray-900 font-medium" : "text-gray-400"}>
-                    {data.contactPersonName || "Select Contact Person / Staff"}
+                  <span className={data.contactPersonName ? "text-gray-900 font-medium" : (teamMembers.length === 0 ? "text-gray-500" : "text-gray-400")}>
+                    {data.contactPersonName ? `${data.contactPersonName}${teamMembers.length === 0 ? " (Self)" : ""}` : (teamMembers.length === 0 ? "Self (Team members cannot assign other members)" : "Select Contact Person / Staff")}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                  {teamMembers.length > 0 && <ChevronDown className="w-4 h-4 text-gray-500" />}
                 </div>
 
                 {openDropdowns.contactPerson && (

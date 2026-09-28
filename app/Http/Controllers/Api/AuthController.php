@@ -136,8 +136,12 @@ class AuthController extends Controller
             }
 
             $user->update([
-                'is_online'   => true,
-                'last_active' => now()
+                'app_is_online'   => true,
+                'app_last_active' => now(),
+                'app_latitude'    => $request->latitude ?? $user->app_latitude,
+                'app_longitude'   => $request->longitude ?? $user->app_longitude,
+                'is_online'       => true,
+                'last_active'     => now(),
             ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -170,8 +174,10 @@ class AuthController extends Controller
 
         if ($user) {
             $user->update([
-                'is_online'   => false,
-                'last_active' => now()
+                'app_is_online'   => false,
+                'app_last_active' => now(),
+                'is_online'       => (bool) $user->web_is_online,
+                'last_active'     => now(),
             ]);
 
             $request->user()->currentAccessToken()->delete();

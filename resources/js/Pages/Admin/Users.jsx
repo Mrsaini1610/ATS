@@ -26,7 +26,7 @@ const INDIA_CITIES = [
   "Other",
 ];
 
-export default function Users({ users = [] }) {
+export default function Users({ users = [], categories = [], canViewAll = false, scope = "your" }) {
   const { auth, flash } = usePage().props;
   const admin = auth?.admin;
   const permissions = admin?.permissions || [];
@@ -44,6 +44,7 @@ export default function Users({ users = [] }) {
     city: "",
     jobTitle: "",
     experience: "",
+    category: "",
   });
 
   const openAddModal = () => {
@@ -223,7 +224,7 @@ export default function Users({ users = [] }) {
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select category</option>
-                    {categories.map((cat) => (
+                    {Array.isArray(categories) && categories.map((cat) => (
                       <option key={cat.id || cat.uuid} value={cat.name}>
                         {cat.icon ? `${cat.icon} ` : ""}{cat.name}
                       </option>
@@ -271,6 +272,30 @@ export default function Users({ users = [] }) {
             </button>
           )}
         </div>
+
+        {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
+        {canViewAll && (
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl w-fit mb-5">
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.users.index"), { scope: "all" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              All Candidates
+            </button>
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.users.index"), { scope: "your" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "your" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Your Candidates
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">

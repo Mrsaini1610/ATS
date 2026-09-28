@@ -31,6 +31,8 @@ export default function Tasks({
   teamMembers = [],
   unassignedJobs = [],
   jobLocations = [],
+  canViewAll = false,
+  scope = "your",
 }) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
@@ -324,8 +326,15 @@ export default function Tasks({
                     </label>
                     <input
                       type="number"
+                      min="1"
                       value={data.targetCount}
-                      onChange={(e) => setData("targetCount", e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "-" || e.key === "e" || e.key === "+") e.preventDefault();
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        setData("targetCount", val);
+                      }}
                       placeholder="e.g. 50 calls / 10 reviews"
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -388,6 +397,30 @@ export default function Tasks({
             </button>
           )}
         </div>
+
+        {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
+        {canViewAll && (
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl w-fit mb-5">
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.tasks.index"), { scope: "all" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              All Tasks
+            </button>
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.tasks.index"), { scope: "your" }, { preserveState: true, preserveScroll: true })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                scope === "your" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Your Tasks
+            </button>
+          </div>
+        )}
 
         {/* Status Filters */}
         <div className="flex gap-2 mb-5 overflow-x-auto pb-1">

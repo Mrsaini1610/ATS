@@ -16,13 +16,30 @@ class TaskController extends Controller
     {
         $admin = auth('admin')->user();
 
+        $canViewAll = $admin && ($admin->isSuperAdmin() || in_array('view_all_tasks', $admin->permissionList(), true));
+        $scope = $request->query('scope', $canViewAll ? 'all' : 'your');
+        if (! $canViewAll) {
+            $scope = 'your';
+        }
+
         $query = Task::query()
             ->with(['member', 'creator'])
             ->latest();
 
-        // team member only sees tasks assigned to them
-        if ($admin && $admin->role === 'team_member') {
-            $query->where('member_id', $admin->id);
+        if ($scope === 'your') {
+            if ($admin->isAdmin()) {
+                $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
+                $clusterIds = array_merge([$admin->id], $teamMemberIds);
+                $query->where(function ($q) use ($clusterIds) {
+                    $q->whereIn('member_id', $clusterIds)
+                      ->orWhereIn('created_by', $clusterIds);
+                });
+            } else {
+                $query->where(function ($q) use ($admin) {
+                    $q->where('member_id', $admin->id)
+                      ->orWhere('created_by', $admin->id);
+                });
+            }
         }
 
         $tasks = $query->get()->map(function ($t) {
@@ -42,7 +59,7 @@ class TaskController extends Controller
                 'assignedTo'     => $t->member_id,
                 'assignedToName' => $t->member->name ?? 'Staff Member',
                 'assignedBy'     => $t->creator->name ?? 'Admin',
-                'priority' => in_array($t->task_type, ['high', 'medium', 'low']) ? $t->task_type : 'medium',
+                'priority'       => in_array($t->task_type, ['high', 'medium', 'low']) ? $t->task_type : 'medium',
                 'status'         => $mappedStatus,
                 'dueDate'        => $t->end_date ? $t->end_date->format('Y-m-d') : null,
                 'area'           => $t->specific_day ?? 'General',
@@ -53,22 +70,44 @@ class TaskController extends Controller
             ];
         });
 
-        // Fetch team members with total assigned tasks count, sorted with 0 tasks first
-        $teamMembers = Admin::whereIn('role', ['team_member', 'admin'])
-            ->where('status', 1)
-            ->withCount('assignedTasks')
-            ->orderBy('assigned_tasks_count', 'asc')
-            ->orderBy('name', 'asc')
-            ->get(['id', 'name', 'role', 'phone', 'email']);
+        // Team members for task assignment modal
+        if ($admin->isSuperAdmin()) {
+            $teamMembers = Admin::whereIn('role', ['team_member', 'admin'])
+                ->where('status', 1)
+                ->withCount('assignedTasks')
+                ->orderBy('assigned_tasks_count', 'asc')
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'role', 'phone', 'email']);
+        } elseif ($admin->isAdmin()) {
+            $teamMembers = Admin::where(function ($q) use ($admin) {
+                    $q->where('created_by', $admin->id)->orWhere('id', $admin->id);
+                })
+                ->where('status', 1)
+                ->withCount('assignedTasks')
+                ->orderBy('assigned_tasks_count', 'asc')
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'role', 'phone', 'email']);
+        } else {
+            $teamMembers = collect([]);
+        }
 
         // Fetch unassigned job posts
-        $unassignedJobs = JobPost::where(function ($q) {
+        $unassignedQuery = JobPost::where(function ($q) {
                 $q->whereNull('assigned_to')
                   ->orWhere('assigned_to', 0);
             })
             ->select('id', 'uuid', 'title', 'company', 'location')
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderBy('created_at', 'desc');
+
+        if ($admin->isAdmin()) {
+            $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
+            $clusterIds = array_merge([$admin->id], $teamMemberIds);
+            $unassignedQuery->whereIn('created_by', $clusterIds);
+        } elseif ($admin->isTeamMember()) {
+            $unassignedQuery->where('created_by', $admin->id);
+        }
+
+        $unassignedJobs = $unassignedQuery->get();
 
         // Distinct list of areas / cities from job posts
         $jobLocations = JobPost::whereNotNull('location')
@@ -84,6 +123,8 @@ class TaskController extends Controller
             'teamMembers'    => $teamMembers,
             'unassignedJobs' => $unassignedJobs,
             'jobLocations'   => $jobLocations,
+            'canViewAll'     => $canViewAll,
+            'scope'          => $scope,
         ]);
     }
 

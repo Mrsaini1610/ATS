@@ -2,6 +2,7 @@ import React from "react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
 import HeroSection from "@/Components/Home/HeroSection";
 import StatsSection from "@/Components/Home/StatsSection";
+import QuickActionsSection from "@/Components/Home/QuickActionsSection";
 import RecommendedJobsSection from "@/Components/Home/RecommendedJobsSection";
 import RecentJobsSection from "@/Components/Home/RecentJobsSection";
 import FeaturesSection from "@/Components/Home/FeaturesSection";
@@ -27,7 +28,7 @@ export default function Homepage() {
 
   return (
     <HomepageLayout>
-      <Head title="WorkIndia ATS - Direct Hiring & Verified Jobs in India" />
+      <Head title="ATS - Direct Hiring & Verified Jobs in India" />
 
       {/* Hero Section with Live Search */}
       <HeroSection user={auth?.user} />
@@ -36,12 +37,19 @@ export default function Homepage() {
         {/* Stats Strip */}
         <StatsSection stats={stats} />
 
-        {/* 1. Recommended Jobs Section (Profile-matched when logged in, teaser for guests) */}
-        <RecommendedJobsSection
-          recommendedJobs={recommendedJobs}
-          isLoggedIn={isLoggedIn}
-          candidateProfile={candidateProfile}
-        />
+        {/* Quick Actions (Browse Jobs, Applications, Saved Jobs, Alerts) - Only shown after login, ABOVE Recent Jobs */}
+        {(isLoggedIn || Boolean(auth?.user)) && (
+          <QuickActionsSection />
+        )}
+
+        {/* 1. Recommended Jobs Section (Only visible when logged in) */}
+        {(isLoggedIn || Boolean(auth?.user)) && (
+          <RecommendedJobsSection
+            recommendedJobs={recommendedJobs}
+            isLoggedIn={isLoggedIn || Boolean(auth?.user)}
+            candidateProfile={candidateProfile}
+          />
+        )}
 
         {/* 2. Recent Jobs Openings */}
         <RecentJobsSection recentJobs={recentJobs} />

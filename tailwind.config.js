@@ -25,6 +25,32 @@ export default {
     			sm: 'calc(var(--radius) - 4px)'
     		},
     		colors: {
+    			blue: {
+    				50: '#eff4ff',
+    				100: '#dbe7fe',
+    				200: '#bfd5fe',
+    				300: '#90b9fd',
+    				400: '#5594fb',
+    				500: '#226df6',
+    				600: '#0c3da4', // Exact ATS.com Royal Blue Logo Color
+    				700: '#093288',
+    				800: '#07266b',
+    				900: '#051a4d',
+    				950: '#030d2b',
+    			},
+    			brand: {
+    				50: '#eff4ff',
+    				100: '#dbe7fe',
+    				200: '#bfd5fe',
+    				300: '#90b9fd',
+    				400: '#5594fb',
+    				500: '#226df6',
+    				600: '#0c3da4',
+    				700: '#093288',
+    				800: '#07266b',
+    				900: '#051a4d',
+    				950: '#030d2b',
+    			},
     			background: 'hsl(var(--background))',
     			foreground: 'hsl(var(--foreground))',
     			card: {

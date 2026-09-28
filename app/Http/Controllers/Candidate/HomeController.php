@@ -144,6 +144,9 @@ class HomeController extends Controller
         }
 
         $categories = $categoryQuery
+            ->whereHas('jobPosts', function ($q) {
+                $q->whereIn('job_posts.status', ['active', 'approved']);
+            })
             ->withCount(['jobPosts' => function ($q) {
                 $q->whereIn('job_posts.status', ['active', 'approved']);
             }])
@@ -167,13 +170,14 @@ class HomeController extends Controller
                 ];
             });
 
-        // 5. Dynamic Top Companies List
+        // 5. Dynamic Top Companies List (Only companies with active posts)
         $topCompanies = Company::where('status', 'active')
-            ->take(8)
             ->get()
             ->map(function ($comp) {
-                $jobsCount = JobPost::where('company_uuid', $comp->uuid)
-                    ->orWhere('company', $comp->name)
+                $jobsCount = JobPost::where(function ($q) use ($comp) {
+                        $q->where('company_uuid', $comp->uuid)
+                          ->orWhere('company', $comp->name);
+                    })
                     ->whereIn('status', ['active', 'approved'])
                     ->count();
 
@@ -186,7 +190,12 @@ class HomeController extends Controller
                     'location' => $comp->location ?: $comp->address ?: 'India',
                     'jobs'     => $jobsCount,
                 ];
-            });
+            })
+            ->filter(function ($comp) {
+                return $comp['jobs'] > 0;
+            })
+            ->take(8)
+            ->values();
 
         // If companies table has few records, merge with distinct job companies
         if ($topCompanies->count() < 4) {
@@ -197,6 +206,7 @@ class HomeController extends Controller
                 ->where('company', '!=', '')
                 ->whereNotIn('company', $existingNames)
                 ->groupBy('company')
+                ->havingRaw('count(*) > 0')
                 ->orderByDesc('jobs_count')
                 ->take(8 - $topCompanies->count())
                 ->get()
@@ -232,24 +242,27 @@ class HomeController extends Controller
         // 7. Testimonials
         $testimonials = [
             [
+                'id'      => 1,
                 'name'    => 'Pooja Sharma',
                 'role'    => 'Telecalling Specialist at TeleConnect',
                 'avatar'  => 'PS',
-                'comment' => 'Applied to 3 verified jobs in Jaipur and got placed within 4 days with a great salary hike!',
+                'content' => 'Applied to 3 verified jobs in Jaipur and got placed within 4 days with a great salary hike!',
                 'rating'  => 5,
             ],
             [
+                'id'      => 2,
                 'name'    => 'Aman Verma',
                 'role'    => 'Frontend Developer at WebCraft',
                 'avatar'  => 'AV',
-                'comment' => 'The direct company matching and interview scheduling made my job hunt seamless and transparent.',
+                'content' => 'The direct company matching and interview scheduling made my job hunt seamless and transparent.',
                 'rating'  => 5,
             ],
             [
+                'id'      => 3,
                 'name'    => 'Ritu Singhania',
                 'role'    => 'HR Executive at ProStaff',
                 'avatar'  => 'RS',
-                'comment' => 'WorkIndia ATS platform gives genuine job openings with direct recruiter contact numbers.',
+                'content' => 'ATS platform gives genuine job openings with direct recruiter contact numbers.',
                 'rating'  => 5,
             ],
         ];
@@ -301,6 +314,7 @@ class HomeController extends Controller
                 'created_at_human'   => $job->created_at ? $job->created_at->diffForHumans() : 'Recently',
                 'match_percent'      => $job->match_percent ?? null,
                 'match_reasons'      => $job->match_reasons ?? [],
+                'is_applied'         => !empty($job->is_applied),
                 'can_apply'          => $job->can_apply ?? true,
                 'application_status' => $job->application_status ?? null,
             ];
@@ -311,6 +325,7 @@ class HomeController extends Controller
     {
         if (!Auth::guard('web')->check()) {
             return $jobs->transform(function ($job) {
+                $job->is_applied = false;
                 $job->application_status = null;
                 $job->can_apply = true;
                 $job->reapply_at = null;
@@ -325,29 +340,27 @@ class HomeController extends Controller
         return $jobs->transform(function ($job) use ($applications) {
             $application = $applications[$job->id] ?? null;
 
+            $job->is_applied = false;
             $job->application_status = null;
             $job->can_apply = true;
             $job->reapply_at = null;
 
             if ($application) {
-                $status = strtolower($application->status);
+                $status = strtolower($application->status ?: 'applied');
                 $job->application_status = $status;
+                $job->is_applied = true;
 
-                switch ($status) {
-                    case 'pending':
-                    case 'applied':
-                    case 'selected':
-                    case 'cancelled':
+                if (in_array($status, ['rejected', 'calling_rejected', 'not_selected'])) {
+                    $reapplyAt = Carbon::parse($application->updated_at ?: now())->addDays(60);
+                    if (now()->lt($reapplyAt)) {
                         $job->can_apply = false;
-                        break;
-
-                    case 'rejected':
-                        $reapplyAt = Carbon::parse($application->updated_at)->addDays(60);
-                        if (now()->lt($reapplyAt)) {
-                            $job->can_apply = false;
-                            $job->reapply_at = $reapplyAt->toISOString();
-                        }
-                        break;
+                        $job->reapply_at = $reapplyAt->toISOString();
+                    } else {
+                        $job->can_apply = true;
+                    }
+                } else {
+                    // For applied, viewed, shortlisted, interview, hired etc.
+                    $job->can_apply = false;
                 }
             }
 
