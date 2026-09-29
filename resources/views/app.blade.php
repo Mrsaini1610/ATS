@@ -11,7 +11,31 @@
     <meta name="msapplication-TileColor" content="#0c3da4">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-    <title inertia>{{ config('app.name', 'Laravel') }}</title>
+    <title inertia>{{ config('app.name', 'ATS') }} - Direct Hiring & Verified Jobs in India</title>
+
+    <meta name="description" content="Apply directly to top verified companies with transparent salary and zero consultancy fees. 100% free for job seekers.">
+    <meta name="keywords" content="ATS, Job Portal, Jobs in India, Direct Hiring, Verified Jobs, Tech Jobs, Delivery Jobs, Driver Jobs">
+    <meta name="author" content="ATS">
+
+    <!-- Open Graph / WhatsApp / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ config('app.name', 'ATS') }}">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:title" content="ATS - Direct Hiring & Verified Jobs in India">
+    <meta property="og:description" content="Apply directly to top verified companies with transparent salary and zero consultancy fees. 100% free for job seekers.">
+    <meta property="og:image" content="{{ asset('images/og-banner.png') }}">
+    <meta property="og:image:secure_url" content="{{ asset('images/og-banner.png') }}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ATS Job Portal">
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ATS - Direct Hiring & Verified Jobs in India">
+    <meta name="twitter:description" content="Apply directly to top verified companies with transparent salary. 100% free for job seekers.">
+    <meta name="twitter:image" content="{{ asset('images/og-banner.png') }}">
+    <meta name="twitter:image:alt" content="ATS Job Portal">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -20,7 +44,7 @@
     <!-- Scripts -->
     @routes
     @viteReactRefresh
-@vite(['resources/js/app.jsx'])
+    @vite(['resources/js/app.jsx'])
     @inertiaHead
 </head>
 
