@@ -36,17 +36,25 @@ use App\Http\Controllers\Admin\AdminNotificationController;
 // CANDIDATE & PUBLIC ROUTES
 // ==========================================
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/jobs', [JobController::class, 'index'])->name('jobs');
+Route::get('/job', fn() => redirect()->route('job.listings'));
 Route::get('/job-search', [JobController::class, 'index'])->name('job.search');
 Route::get('/job-listings', [JobController::class, 'index'])->name('job.listings');
 Route::get('/public/jobs', [JobController::class, 'index'])->name('public.jobs');
 Route::get('/categories', [PageController::class, 'getCategories'])->name('categories');
+Route::get('/category', fn() => redirect()->route('categories'));
 Route::get('/companies', [PageController::class, 'companies'])->name('companies');
+Route::get('/company', fn() => redirect()->route('companies'));
 Route::get('/services', [PageController::class, 'getServices'])->name('services');
+Route::get('/service', fn() => redirect()->route('services'));
 Route::get('/companies/{company}', [PageController::class, 'getCompany'])->name('companies.show');
 Route::get('/about', [PageController::class, 'about'])->name('about');
+Route::get('/about-us', fn() => redirect()->route('about'));
 Route::get('/mobile-app', [PageController::class, 'apps'])->name('mobile.app');
 Route::get('/apps', [PageController::class, 'apps']);
+Route::get('/app', fn() => redirect()->route('mobile.app'));
 Route::get('/contact', [PageController::class, 'contact'])->name('contact.show');
+Route::get('/contact-us', fn() => redirect()->route('contact.show'));
 Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
 Route::get('/apply/{job}', function ($jobKey) {
     $job = \App\Models\JobPost::where('uuid', $jobKey)->first() ?: \App\Models\JobPost::find($jobKey);
@@ -184,6 +192,9 @@ Route::middleware('auth:web')->group(function () {
 
     Route::get('/applied-jobs', fn() => redirect()->route('my-applications'))->name('applied-jobs');
     Route::get('/applied', fn() => redirect()->route('my-applications'));
+    Route::get('/applications', fn() => redirect()->route('my-applications'))->name('applications');
+    Route::get('/my-application', fn() => redirect()->route('my-applications'));
+    Route::get('/my-jobs', fn() => redirect()->route('my-applications'));
 
     Route::delete('/my-applications/{id}/withdraw', function ($id) {
         $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
@@ -333,12 +344,17 @@ Route::middleware('auth:web')->group(function () {
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::delete('/notifications', [NotificationController::class, 'clearAll'])->name('notifications.clear');
 
-    Route::get('/settings', fn () => Inertia::render('Settings'));
+    Route::get('/saved-jobs', fn() => redirect()->route('savedjobs'))->name('saved-jobs');
+    Route::get('/saved_jobs', fn() => redirect()->route('savedjobs'));
+    Route::get('/saved', fn() => redirect()->route('savedjobs'));
+
+    Route::get('/settings', fn () => redirect()->route('profile'));
 });
 
 // ==========================================
 // ADMIN PANEL ROUTES (Super Admin, Admin, Team Member)
 // ==========================================
+Route::get('/admin', fn () => redirect()->route('admin.dashboard'));
 Route::prefix('admin')->name('admin.')->group(function () {
 
     // 1. Guest Routes (Login)

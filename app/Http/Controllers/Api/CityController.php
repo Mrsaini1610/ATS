@@ -545,6 +545,72 @@ private function parseAddressComponents(array $geoResult): array
     return $components;
 }
 
+    /**
+     * Get areas/localities for a city
+     */
+    public function getCityAreas(Request $request)
+    {
+        $cityName = trim((string) ($request->input('city_name') ?: $request->input('city') ?: ''));
 
+        if (!$cityName && $request->input('city_uuid')) {
+            $city = DB::table('cities')->where('uuid', $request->input('city_uuid'))->first();
+            $cityName = $city ? $city->name : '';
+        }
 
+        if (!$cityName) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'City name or UUID is required.',
+                'data'    => [],
+            ], 422);
+        }
+
+        $knownLocalities = [
+            'jaipur' => [
+                'Niwaru', 'Niwaru Road', 'Jhotwara', 'Kalwar Road', 'Khatipura', 'Harmada', 'Murlipura',
+                'Vidhyadhar Nagar', 'Shastri Nagar', 'Ambabari', 'Bani Park', 'C-Scheme', 'Civil Lines',
+                'Bais Godam', 'Hasanpura', 'Sodala', 'Shyam Nagar', 'Nirman Nagar', 'Vaishali Nagar',
+                'Sirsi Road', 'Chitrakoot', 'Ajmer Road', 'Bhankrota', 'Mansarovar', 'Gopalpura',
+                'Gopalpura Bypass', 'Durgapura', 'Mahaveer Nagar', 'Tonk Road', 'Sitapura', 'Pratap Nagar',
+                'Sanganer', 'Malviya Nagar', 'Jagatpura', 'Raja Park', 'Tilak Nagar', 'Adarsh Nagar',
+                'Jawahar Nagar', 'Sethi Colony', 'Transport Nagar', 'Ghat Gate', 'Johari Bazaar',
+                'Chandpole', 'MI Road', 'Ajmeri Gate', 'Tripolia', 'Amer', 'Kukas', 'VKI Area',
+            ],
+            'delhi' => [
+                'Connaught Place', 'South Extension', 'Saket', 'Hauz Khas', 'Rohini',
+                'Dwarka', 'Laxmi Nagar', 'Janakpuri', 'Karol Bagh', 'Nehru Place',
+                'Okhla', 'Pitampura', 'Vasant Kunj', 'Mayur Vihar', 'Chandni Chowk',
+            ],
+            'mumbai' => [
+                'Andheri East', 'Andheri West', 'Bandra West', 'Bandra East', 'Powai',
+                'Thane West', 'Navi Mumbai', 'Dadar', 'Borivali West', 'Goregaon East',
+                'Malad West', 'BKC', 'Kurla', 'Lower Parel', 'Juhu', 'Kandivali', 'Worli',
+            ],
+            'bengaluru' => [
+                'Koramangala', 'Indiranagar', 'Whitefield', 'HSR Layout', 'Electronic City',
+                'Marathahalli', 'Jayanagar', 'BTM Layout', 'Hebbal', 'Bellandur', 'JP Nagar',
+            ],
+            'bangalore' => [
+                'Koramangala', 'Indiranagar', 'Whitefield', 'HSR Layout', 'Electronic City',
+                'Marathahalli', 'Jayanagar', 'BTM Layout', 'Hebbal', 'Bellandur', 'JP Nagar',
+            ],
+            'pune' => [
+                'Hinjewadi', 'Kothrud', 'Viman Nagar', 'Baner', 'Wakad', 'Aundh', 'Hadapsar',
+                'Kalyani Nagar', 'Magarpatta', 'Shivaji Nagar', 'Kharadi', 'Pimpri', 'Chinchwad',
+            ],
+        ];
+
+        $lowerCity = strtolower($cityName);
+        $areas = $knownLocalities[$lowerCity] ?? [
+            'City Center', 'Main Market', 'Civil Lines', 'Industrial Area',
+            'Station Road', 'Model Town', 'Commercial Hub', 'North Extension',
+        ];
+
+        return response()->json([
+            'status'    => true,
+            'city_name' => $cityName,
+            'total'     => count($areas),
+            'data'      => $areas,
+        ], 200);
+    }
 }

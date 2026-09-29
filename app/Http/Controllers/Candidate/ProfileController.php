@@ -395,14 +395,22 @@ class ProfileController extends Controller
 
     public function show($id)
     {
-        $application = JobApplication::with('jobPost')
-            ->findOrFail($id);
+        $user = Auth::guard('web')->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
 
-        return Inertia::render(
-            'Candidate/Profile/ApplicationDetails',
-            [
-                'application' => $application,
-            ]
-        );
+        $application = JobApplication::with('jobPost')
+            ->where('candidate_id', $user->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('uuid', $id);
+            })
+            ->first();
+
+        if (!$application) {
+            return redirect()->route('my-applications')->with('error', 'Application not found.');
+        }
+
+        return redirect()->route('my-applications')->with('view_application_id', $application->uuid ?: $application->id);
     }
 }

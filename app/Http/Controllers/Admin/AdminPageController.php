@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -12,6 +14,46 @@ class AdminPageController extends Controller
     public function profile(): Response
     {
         return Inertia::render('Admin/AdminProfile');
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+        if (!$admin) {
+            return redirect()->route('admin.login');
+        }
+
+        $validated = $request->validate([
+            'name'  => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        $admin->update($validated);
+
+        return back()->with('success', 'Profile updated successfully.');
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+        if (!$admin) {
+            return redirect()->route('admin.login');
+        }
+
+        $request->validate([
+            'current_password'          => ['required', function ($attribute, $value, $fail) use ($admin) {
+                if (!Hash::check($value, $admin->password)) {
+                    $fail('The current password provided is incorrect.');
+                }
+            }],
+            'new_password'              => 'required|string|min:6|confirmed',
+        ]);
+
+        $admin->update([
+            'password' => Hash::make($request->new_password),
+        ]);
+
+        return back()->with('success', 'Password updated successfully.');
     }
 
     public function notifications(): Response
