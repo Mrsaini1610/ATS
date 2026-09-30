@@ -5,7 +5,17 @@ import HomepageLayout from '@/Layouts/HomepageLayout';
 export default function Companies({ companies }) {
     return (
         <ThemeProvider>
-            <Head title="Companies | ATS" />
+            <Head>
+                <title>Top Hiring Companies in India | ATS Direct Employer Directory</title>
+                <meta
+                    name="description"
+                    content="Discover top verified companies actively hiring across India on ATS. Apply directly without consultants and track applications in real time."
+                />
+                <meta
+                    name="keywords"
+                    content="companies hiring in India, top employers, direct hiring companies, ATS companies directory"
+                />
+            </Head>
             <HomepageLayout>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                     <div className="flex items-end justify-between gap-4 flex-wrap">

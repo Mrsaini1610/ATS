@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 // import { Link, usePage } from "@inertiajs/react";
-import { Link, usePage, router } from "@inertiajs/react";
+import { Link, usePage, router, Head } from "@inertiajs/react";
 import { ArrowLeft, Upload, CheckCircle2, Briefcase, MapPin, DollarSign, User, Mail, Phone, FileText, Globe, Linkedin, Send } from "lucide-react";
 import HomepageLayout from "@/Layouts/HomepageLayout"; // Aapka standard template layout
 // import CandidateLoginPopup from "@/Components/CandidateLoginPopup";
@@ -177,8 +177,53 @@ const handleNext = (e) => {
     );
   }
 
+  const jobPostingSchema = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": job.title,
+    "description": job.description || job.title,
+    "datePosted": job.created_at || new Date().toISOString(),
+    "validThrough": job.last_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    "employmentType": job.job_type === "Part Time" ? "PART_TIME" : "FULL_TIME",
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": job.company || "Verified Employer",
+      "logo": job.company_image || "https://atstechnologyhiring.com/images/logo.png"
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": job.location || "India",
+        "addressCountry": "IN"
+      }
+    },
+    ...(job.min_salary ? {
+      "baseSalary": {
+        "@type": "MonetaryAmount",
+        "currency": "INR",
+        "value": {
+          "@type": "QuantitativeValue",
+          "minValue": Number(job.min_salary),
+          "maxValue": Number(job.max_salary || job.min_salary),
+          "unitText": job.salary_type === "yearly" ? "YEAR" : "MONTH"
+        }
+      }
+    } : {})
+  };
+
   return (
     <HomepageLayout>
+      <Head>
+        <title>{`${job.title} at ${job.company || 'Verified Employer'} | ATS Jobs`}</title>
+        <meta
+          name="description"
+          content={`Apply for ${job.title} at ${job.company} in ${job.location || 'India'}. Direct HR hiring, transparent salary, zero consultancy fee.`}
+        />
+        <script type="application/ld+json">
+          {JSON.stringify(jobPostingSchema)}
+        </script>
+      </Head>
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Back Link adjusted to Public Listings */}
         <Link href="/jobs" className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-5 font-medium">

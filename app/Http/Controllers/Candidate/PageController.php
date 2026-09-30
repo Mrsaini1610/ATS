@@ -266,4 +266,24 @@ class PageController extends Controller
     {
         return Inertia::render('Candidate/MobileApp', []);
     }
+
+    public function privacy()
+    {
+        return Inertia::render('Candidate/PrivacyPolicy');
+    }
+
+    public function terms()
+    {
+        return Inertia::render('Candidate/Terms');
+    }
+
+    public function faq()
+    {
+        return Inertia::render('Candidate/Faq');
+    }
+
+    public function cookies()
+    {
+        return Inertia::render('Candidate/Cookies');
+    }
 }

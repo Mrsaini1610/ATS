@@ -479,7 +479,17 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
 
     return (
         <>
-            <Head title="Browse Jobs - ATS" />
+            <Head>
+                <title>Browse Latest Verified Jobs in India | ATS Direct Hiring</title>
+                <meta
+                    name="description"
+                    content="Explore verified job openings from top companies across India. Filter by city, salary, experience, and role. Apply directly with zero consultancy fees."
+                />
+                <meta
+                    name="keywords"
+                    content="jobs in India, verified job openings, IT jobs, telecaller jobs, sales vacancies, freshers jobs, ATS direct hiring"
+                />
+            </Head>
             <HomepageLayout>
                 <div className={`min-h-screen ${bgColor}`}>
                 {/* Header */}

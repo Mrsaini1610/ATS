@@ -1,8 +1,9 @@
 import React from "react";
-import { Link, Head } from "@inertiajs/react";
+import { Link, Head, usePage } from "@inertiajs/react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
 import {
   Users,
+  User,
   Award,
   Target,
   Heart,
@@ -162,9 +163,23 @@ const TESTIMONIALS = [
 ];
 
 export default function About() {
+  const { auth, isLoggedIn } = usePage().props;
+  const user = auth?.user;
+  const isAuth = Boolean(user || isLoggedIn);
+
   return (
     <>
-      <Head title="About Us - ATS" />
+      <Head>
+        <title>About Us - India's Trusted Direct Hiring Platform | ATS</title>
+        <meta
+          name="description"
+          content="Learn about ATS (ATS Technology Hiring), India's premier direct hiring platform connecting verified candidates directly with 15,000+ top employers without any middleman consultancy fees."
+        />
+        <meta
+          name="keywords"
+          content="About ATS, ATS Technology Hiring, job portal India, direct hiring platform, verified employers, free job search"
+        />
+      </Head>
       <HomepageLayout>
         <div className="bg-slate-50/50">
           {/* Hero Section */}
@@ -412,18 +427,28 @@ export default function About() {
                 Join 10 Lakh+ professionals discovering direct career opportunities without third-party fees.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3.5 justify-center">
-                <Link
-                  href="/register"
-                  className="px-8 py-3.5 bg-white text-blue-700 font-bold rounded-2xl text-sm hover:bg-blue-50 transition shadow-sm inline-flex items-center justify-center gap-2"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>Create Free Account</span>
-                </Link>
+              <div className="flex flex-col sm:flex-row gap-3.5 justify-center items-center">
+                {isAuth ? (
+                  <Link
+                    href="/profile"
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 font-bold rounded-2xl text-sm hover:bg-blue-50 transition shadow-sm inline-flex items-center justify-center gap-2"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>View / Update Profile</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/register"
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 font-bold rounded-2xl text-sm hover:bg-blue-50 transition shadow-sm inline-flex items-center justify-center gap-2"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Create Free Account</span>
+                  </Link>
+                )}
 
                 <Link
                   href="/job-search"
-                  className="px-8 py-3.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold rounded-2xl text-sm transition backdrop-blur-xs inline-flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-8 py-3.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold rounded-2xl text-sm transition backdrop-blur-xs inline-flex items-center justify-center gap-2"
                 >
                   <span>Browse Jobs</span>
                   <ArrowRight className="w-4 h-4" />

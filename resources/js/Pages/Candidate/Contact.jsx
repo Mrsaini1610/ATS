@@ -81,7 +81,17 @@ export default function Contact() {
 
   return (
     <>
-      <Head title="Contact Support - ATS.com | Candidate & Employer Help" />
+      <Head>
+        <title>Contact Us & Support | ATS Job Portal India</title>
+        <meta
+          name="description"
+          content="Have questions or need assistance? Reach out to the ATS support team for candidate help, job applications, or employer hiring solutions."
+        />
+        <meta
+          name="keywords"
+          content="contact ATS, ATS support, customer service ATS, job portal helpline India"
+        />
+      </Head>
       <HomepageLayout>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-14">
           

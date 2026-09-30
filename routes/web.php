@@ -56,6 +56,72 @@ Route::get('/app', fn() => redirect()->route('mobile.app'));
 Route::get('/contact', [PageController::class, 'contact'])->name('contact.show');
 Route::get('/contact-us', fn() => redirect()->route('contact.show'));
 Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
+
+// Legal, Trust & Information Pages
+Route::get('/privacy-policy', [PageController::class, 'privacy'])->name('privacy');
+Route::get('/privacy', fn() => redirect()->route('privacy'));
+
+Route::get('/terms', [PageController::class, 'terms'])->name('terms');
+Route::get('/terms-and-conditions', fn() => redirect()->route('terms'));
+Route::get('/terms-of-service', fn() => redirect()->route('terms'));
+
+Route::get('/faq', [PageController::class, 'faq'])->name('faq');
+Route::get('/faqs', fn() => redirect()->route('faq'));
+
+Route::get('/cookies', [PageController::class, 'cookies'])->name('cookies');
+Route::get('/cookie-policy', fn() => redirect()->route('cookies'));
+
+Route::get('/sitemap.xml', function () {
+    $baseUrl = url('/');
+    $now = now()->toAtomString();
+
+    $jobs = \App\Models\JobPost::where('status', 'approved')
+        ->latest('updated_at')
+        ->get(['uuid', 'updated_at']);
+
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+    $staticPages = [
+        ['url' => '', 'priority' => '1.0', 'changefreq' => 'daily'],
+        ['url' => '/jobs', 'priority' => '0.9', 'changefreq' => 'hourly'],
+        ['url' => '/job-search', 'priority' => '0.9', 'changefreq' => 'hourly'],
+        ['url' => '/companies', 'priority' => '0.8', 'changefreq' => 'daily'],
+        ['url' => '/categories', 'priority' => '0.8', 'changefreq' => 'weekly'],
+        ['url' => '/services', 'priority' => '0.8', 'changefreq' => 'weekly'],
+        ['url' => '/about', 'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['url' => '/contact', 'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['url' => '/faq', 'priority' => '0.7', 'changefreq' => 'weekly'],
+        ['url' => '/privacy-policy', 'priority' => '0.5', 'changefreq' => 'monthly'],
+        ['url' => '/terms', 'priority' => '0.5', 'changefreq' => 'monthly'],
+        ['url' => '/cookies', 'priority' => '0.5', 'changefreq' => 'monthly'],
+        ['url' => '/mobile-app', 'priority' => '0.6', 'changefreq' => 'monthly'],
+    ];
+
+    foreach ($staticPages as $p) {
+        $xml .= "  <url>\n";
+        $xml .= "    <loc>" . htmlspecialchars($baseUrl . $p['url']) . "</loc>\n";
+        $xml .= "    <lastmod>{$now}</lastmod>\n";
+        $xml .= "    <changefreq>{$p['changefreq']}</changefreq>\n";
+        $xml .= "    <priority>{$p['priority']}</priority>\n";
+        $xml .= "  </url>\n";
+    }
+
+    foreach ($jobs as $j) {
+        $lastmod = $j->updated_at ? $j->updated_at->toAtomString() : $now;
+        $xml .= "  <url>\n";
+        $xml .= "    <loc>" . htmlspecialchars($baseUrl . '/apply/' . $j->uuid) . "</loc>\n";
+        $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
+        $xml .= "    <changefreq>daily</changefreq>\n";
+        $xml .= "    <priority>0.8</priority>\n";
+        $xml .= "  </url>\n";
+    }
+
+    $xml .= '</urlset>';
+
+    return response($xml, 200)->header('Content-Type', 'text/xml');
+});
+
 Route::get('/apply/{job}', function ($jobKey) {
     $job = \App\Models\JobPost::where('uuid', $jobKey)->first() ?: \App\Models\JobPost::find($jobKey);
     if (!$job) {

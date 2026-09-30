@@ -1,2 +1,22 @@
 User-agent: *
-Disallow:
+Allow: /
+Allow: /jobs
+Allow: /job-search
+Allow: /companies
+Allow: /categories
+Allow: /services
+Allow: /about
+Allow: /contact
+Allow: /mobile-app
+
+# Disallow private user/admin panels
+Disallow: /admin/
+Disallow: /superadmin/
+Disallow: /api/
+Disallow: /candidate/
+Disallow: /profile
+Disallow: /my-applications
+Disallow: /savedjobs
+Disallow: /notifications
+
+Sitemap: https://atstechnologyhiring.com/sitemap.xml

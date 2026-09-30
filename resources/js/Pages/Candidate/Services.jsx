@@ -196,7 +196,17 @@ export default function Services() {
 
   return (
     <>
-      <Head title="Candidate Services & Career Tools - ATS" />
+      <Head>
+        <title>Career Services & Candidate Tools | ATS Job Portal India</title>
+        <meta
+          name="description"
+          content="Explore career services on ATS: verified digital candidate profiles, real-time application tracking, direct recruiter chat, and interview scheduling."
+        />
+        <meta
+          name="keywords"
+          content="career services, resume review, ATS job tools, job application tracking, candidate tools India"
+        />
+      </Head>
       <HomepageLayout>
         <div className="bg-slate-50/50">
           {/* Hero Section */}

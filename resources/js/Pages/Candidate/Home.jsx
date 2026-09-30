@@ -28,7 +28,17 @@ export default function Homepage() {
 
   return (
     <HomepageLayout>
-      <Head title="ATS - Direct Hiring & Verified Jobs in India" />
+      <Head>
+        <title>ATS - Direct Hiring Job Portal in India | 100% Free for Job Seekers</title>
+        <meta
+          name="description"
+          content="Find verified jobs across India with transparent salary and zero consultancy fees. Apply directly to top companies in Jaipur, Delhi NCR, Mumbai, Bengaluru, Pune, and remote."
+        />
+        <meta
+          name="keywords"
+          content="ATS, ATS Job Portal, ATS Technology Hiring, Jobs in India, Direct Hiring, Verified Jobs, Jobs in Jaipur, Jobs in Delhi NCR, Jobs in Mumbai, Jobs in Bengaluru, Freshers Jobs, Telecaller Jobs, Sales Jobs, IT Jobs, Free Job Search"
+        />
+      </Head>
 
       {/* Hero Section with Live Search */}
       <HeroSection user={auth?.user} />
@@ -67,7 +77,7 @@ export default function Homepage() {
         <TestimonialsSection testimonials={testimonials} />
 
         {/* 7. Call To Action Banner */}
-        <CTASection />
+        <CTASection user={auth?.user} />
       </div>
     </HomepageLayout>
   );
