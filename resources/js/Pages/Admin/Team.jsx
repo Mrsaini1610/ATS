@@ -12,6 +12,7 @@ import {
   Users,
   Trash2,
   AlertCircle,
+  UserCheck,
 } from "lucide-react";
 
 const PERMISSION_GROUPS = [
@@ -70,6 +71,10 @@ const DEFAULT_ADMIN_PERMS = [
   "view_interviews",
   "view_tasks",
   "view_team_member",
+  "create_team_member",
+  "edit_team_member",
+  "status_team_member",
+  "delete_team_member",
 ];
 
 const PERMISSION_LABELS = {
@@ -196,7 +201,7 @@ const ACTIONS_BY_VIEW_PERMISSION = Object.entries(VIEW_PERMISSION_BY_ACTION).red
   {}
 );
 
-function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
+function MemberCard({ member, onEdit, onToggle, onDelete, onAssignAdmin, canEdit, isSuperAdmin }) {
   const [showPerms, setShowPerms] = useState(false);
   const ROLE_COLOR = {
     super_admin: "bg-purple-100 text-purple-700",
@@ -252,6 +257,17 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
         </p>
       </div>
 
+      {member.role === "team_member" && (
+        <div className="mb-3 px-2.5 py-1.5 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between text-xs">
+          <span className="text-gray-500 flex items-center gap-1 font-medium">
+            <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" /> Assigned Admin:
+          </span>
+          <span className="font-bold text-blue-900 truncate max-w-[130px]" title={member.assignedAdminName || "Super Admin"}>
+            {member.assignedAdminName || "Super Admin"}
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <button
           type="button"
@@ -264,6 +280,16 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
         <div className="flex gap-1.5">
           {canEdit && member.role !== "super_admin" && (
             <>
+              {isSuperAdmin && member.role === "team_member" && (
+                <button
+                  type="button"
+                  onClick={onAssignAdmin}
+                  className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg cursor-pointer transition"
+                  title="Assign to Admin (Manager)"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onEdit}
@@ -311,12 +337,15 @@ function MemberCard({ member, onEdit, onToggle, onDelete, canEdit }) {
   );
 }
 
-export default function Team({ members = [] }) {
+export default function Team({ members = [], admins: availableAdmins = [] }) {
   const { auth } = usePage().props;
   const currentUser = auth?.admin;
   const isSuperAdmin = currentUser?.role === "super_admin";
 
   const [modal, setModal] = useState(null);
+  const [assignModal, setAssignModal] = useState(null);
+  const [targetAdminId, setTargetAdminId] = useState("");
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const { data, setData, post, put, processing, reset, errors, clearErrors, setError } = useForm({
     name: "",
@@ -324,7 +353,8 @@ export default function Team({ members = [] }) {
     email: "",
     phone: "",
     password: "",
-    role: "",
+    role: isSuperAdmin ? "" : "team_member",
+    assigned_admin_id: "",
     permissions: [],
     force_action: "", // Restore conflict handle ke liye
   });
@@ -398,13 +428,14 @@ export default function Team({ members = [] }) {
 
   const openAddModal = () => {
     clearErrors();
-    reset({
+    setData({
       name: "",
       username: "",
       email: "",
       phone: "",
       password: "",
       role: isSuperAdmin ? "" : "team_member",
+      assigned_admin_id: "",
       permissions: [],
       force_action: "",
     });
@@ -419,11 +450,36 @@ export default function Team({ members = [] }) {
       email: member.email || "",
       phone: member.phone === "—" ? "" : member.phone || "",
       password: "",
-      role: member.role || "",
+      role: member.role || (isSuperAdmin ? "" : "team_member"),
+      assigned_admin_id: member.assignedAdminId || member.createdBy || "",
       permissions: member.permissions || [],
       force_action: "",
     });
     setModal({ mode: "edit", data: member });
+  };
+
+  const openAssignModal = (member) => {
+    setAssignModal(member);
+    setTargetAdminId(member.assignedAdminId || member.createdBy || "");
+  };
+
+  const handleConfirmAssign = () => {
+    if (!assignModal) return;
+    setIsAssigning(true);
+    router.post(
+      route("admin.team.assign-admin", assignModal.id),
+      { assigned_admin_id: targetAdminId },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          setAssignModal(null);
+          setIsAssigning(false);
+        },
+        onError: () => {
+          setIsAssigning(false);
+        },
+      }
+    );
   };
 
   const closeModal = () => {
@@ -481,7 +537,8 @@ export default function Team({ members = [] }) {
       hasErr = true;
     }
 
-    if (!data.role) {
+    const effectiveRole = isSuperAdmin ? data.role : (data.role || "team_member");
+    if (!effectiveRole) {
       setError("role", "Please select a role.");
       hasErr = true;
     }
@@ -506,9 +563,9 @@ export default function Team({ members = [] }) {
 
     if (hasErr) return;
 
-    let submissionData = data;
+    let submissionData = { ...data, role: effectiveRole };
     if (forceAction) {
-      submissionData = { ...data, force_action: forceAction };
+      submissionData = { ...submissionData, force_action: forceAction };
     }
 
     if (modal.mode === "add") {
@@ -558,6 +615,83 @@ export default function Team({ members = [] }) {
       <Head title="Team & Staff Management - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6">
+        {/* Quick Assign Admin Modal */}
+        {assignModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3 sm:px-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">Assign to Admin (Manager)</h3>
+                    <p className="text-xs text-gray-500">Assign this team member to an admin</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAssignModal(null)}
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="mb-4 p-3 bg-blue-50/60 rounded-xl border border-blue-100/80">
+                <p className="text-xs text-gray-700">
+                  <span className="text-gray-500">Member:</span> <strong className="text-gray-900">{assignModal.name}</strong>
+                </p>
+                <p className="text-xs text-gray-700 mt-1">
+                  <span className="text-gray-500">Current Assigned Admin:</span>{" "}
+                  <strong className="text-blue-700">{assignModal.assignedAdminName || "Super Admin"}</strong>
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Select Managing Admin *
+                  </label>
+                  <select
+                    value={targetAdminId}
+                    onChange={(e) => setTargetAdminId(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    <option value="">Super Admin (Direct Management)</option>
+                    {availableAdmins.map((adm) => (
+                      <option key={adm.id} value={adm.id}>
+                        {adm.name} ({adm.email})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-500 mt-1.5">
+                    The chosen Admin will manage this team member and see their activity in their Team panel.
+                  </p>
+                </div>
+
+                <div className="flex gap-2.5 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setAssignModal(null)}
+                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-medium transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isAssigning}
+                    onClick={handleConfirmAssign}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-200 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isAssigning ? "Assigning..." : "Confirm Assign"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Member Modal (Add / Edit) */}
         {modal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3 sm:px-4 backdrop-blur-xs">
@@ -712,15 +846,42 @@ export default function Team({ members = [] }) {
                         <option value="admin">Admin</option>
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        value="Team Member"
-                        disabled
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-100 text-gray-700 cursor-not-allowed font-medium"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value="Team Member"
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-100 text-gray-700 cursor-not-allowed font-medium"
+                        />
+                        <input type="hidden" name="role" value="team_member" />
+                      </>
                     )}
                     {errors.role && <p className="text-xs text-red-500 mt-1 font-medium">{errors.role}</p>}
                   </div>
+
+                  {isSuperAdmin && data.role === "team_member" && (
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">
+                        Assign to Admin (Manager)
+                      </label>
+                      <select
+                        value={data.assigned_admin_id}
+                        onChange={(e) => setData("assigned_admin_id", e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none transition focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Super Admin (Direct Management)</option>
+                        {availableAdmins.map((adm) => (
+                          <option key={adm.id} value={adm.id}>
+                            {adm.name} ({adm.email})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Select which Admin manages this team member. The member will appear in that Admin's team panel.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -891,6 +1052,7 @@ export default function Team({ members = [] }) {
                     onToggle={() => toggleActive(m.id)}
                     onDelete={() => deleteMember(m.id, m.name)}
                     canEdit={isSuperAdmin}
+                    isSuperAdmin={isSuperAdmin}
                   />
                 ))}
               </div>
@@ -916,7 +1078,9 @@ export default function Team({ members = [] }) {
                   onEdit={() => openEditModal(m)}
                   onToggle={() => toggleActive(m.id)}
                   onDelete={() => deleteMember(m.id, m.name)}
+                  onAssignAdmin={() => openAssignModal(m)}
                   canEdit={isSuperAdmin || currentUser?.role === "admin"}
+                  isSuperAdmin={isSuperAdmin}
                 />
               ))}
             </div>

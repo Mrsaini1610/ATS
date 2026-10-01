@@ -11,9 +11,73 @@
     <meta name="msapplication-TileColor" content="#0c3da4">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-    <title inertia>{{ config('app.name', 'ATS') }} - Direct Hiring & Verified Jobs in India</title>
+@php
+    $appName = config('app.name', 'ATS');
+    $pageTitle = $appName . ' - Direct Hiring & Verified Jobs in India';
+    $pageDescription = 'Search & apply directly to 10,000+ verified job vacancies in India on ATS. 100% free for job seekers, transparent salaries, verified companies, zero consultancy fees.';
 
-    <meta name="description" content="Search & apply directly to 10,000+ verified job vacancies in India on ATS. 100% free for job seekers, transparent salaries, verified companies, zero consultancy fees.">
+    if (request()->is('admin/login*')) {
+        $pageTitle = 'Sign In - ATS Admin';
+        $pageDescription = 'Sign in to ATS Admin Recruitment & Staffing Management Portal.';
+    } elseif (request()->is('admin/dashboard*')) {
+        $pageTitle = 'Dashboard - ATS Admin';
+    } elseif (request()->is('admin/jobs/create*')) {
+        $pageTitle = 'Post a New Job - ATS Admin';
+    } elseif (request()->is('admin/jobs*')) {
+        $pageTitle = 'Job Posts & Moderation - ATS Admin';
+    } elseif (request()->is('admin/applications*')) {
+        $pageTitle = 'Candidate Applications - ATS Admin';
+    } elseif (request()->is('admin/users*')) {
+        $pageTitle = 'Registered Candidates - ATS Admin';
+    } elseif (request()->is('admin/team*') || request()->is('admin/super/staff*')) {
+        $pageTitle = 'Team & Staff Management - ATS Admin';
+    } elseif (request()->is('admin/tasks*')) {
+        $pageTitle = 'Task Management - ATS Admin';
+    } elseif (request()->is('admin/interviews*')) {
+        $pageTitle = 'Interview Scheduling - ATS Admin';
+    } elseif (request()->is('admin/bulk*')) {
+        $pageTitle = 'Bulk Notifications - ATS Admin';
+    } elseif (request()->is('admin/companies*')) {
+        $pageTitle = 'Registered Companies - ATS Admin';
+    } elseif (request()->is('admin/categories*')) {
+        $pageTitle = 'Job Categories - ATS Admin';
+    } elseif (request()->is('admin/skills*')) {
+        $pageTitle = 'Skill Management - ATS Admin';
+    } elseif (request()->is('admin/permissions*')) {
+        $pageTitle = 'Permission Management - ATS Admin';
+    } elseif (request()->is('admin/profile*')) {
+        $pageTitle = 'My Profile - ATS Admin';
+    } elseif (request()->is('admin/notifications*')) {
+        $pageTitle = 'Notifications - ATS Admin';
+    } elseif (request()->is('admin*')) {
+        $pageTitle = 'Dashboard - ATS Admin';
+    } elseif (request()->is('jobs*') || request()->is('job-search*')) {
+        $pageTitle = 'Search & Apply to Verified Jobs in India - ATS';
+    } elseif (request()->is('companies*')) {
+        $pageTitle = 'Top Verified Hiring Companies in India - ATS';
+    } elseif (request()->is('categories*')) {
+        $pageTitle = 'Browse Job Categories & Roles - ATS';
+    } elseif (request()->is('services*')) {
+        $pageTitle = 'Our Recruitment Services - ATS';
+    } elseif (request()->is('about*')) {
+        $pageTitle = 'About Us - ATS Direct Hiring';
+    } elseif (request()->is('contact*')) {
+        $pageTitle = 'Contact Us - ATS Job Portal';
+    } elseif (request()->is('privacy*')) {
+        $pageTitle = 'Privacy Policy - ATS';
+    } elseif (request()->is('terms*')) {
+        $pageTitle = 'Terms & Conditions - ATS';
+    } elseif (request()->is('faq*')) {
+        $pageTitle = 'Frequently Asked Questions - ATS';
+    } elseif (request()->is('cookies*')) {
+        $pageTitle = 'Cookie Policy - ATS';
+    } elseif (request()->is('mobile-app*')) {
+        $pageTitle = 'Download ATS Mobile App - Direct Jobs';
+    }
+@endphp
+    <title inertia>{{ $pageTitle }}</title>
+
+    <meta name="description" content="{{ $pageDescription }}">
     <meta name="keywords" content="ATS, ATS Job Portal, ATS Technology Hiring, Jobs in India, Direct Hiring, Verified Jobs, Jobs in Jaipur, Jobs in Delhi NCR, Jobs in Mumbai, Jobs in Bengaluru, Jobs in Pune, Freshers Jobs, Telecaller Jobs, Sales Jobs, IT Jobs, Work From Home Jobs, 100% Free Job Search">
     <meta name="author" content="ATS">
 
@@ -30,8 +94,8 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ config('app.name', 'ATS') }}">
     <meta property="og:url" content="{{ url()->current() }}">
-    <meta property="og:title" content="ATS - Direct Hiring & Verified Jobs in India">
-    <meta property="og:description" content="Search & apply directly to 10,000+ verified job vacancies in India on ATS. 100% free for job seekers, transparent salaries, zero consultancy fees.">
+    <meta property="og:title" content="{{ $pageTitle }}">
+    <meta property="og:description" content="{{ $pageDescription }}">
     <meta property="og:image" content="{{ asset('images/og-banner.png') }}">
     <meta property="og:image:secure_url" content="{{ asset('images/og-banner.png') }}">
     <meta property="og:image:type" content="image/png">
@@ -41,8 +105,8 @@
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ATS - Direct Hiring & Verified Jobs in India">
-    <meta name="twitter:description" content="Search & apply directly to verified jobs in India with transparent salary and zero consultancy fees.">
+    <meta name="twitter:title" content="{{ $pageTitle }}">
+    <meta name="twitter:description" content="{{ $pageDescription }}">
     <meta name="twitter:image" content="{{ asset('images/og-banner.png') }}">
     <meta name="twitter:image:alt" content="ATS Job Portal">
 

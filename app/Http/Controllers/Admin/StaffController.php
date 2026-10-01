@@ -20,7 +20,7 @@ class StaffController extends Controller
             abort(403, 'Team members are not allowed to access Staff & Team.');
         }
 
-        $query = Admin::query()->latest();
+        $query = Admin::query()->with('creator:id,name,role,email')->latest();
 
         if ($currentUser->isAdmin()) {
             // Admin only sees their own team members; never super admin or other admins
@@ -44,22 +44,32 @@ class StaffController extends Controller
 
         $staff->getCollection()->transform(function ($member) {
             return [
-                'id'          => $member->id,
-                'uuid'        => (string) $member->id,
-                'name'        => $member->name,
-                'username'    => $member->username,
-                'email'       => $member->email,
-                'phone'       => $member->phone ?? '—',
-                'role'        => $member->role,
-                'roleLabel'   => str_replace('_', ' ', ucwords($member->role, '_')),
-                'active'      => (bool) $member->status,
-                'permissions' => $member->permissionList(),
-                'createdAt'   => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
+                'id'                => $member->id,
+                'uuid'              => (string) $member->id,
+                'name'              => $member->name,
+                'username'          => $member->username,
+                'email'             => $member->email,
+                'phone'             => $member->phone ?? '—',
+                'role'              => $member->role,
+                'roleLabel'         => str_replace('_', ' ', ucwords($member->role, '_')),
+                'active'            => (bool) $member->status,
+                'permissions'       => $member->permissionList(),
+                'createdBy'         => $member->created_by,
+                'assignedAdminId'   => $member->created_by,
+                'assignedAdminName' => $member->creator ? $member->creator->name : ($member->role === 'team_member' ? 'Super Admin' : 'System'),
+                'createdAt'         => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
             ];
         });
 
+        $adminsList = Admin::where('role', 'admin')
+            ->where('status', 1)
+            ->select('id', 'name', 'email', 'phone')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Admin/Team', [
             'members' => $staff->items(),
+            'admins'  => $adminsList,
             'filters' => $request->only(['search', 'role']),
         ]);
     }
@@ -74,16 +84,17 @@ class StaffController extends Controller
         $allowedRoles = $currentUser->isSuperAdmin() ? ['admin', 'team_member'] : ['team_member'];
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'username'    => 'required|string|max:255|unique:admins,username',
-            'email'       => 'required|email|max:255|unique:admins,email',
-            'phone'       => 'nullable|string|max:20',
-            'password'    => 'required|string|min:6',
-            'role'        => ['required', Rule::in($allowedRoles)],
-            'permissions' => 'nullable|array',
+            'name'              => 'required|string|max:255',
+            'username'          => 'required|string|max:255|unique:admins,username',
+            'email'             => 'required|email|max:255|unique:admins,email',
+            'phone'             => 'nullable|string|max:20',
+            'password'          => 'required|string|min:6',
+            'role'              => [$currentUser->isSuperAdmin() ? 'required' : 'nullable', Rule::in($allowedRoles)],
+            'assigned_admin_id' => 'nullable',
+            'permissions'       => 'nullable|array',
         ]);
 
-        $role = $currentUser->isAdmin() ? 'team_member' : $validated['role'];
+        $role = $currentUser->isAdmin() ? 'team_member' : ($validated['role'] ?? 'team_member');
         $permissions = $validated['permissions'] ?? [];
         if ($currentUser->isAdmin()) {
             $adminPerms = $currentUser->permissionList();
@@ -92,6 +103,11 @@ class StaffController extends Controller
         if ($role === 'team_member') {
             $staffPerms = ['view_team_member', 'create_team_member', 'edit_team_member', 'status_team_member', 'delete_team_member'];
             $permissions = array_values(array_diff($permissions, $staffPerms));
+        }
+
+        $createdBy = $currentUser->id;
+        if ($currentUser->isSuperAdmin() && $role === 'team_member' && !empty($validated['assigned_admin_id'])) {
+            $createdBy = (int) $validated['assigned_admin_id'];
         }
 
         Admin::create([
@@ -103,7 +119,7 @@ class StaffController extends Controller
             'role'                 => $role,
             'permissions'          => $permissions,
             'status'               => true,
-            'created_by'           => $currentUser->id,
+            'created_by'           => $createdBy,
             'must_change_password' => false,
         ]);
 
@@ -124,16 +140,17 @@ class StaffController extends Controller
         $allowedRoles = $currentUser->isSuperAdmin() ? ['admin', 'team_member'] : ['team_member'];
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'username'    => ['required', 'string', 'max:255', Rule::unique('admins', 'username')->ignore($admin->id)],
-            'email'       => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($admin->id)],
-            'phone'       => 'nullable|string|max:20',
-            'password'    => 'nullable|string|min:6',
-            'role'        => ['required', Rule::in($allowedRoles)],
-            'permissions' => 'nullable|array',
+            'name'              => 'required|string|max:255',
+            'username'          => ['required', 'string', 'max:255', Rule::unique('admins', 'username')->ignore($admin->id)],
+            'email'             => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($admin->id)],
+            'phone'             => 'nullable|string|max:20',
+            'password'          => 'nullable|string|min:6',
+            'role'              => [$currentUser->isSuperAdmin() ? 'required' : 'nullable', Rule::in($allowedRoles)],
+            'assigned_admin_id' => 'nullable',
+            'permissions'       => 'nullable|array',
         ]);
 
-        $role = $currentUser->isAdmin() ? 'team_member' : $validated['role'];
+        $role = $currentUser->isAdmin() ? 'team_member' : ($validated['role'] ?? 'team_member');
         $permissions = $validated['permissions'] ?? [];
         if ($currentUser->isAdmin()) {
             $adminPerms = $currentUser->permissionList();
@@ -153,6 +170,10 @@ class StaffController extends Controller
             'permissions' => $permissions,
         ];
 
+        if ($currentUser->isSuperAdmin() && $role === 'team_member' && array_key_exists('assigned_admin_id', $validated)) {
+            $updateData['created_by'] = !empty($validated['assigned_admin_id']) ? (int) $validated['assigned_admin_id'] : $currentUser->id;
+        }
+
         if (!empty($validated['password'])) {
             $updateData['password'] = Hash::make($validated['password']);
         }
@@ -160,6 +181,26 @@ class StaffController extends Controller
         $admin->update($updateData);
 
         return redirect()->back()->with('success', 'Staff member successfully updated.');
+    }
+
+    public function assignAdmin(Request $request, Admin $admin)
+    {
+        $currentUser = Auth::guard('admin')->user();
+        if (! $currentUser || ! $currentUser->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can assign team members to other admins.');
+        }
+
+        $validated = $request->validate([
+            'assigned_admin_id' => 'nullable',
+        ]);
+
+        $assignedAdminId = !empty($validated['assigned_admin_id']) ? (int) $validated['assigned_admin_id'] : $currentUser->id;
+        $targetAdmin = Admin::find($assignedAdminId);
+        $adminName = $targetAdmin ? $targetAdmin->name : 'Super Admin';
+
+        $admin->update(['created_by' => $assignedAdminId]);
+
+        return redirect()->back()->with('success', "Team member '{$admin->name}' successfully assigned to {$adminName}.");
     }
 
     public function toggleStatus(Admin $admin)

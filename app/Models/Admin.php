@@ -103,6 +103,10 @@ class Admin extends Authenticatable
                 'view_interviews',
                 'view_tasks',
                 'view_team_member',
+                'create_team_member',
+                'edit_team_member',
+                'status_team_member',
+                'delete_team_member',
             ];
             $list = array_values(array_unique(array_merge($list, $defaultAdminPermissions)));
         }
@@ -131,6 +135,9 @@ class Admin extends Authenticatable
                     'reject_jobs',
                     'hold_jobs',
                     'deactivate_jobs',
+                    'view_applications',
+                    'view_all_applications',
+                    'update_application_status',
                 ];
                 $list = array_values(array_unique(array_merge($list, $autoAssignedPerms)));
             }

@@ -331,6 +331,7 @@ export default function Applications({
   teamMembers = [],
   canViewAll = false,
   scope = "your",
+  filters = {},
 }) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
@@ -457,6 +458,22 @@ export default function Applications({
             </p>
           </div>
         </div>
+
+        {filters?.job_id && (
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2.5 rounded-xl text-xs font-semibold mb-4">
+            <span className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-blue-600" />
+              Showing {applications.length} applicant{applications.length !== 1 ? "s" : ""} for Job #{filters.job_id}
+            </span>
+            <button
+              type="button"
+              onClick={() => router.get(route("admin.applications.index"))}
+              className="text-blue-600 hover:text-blue-900 underline font-bold cursor-pointer"
+            >
+              Clear Filter
+            </button>
+          </div>
+        )}
 
         {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
         {canViewAll && (

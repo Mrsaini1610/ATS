@@ -15,29 +15,15 @@ class AdminJobController extends Controller
 {
     private function getAssignableTeamMembers(?Admin $user)
     {
-        if (! $user) {
+        if (! $user || $user->isTeamMember()) {
             return collect([]);
         }
 
-        if ($user->isSuperAdmin()) {
-            return Admin::where('role', '!=', 'super_admin')
-                ->where('status', 1)
-                ->select('id', 'uuid', 'name', 'email', 'phone', 'role')
-                ->orderBy('name')
-                ->get();
-        }
-
-        if ($user->isAdmin()) {
-            return Admin::where('created_by', $user->id)
-                ->where('role', 'team_member')
-                ->where('status', 1)
-                ->select('id', 'uuid', 'name', 'email', 'phone', 'role')
-                ->orderBy('name')
-                ->get();
-        }
-
-        // Team members cannot assign to anyone
-        return collect([]);
+        return Admin::whereIn('role', ['team_member', 'admin'])
+            ->where('status', 1)
+            ->select('id', 'uuid', 'name', 'email', 'phone', 'role')
+            ->orderBy('name')
+            ->get();
     }
 
     public function index(Request $request)
@@ -51,14 +37,16 @@ class AdminJobController extends Controller
         }
 
         $query = JobPost::with(['creator:id,name', 'assignedMember:id,name', 'category:id,name', 'companyRelation:uuid,name,location'])
+            ->withCount('applications')
             ->latest();
 
         if ($scope === 'your') {
             if ($user->isAdmin()) {
                 $clusterUserIds = Admin::where('created_by', $user->id)->pluck('id')->push($user->id)->all();
-                $query->where(function ($q) use ($clusterUserIds) {
+                $query->where(function ($q) use ($clusterUserIds, $user) {
                     $q->whereIn('created_by', $clusterUserIds)
-                      ->orWhereIn('assigned_to', $clusterUserIds);
+                      ->orWhereIn('assigned_to', $clusterUserIds)
+                      ->orWhere('assigned_to', $user->id);
                 });
             } elseif ($user->isTeamMember()) {
                 $query->where(function ($q) use ($user) {
@@ -90,7 +78,7 @@ class AdminJobController extends Controller
                 'type'                      => $job->job_type ?? 'Full Time',
                 'exp'                       => $job->experience ?? '0-1 yr',
                 'openings'                  => $job->openings ?? 1,
-                'applicants'                => $job->applicants ?? 0,
+                'applicants'                => max((int) ($job->applications_count ?? 0), (int) ($job->applicants ?? 0)),
                 'is_hot'                    => $job->badge === 'hot' || $job->badge === 'featured',
                 'posted_at'                 => $job->created_at ? $job->created_at->format('d M Y') : 'Recent',
                 'posted_by'                 => $job->creator?->name ?? 'System',
@@ -143,7 +131,7 @@ class AdminJobController extends Controller
         $teamMembers = $this->getAssignableTeamMembers($user)->map(fn($m) => [
             'id' => $m->id,
             'uuid' => $m->uuid,
-            'name' => $m->name . ($user->isSuperAdmin() ? ' (' . str_replace('_', ' ', ucwords($m->role, '_')) . ')' : ''),
+            'name' => $m->name,
             'email' => $m->email,
             'phone' => $m->phone,
             'role' => $m->role,
@@ -179,13 +167,10 @@ class AdminJobController extends Controller
         if (!empty($requestedAssignee)) {
             if ($user->isTeamMember()) {
                 $assignedTo = null;
-            } elseif ($user->isAdmin()) {
+            } else {
                 $targetMember = Admin::where(function ($q) use ($requestedAssignee) {
                     $q->where('id', $requestedAssignee)->orWhere('uuid', $requestedAssignee);
-                })->where('created_by', $user->id)->where('role', 'team_member')->first();
-                $assignedTo = $targetMember?->id;
-            } else {
-                $targetMember = Admin::where('id', $requestedAssignee)->orWhere('uuid', $requestedAssignee)->first();
+                })->where('status', 1)->first();
                 $assignedTo = $targetMember?->id;
             }
         }

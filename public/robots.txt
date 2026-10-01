@@ -8,6 +8,7 @@ Allow: /services
 Allow: /about
 Allow: /contact
 Allow: /mobile-app
+Allow: /admin/login
 
 # Disallow private user/admin panels
 Disallow: /admin/

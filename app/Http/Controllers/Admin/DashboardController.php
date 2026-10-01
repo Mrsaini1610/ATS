@@ -92,21 +92,34 @@ class DashboardController extends Controller
     {
         $admin = Auth::guard('admin')->user();
 
+        $assignedJobIds = JobPost::where('assigned_to', $admin->id)
+            ->orWhere('created_by', $admin->id)
+            ->pluck('id')
+            ->toArray();
+
+        $appQuery = JobApplication::where(function ($q) use ($admin, $assignedJobIds) {
+            $q->where('assigned_calling_team_member_id', $admin->id)
+              ->orWhereIn('job_id', $assignedJobIds);
+        });
+
         // Filtered metrics specifically assigned to this team member
         $stats = [
-            'pendingJobs'         => 0,
-            'activeJobs'          => 0,
+            'pendingJobs'         => JobPost::where(function ($q) use ($admin) {
+                $q->where('assigned_to', $admin->id)->orWhere('created_by', $admin->id);
+            })->where('status', 'pending')->count(),
+            'activeJobs'          => JobPost::where(function ($q) use ($admin) {
+                $q->where('assigned_to', $admin->id)->orWhere('created_by', $admin->id);
+            })->whereIn('status', ['active', 'approved'])->count(),
             'totalUsers'          => 0,
             'totalCompanies'      => 0,
-            'totalApps'           => JobApplication::where('assigned_calling_team_member_id', $admin->id)->count(),
-            'shortlisted'         => JobApplication::where('assigned_calling_team_member_id', $admin->id)->where('status', 'shortlisted')->count(),
+            'totalApps'           => (clone $appQuery)->count(),
+            'shortlisted'         => (clone $appQuery)->where('status', 'shortlisted')->count(),
             'scheduledInterviews' => Interview::count(),
             'pendingTasks'        => Task::where('member_id', $admin->id)->whereIn('status', ['pending', 'running'])->count(),
-            'hired'               => JobApplication::where('assigned_calling_team_member_id', $admin->id)->where('status', 'hired')->count(),
+            'hired'               => (clone $appQuery)->where('status', 'hired')->count(),
         ];
 
-        $recentApplications = JobApplication::with(['jobPost'])
-            ->where('assigned_calling_team_member_id', $admin->id)
+        $recentApplications = (clone $appQuery)->with(['jobPost'])
             ->latest()
             ->take(5)
             ->get()

@@ -161,10 +161,14 @@ export default function Jobs({
   const [assigningJob, setAssigningJob] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const isAssignedToCurrent = selectedJob && (
-    (selectedJob.assigned_team_member_id && String(selectedJob.assigned_team_member_id) === String(admin?.id)) ||
-    (admin?.uuid && selectedJob.assigned_team_member_uuid && String(selectedJob.assigned_team_member_uuid) === String(admin?.uuid))
-  );
+  const isJobAssignedToCurrent = (job) => {
+    if (!job || !admin) return false;
+    return (
+      (job.assigned_team_member_id && String(job.assigned_team_member_id) === String(admin.id)) ||
+      (admin.uuid && job.assigned_team_member_uuid && String(job.assigned_team_member_uuid) === String(admin.uuid))
+    );
+  };
+  const isAssignedToCurrent = selectedJob && isJobAssignedToCurrent(selectedJob);
   const canModerateJob = canManage || isAssignedToCurrent;
 
   // Keep selectedJob in sync with updated jobs prop
@@ -415,10 +419,15 @@ export default function Jobs({
                           <MapPin className="w-3 h-3 text-gray-400" />
                           {job.location}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3 text-gray-400" />
+                        <Link
+                          href={route("admin.applications.index", { job_id: job.id })}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                          title="Click to view applicants"
+                        >
+                          <Users className="w-3 h-3 text-blue-500" />
                           {job.applicants ?? 0} applicants
-                        </span>
+                        </Link>
                         <span className="font-medium text-gray-700">{job.salary}</span>
                         <span className="font-medium text-gray-700">Posted by {job.posted_by || "System"}</span>
                         {job.work_mode && job.work_mode !== job.type && (
@@ -427,7 +436,7 @@ export default function Jobs({
                       </div>
                     </div>
 
-                    {canManage && (
+                    {(canManage || isJobAssignedToCurrent(job)) && (
                       <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         {can("approve_jobs") && job.status !== "approved" && job.status !== "active" && (
                           <button
@@ -555,7 +564,7 @@ export default function Jobs({
                     { label: "Salary", val: selectedJob.salary },
                     { label: "Experience", val: selectedJob.exp },
                     { label: "Openings", val: selectedJob.openings },
-                    { label: "Applicants", val: selectedJob.applicants ?? 0 },
+                    { label: "Applicants", val: selectedJob.applicants ?? 0, isApplicants: true },
                     { label: "Posted By", val: selectedJob.posted_by, isPostedBy: true },
                     { label: "Posted On", val: selectedJob.posted_at },
                     ...(selectedJob.deadline ? [{ label: "Deadline", val: selectedJob.deadline }] : []),
@@ -567,6 +576,17 @@ export default function Jobs({
                           <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                           {r.val || "System"}
                         </span>
+                      ) : r.isApplicants ? (
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">{r.val || 0}</p>
+                          <Link
+                            href={route("admin.applications.index", { job_id: selectedJob.id })}
+                            className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md font-semibold inline-flex items-center gap-1 transition"
+                            title="View all applications for this job"
+                          >
+                            <Users className="w-3 h-3" /> View All
+                          </Link>
+                        </div>
                       ) : (
                         <p className="font-semibold text-gray-900">{r.val || "—"}</p>
                       )}

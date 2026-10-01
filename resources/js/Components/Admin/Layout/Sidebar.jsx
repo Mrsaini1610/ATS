@@ -269,12 +269,13 @@ export default function SidebarLayout({ children }) {
               <h1 className="text-sm font-black text-gray-900 leading-tight truncate">
                 {(() => {
                   if (currentPath.includes("dashboard") || currentPath === "/admin" || currentPath === "/admin/" || currentPath === "/") return "Dashboard";
+                  if (currentPath.startsWith("/admin/jobs/create")) return "Post a New Job";
                   if (currentPath.startsWith("/admin/jobs")) return "Job Posts";
                   if (currentPath.startsWith("/admin/applications")) return "Applications";
                   if (currentPath.startsWith("/admin/users")) return "Users";
                   if (currentPath.startsWith("/admin/interviews")) return "Interviews";
                   if (currentPath.startsWith("/admin/tasks")) return "Tasks";
-                  if (currentPath.startsWith("/admin/team")) return "Staff & Team";
+                  if (currentPath.startsWith("/admin/team") || currentPath.startsWith("/admin/super/staff")) return "Staff & Team";
                   if (currentPath.startsWith("/admin/bulk")) return "Bulk Messages";
                   if (currentPath.startsWith("/admin/companies")) return "Companies";
                   if (currentPath.startsWith("/admin/categories")) return "Categories";
@@ -282,6 +283,7 @@ export default function SidebarLayout({ children }) {
                   if (currentPath.startsWith("/admin/permissions")) return "Permissions";
                   if (currentPath.startsWith("/admin/profile")) return "My Profile";
                   if (currentPath.startsWith("/admin/notifications")) return "Notifications";
+                  if (currentPath.startsWith("/admin/super")) return "Super Admin Portal";
                   return "Admin Portal";
                 })()}
               </h1>

@@ -25,18 +25,27 @@ class JobApplicationController extends Controller
             ->with(['jobPost.companyRelation', 'assignedCallingMember', 'candidate'])
             ->latest();
 
+        if ($request->filled('job_id')) {
+            $query->where('job_id', $request->input('job_id'));
+        }
+        if ($request->filled('job_uuid')) {
+            $query->whereHas('jobPost', fn($q) => $q->where('uuid', $request->input('job_uuid')));
+        }
+
         if ($scope === 'your') {
             if ($admin->isAdmin()) {
                 $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
                 $clusterIds = array_merge([$admin->id], $teamMemberIds);
                 $clusterJobIds = \App\Models\JobPost::whereIn('created_by', $clusterIds)
                     ->orWhereIn('assigned_to', $clusterIds)
+                    ->orWhere('assigned_to', $admin->id)
                     ->pluck('id')
                     ->toArray();
 
-                $query->where(function ($q) use ($clusterJobIds, $clusterIds) {
+                $query->where(function ($q) use ($clusterJobIds, $clusterIds, $admin) {
                     $q->whereIn('job_id', $clusterJobIds)
-                      ->orWhereIn('assigned_calling_team_member_id', $clusterIds);
+                      ->orWhereIn('assigned_calling_team_member_id', $clusterIds)
+                      ->orWhere('assigned_calling_team_member_id', $admin->id);
                 });
             } else {
                 $myJobIds = \App\Models\JobPost::where('created_by', $admin->id)
@@ -55,6 +64,7 @@ class JobApplicationController extends Controller
             return [
                 'id'             => $app->id,
                 'uuid'           => $app->uuid,
+                'jobId'          => $app->job_id,
                 'userName'       => $app->candidate_name ?? ($app->candidate->full_name ?? 'Applicant'),
                 'userPhone'      => $app->candidate_phone ?? ($app->candidate->phone ?? '—'),
                 'userEmail'      => $app->candidate_email ?? ($app->candidate->email ?? null),
@@ -76,8 +86,7 @@ class JobApplicationController extends Controller
                 ->where('status', 1)
                 ->get(['id', 'name', 'role', 'phone', 'email']);
         } elseif ($admin->isAdmin()) {
-            $teamMembers = Admin::where('created_by', $admin->id)
-                ->where('role', 'team_member')
+            $teamMembers = Admin::whereIn('role', ['team_member', 'admin'])
                 ->where('status', 1)
                 ->get(['id', 'name', 'role', 'phone', 'email']);
         } else {
@@ -89,6 +98,7 @@ class JobApplicationController extends Controller
             'teamMembers'  => $teamMembers,
             'canViewAll'   => $canViewAll,
             'scope'        => $scope,
+            'filters'      => $request->only(['job_id', 'job_uuid', 'scope']),
         ]);
     }
 

@@ -127,6 +127,12 @@ class JobPost extends Model
     {
         return $this->belongsTo(Admin::class, 'assigned_to', 'id');
     }
+
+    public function applications()
+    {
+        return $this->hasMany(JobApplication::class, 'job_id', 'id');
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class, 'company_uuid', 'uuid');

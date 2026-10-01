@@ -482,10 +482,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Staff & Team (URL: /admin/team)
         Route::get('/team', [StaffController::class, 'index'])->middleware('permission:view_team_member,create_team_member,edit_team_member,status_team_member,delete_team_member')->name('team.index');
-        Route::post('/team', [StaffController::class, 'store'])->middleware('permission:create_team_member')->name('team.store');
-        Route::put('/team/{admin}', [StaffController::class, 'update'])->middleware('permission:edit_team_member')->name('team.update');
-        Route::post('/team/{admin}/toggle-status', [StaffController::class, 'toggleStatus'])->middleware('permission:status_team_member')->name('team.toggle-status');
-        Route::delete('/team/{admin}', [StaffController::class, 'destroy'])->middleware('permission:delete_team_member')->name('team.destroy');
+        Route::post('/team', [StaffController::class, 'store'])->middleware('permission:create_team_member,view_team_member')->name('team.store');
+        Route::put('/team/{admin}', [StaffController::class, 'update'])->middleware('permission:edit_team_member,view_team_member')->name('team.update');
+        Route::post('/team/{admin}/toggle-status', [StaffController::class, 'toggleStatus'])->middleware('permission:status_team_member,view_team_member')->name('team.toggle-status');
+        Route::delete('/team/{admin}', [StaffController::class, 'destroy'])->middleware('permission:delete_team_member,view_team_member')->name('team.destroy');
+        Route::post('/team/{admin}/assign-admin', [StaffController::class, 'assignAdmin'])->name('team.assign-admin');
 
         // 4. Candidates / Users
         Route::get('/users', [UserController::class, 'index'])->middleware('permission:view_users,view_all_users,add_users,status_users')->name('users.index');
