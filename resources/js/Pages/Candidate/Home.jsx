@@ -26,6 +26,10 @@ export default function Homepage() {
     testimonials = [],
   } = usePage().props;
 
+  // Ensure job posts are strictly displayed in descending order (newest first)
+  const sortedRecentJobs = [...recentJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+  const sortedRecommendedJobs = [...recommendedJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+
   return (
     <HomepageLayout>
       <Head>
@@ -40,7 +44,7 @@ export default function Homepage() {
         />
       </Head>
 
-      {/* Hero Section with Live Search */}
+      {/* Hero Section Banner (Search bar removed as requested) */}
       <HeroSection user={auth?.user} />
 
       <div className="px-4 sm:px-6 space-y-10 sm:space-y-14 max-w-7xl mx-auto py-8">
@@ -55,14 +59,14 @@ export default function Homepage() {
         {/* 1. Recommended Jobs Section (Only visible when logged in) */}
         {(isLoggedIn || Boolean(auth?.user)) && (
           <RecommendedJobsSection
-            recommendedJobs={recommendedJobs}
+            recommendedJobs={sortedRecommendedJobs}
             isLoggedIn={isLoggedIn || Boolean(auth?.user)}
             candidateProfile={candidateProfile}
           />
         )}
 
-        {/* 2. Recent Jobs Openings */}
-        <RecentJobsSection recentJobs={recentJobs} />
+        {/* 2. Recent Jobs Openings (In descending order) */}
+        <RecentJobsSection recentJobs={sortedRecentJobs} />
 
         {/* 3. Browse by Category */}
         <FeaturesSection categories={categories} />

@@ -30,11 +30,11 @@ class HomeController extends Controller
             'successRate' => '95%',
         ];
 
-        // 2. Recent Jobs (Latest active jobs)
+        // 2. Recent Jobs (Latest active jobs in descending order)
         $recentJobsQuery = JobPost::with(['category'])
             ->whereIn('status', ['active', 'approved'])
-            ->latest()
-            ->take(6);
+            ->orderByDesc('id')
+            ->take(12);
 
         $recentJobs = $this->attachApplicationStatus($recentJobsQuery->get());
         $recentJobs = $this->formatJobsData($recentJobs);

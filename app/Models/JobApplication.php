@@ -13,6 +13,7 @@ class JobApplication extends Model
         'uuid',
         'job_id',
         'candidate_id',
+        'candidate_uuid',
         'cover_letter',
         'resume_url',
         'answers',
@@ -41,6 +42,12 @@ class JobApplication extends Model
         'candidate_phone',
         'candidate_skills',
         'candidate_experience',
+        'current_salary',
+        'expected_salary',
+        'last_company',
+        'notice_period',
+        'last_working_day',
+        'city',
     ];
 
     protected $casts = [

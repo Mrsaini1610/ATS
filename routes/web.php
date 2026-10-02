@@ -138,6 +138,14 @@ Route::get('/apply/{job}', function ($jobKey) {
         }
     }
 
+    if ($user) {
+        $user->load([
+            'resumes' => fn($q) => $q->where('is_delete', 0)->latest(),
+            'defaultResume' => fn($q) => $q->where('is_delete', 0),
+            'educations' => fn($q) => $q->where('is_delete', 0)->latest(),
+        ]);
+    }
+
     $qualifications = $job->qualifications;
     if (is_string($qualifications) && !empty($qualifications)) {
         $qualifications = str_contains($qualifications, "\n")
@@ -167,34 +175,129 @@ Route::post('/apply/{job}', function (\Illuminate\Http\Request $request, $jobKey
         return redirect()->route('login');
     }
 
-    $alreadyApplied = \App\Models\JobApplication::where('candidate_id', $user->id)
-        ->where('job_id', $job->id)
-        ->exists();
-
-    if ($alreadyApplied) {
-        return back()->with('submitted', true);
-    }
-
-    $resumePath = null;
+    $resumeUrl = null;
     if ($request->hasFile('cvFile')) {
-        $resumePath = $request->file('cvFile')->store('resumes', 'public');
+        $stored = $request->file('cvFile')->store('resumes', 'public');
+        $resumeUrl = asset('storage/' . $stored);
+
+        // Also save to user's resumes
+        try {
+            \App\Models\UserResume::create([
+                'user_uuid'  => $user->uuid,
+                'title'      => $request->file('cvFile')->getClientOriginalName(),
+                'file_path'  => 'storage/' . $stored,
+                'file_type'  => $request->file('cvFile')->getClientOriginalExtension(),
+                'is_default' => true,
+            ]);
+        } catch (\Throwable $e) {
+            // Ignore resume table error
+        }
+    } elseif ($request->filled('selectedResumeId')) {
+        $selectedResume = \App\Models\UserResume::where('user_uuid', $user->uuid)
+            ->where(function ($q) use ($request) {
+                $q->where('id', $request->selectedResumeId)
+                  ->orWhere('uuid', $request->selectedResumeId);
+            })->first();
+
+        if ($selectedResume && $selectedResume->file_path) {
+            $fp = $selectedResume->file_path;
+            if (str_starts_with($fp, 'http://') || str_starts_with($fp, 'https://')) {
+                $resumeUrl = $fp;
+            } elseif (str_starts_with($fp, 'storage/')) {
+                $resumeUrl = asset($fp);
+            } else {
+                $resumeUrl = asset('storage/' . $fp);
+            }
+        }
     } else {
         $defaultResume = $user->defaultResume ?? $user->resumes()->latest()->first();
-        $resumePath = $defaultResume?->file_path;
+        if ($defaultResume && $defaultResume->file_path) {
+            $fp = $defaultResume->file_path;
+            if (str_starts_with($fp, 'http://') || str_starts_with($fp, 'https://')) {
+                $resumeUrl = $fp;
+            } elseif (str_starts_with($fp, 'storage/')) {
+                $resumeUrl = asset($fp);
+            } else {
+                $resumeUrl = asset('storage/' . $fp);
+            }
+        }
     }
 
-    \App\Models\JobApplication::create([
-        'candidate_id'         => $user->id,
-        'job_id'               => $job->id,
-        'resume_url'           => $resumePath ? asset('storage/' . $resumePath) : null,
-        'cover_letter'         => $request->input('coverLetter') ?: $request->input('whyApply'),
-        'candidate_name'       => $request->input('fullName') ?: ($user->full_name ?? $user->name),
-        'candidate_email'      => $request->input('email') ?: $user->email,
-        'candidate_phone'      => $request->input('phone') ?: $user->phone,
-        'candidate_skills'     => $user->skills,
-        'candidate_experience' => $request->input('experience') ?: $user->total_experience_years,
-        'status'               => 'applied'
-    ]);
+    // Parse Candidate Skills (array or string)
+    $skillsInput = $request->input('skills');
+    $candidateSkills = is_array($skillsInput)
+        ? $skillsInput
+        : (is_string($skillsInput) && !empty($skillsInput)
+            ? array_filter(array_map('trim', explode(',', $skillsInput)))
+            : ($user->skills ?? []));
+
+    $application = \App\Models\JobApplication::updateOrCreate(
+        [
+            'candidate_id' => $user->id,
+            'job_id'       => $job->id,
+        ],
+        [
+            'candidate_uuid'       => $user->uuid,
+            'resume_url'           => $resumeUrl,
+            'cover_letter'         => $request->input('coverLetter') ?: $request->input('whyApply'),
+            'candidate_name'       => $request->input('fullName') ?: ($user->full_name ?? $user->name),
+            'candidate_email'      => $request->input('email') ?: $user->email,
+            'candidate_phone'      => $request->input('phone') ?: $user->phone,
+            'candidate_skills'     => array_values($candidateSkills),
+            'candidate_experience' => $request->input('experience') ?: $user->total_experience_years,
+            'current_salary'       => $request->input('currentSalary'),
+            'expected_salary'      => $request->input('expectedSalary'),
+            'last_company'         => $request->input('lastCompany'),
+            'notice_period'        => $request->input('notice'),
+            'last_working_day'     => $request->input('lastWorkingDay') ?: null,
+            'city'                 => $request->input('city'),
+            'answers'              => [
+                'currentTitle'        => $request->input('currentTitle'),
+                'city'                => $request->input('city'),
+                'experience'          => $request->input('experience'),
+                'qualification'       => $request->input('qualification'),
+                'educationDegree'     => $request->input('educationDegree'),
+                'educationInstitute'  => $request->input('educationInstitute'),
+                'skills'              => array_values($candidateSkills),
+                'currentSalary'       => $request->input('currentSalary'),
+                'expectedSalary'      => $request->input('expectedSalary'),
+                'lastCompany'         => $request->input('lastCompany'),
+                'notice'              => $request->input('notice'),
+                'lastWorkingDay'      => $request->input('lastWorkingDay'),
+                'selectedResumeId'    => $request->input('selectedResumeId'),
+                'portfolio'           => $request->input('portfolio'),
+                'linkedin'            => $request->input('linkedin'),
+                'whyApply'            => $request->input('whyApply'),
+            ],
+            'status'               => 'applied'
+        ]
+    );
+
+    if ($application->wasRecentlyCreated) {
+        $job->increment('applicants');
+    }
+
+    // Update user profile with latest details
+    try {
+        $userUpdateData = array_filter([
+            'full_name'              => $request->input('fullName'),
+            'city'                   => $request->input('city'),
+            'job_title'              => $request->input('currentTitle'),
+            'total_experience_years' => $request->input('experience'),
+            'current_ctc'            => $request->input('currentSalary'),
+            'expected_ctc'           => $request->input('expectedSalary'),
+            'notice_period_days'     => $request->input('notice'),
+            'portfolio'              => $request->input('portfolio'),
+            'linkedin'               => $request->input('linkedin'),
+            'education'              => $request->input('educationDegree') ?: $request->input('qualification'),
+        ]);
+        if (!empty($candidateSkills)) {
+            $userUpdateData['skills'] = array_values($candidateSkills);
+        }
+        $user->update($userUpdateData);
+    } catch (\Throwable $e) {
+        // Ignore user update error
+    }
 
     return back()->with('submitted', true);
 })->name('jobs.apply.submit');
