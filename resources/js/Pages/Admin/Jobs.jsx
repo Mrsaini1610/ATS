@@ -181,6 +181,19 @@ export default function Jobs({
     }
   }, [jobs]);
 
+  // Handle Escape key to close in-page side view
+  useEffect(() => {
+    if (selectedJob) {
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") setSelectedJob(null);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [selectedJob]);
+
   const updateStatus = (uuid, status, remarkReason = null) => {
     setIsProcessing(true);
     router.post(
@@ -388,392 +401,552 @@ export default function Jobs({
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          <div className={`flex-1 w-full ${selectedJob ? "hidden lg:block" : ""} space-y-3`}>
-            {filtered.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-                <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500 font-medium">No jobs found</p>
-              </div>
-            ) : (
-              filtered.map((job) => (
-                <div
-                  key={job.uuid}
-                  onClick={() => setSelectedJob(job)}
-                  className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all ${
-                    selectedJob?.uuid === job.uuid ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" : "border-gray-100 hover:border-blue-200"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold text-gray-900">{job.title}</h3>
-                        {job.is_hot && <Flame className="w-3.5 h-3.5 text-orange-500" title="Hot Job" />}
-                        <StatusBadge status={job.status} />
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Briefcase className="w-3 h-3 text-gray-400" />
-                          {job.company}
+          {/* Jobs List (Left Side) */}
+          <div className={`w-full ${selectedJob ? "lg:w-1/2 xl:w-7/12" : "w-full"} space-y-3 transition-all duration-500 ease-out`}>
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+              <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium">No jobs found</p>
+            </div>
+          ) : (
+            filtered.map((job) => (
+              <div
+                key={job.uuid}
+                onClick={() => setSelectedJob(job)}
+                className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all ${
+                  selectedJob?.uuid === job.uuid ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" : "border-gray-100 hover:border-blue-200"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="font-bold text-gray-900">{job.title}</h3>
+                      {job.is_hot && <Flame className="w-3.5 h-3.5 text-orange-500" title="Hot Job" />}
+                      <StatusBadge status={job.status} />
+                      {(job.is_deleted || job.is_expired) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          Expired
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          {job.location}
-                        </span>
-                        <Link
-                          href={route("admin.applications.index", { job_id: job.id })}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold"
-                          title="Click to view applicants"
-                        >
-                          <Users className="w-3 h-3 text-blue-500" />
-                          {job.applicants ?? 0} applicants
-                        </Link>
-                        <span className="font-medium text-gray-700">{job.salary}</span>
-                        <span className="font-medium text-gray-700">Posted by {job.posted_by || "System"}</span>
-                        {job.work_mode && job.work_mode !== job.type && (
-                          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{job.work_mode}</span>
-                        )}
-                      </div>
+                      )}
                     </div>
-
-                    {(canManage || isJobAssignedToCurrent(job)) && (
-                      <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        {can("approve_jobs") && job.status !== "approved" && job.status !== "active" && (
-                          <button
-                            type="button"
-                            onClick={() => updateStatus(job.uuid, "approved")}
-                            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-medium cursor-pointer transition"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Approve</span>
-                          </button>
-                        )}
-                        {can("reject_jobs") && job.status !== "rejected" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRemarkModal({ job, newStatus: "rejected" });
-                              setRemark("");
-                            }}
-                            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium cursor-pointer transition"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Reject</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="w-3 h-3 text-gray-400" />
+                        {job.company}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-gray-400" />
+                        {job.location}
+                      </span>
+                      <Link
+                        href={route("admin.applications.index", { job_id: job.id })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                        title="Click to view applicants"
+                      >
+                        <Users className="w-3 h-3 text-blue-500" />
+                        {job.applicants ?? 0} applicants
+                      </Link>
+                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                        {job.salary}
+                      </span>
+                      <span className="font-medium text-gray-700">Posted by {job.posted_by || "System"}</span>
+                      {job.work_mode && job.work_mode !== job.type && (
+                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{job.work_mode}</span>
+                      )}
+                    </div>
                   </div>
 
-                  {job.assigned_team_member_name ? (
-                    <div className="flex items-center justify-between gap-2 mt-2">
-                      <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-2.5 py-1.5 w-fit">
-                        <Users className="w-3 h-3 text-blue-600" /> Managed by <strong className="font-semibold">{job.assigned_team_member_name}</strong>
-                      </div>
-                      {canManage && (
+                  {(canManage || isJobAssignedToCurrent(job)) && (
+                    <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {can("approve_jobs") && job.status !== "approved" && job.status !== "active" && (
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAssigningJob(job);
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline ml-auto"
+                          onClick={() => updateStatus(job.uuid, "approved")}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-medium cursor-pointer transition"
                         >
-                          Re-assign
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Approve</span>
+                        </button>
+                      )}
+                      {can("reject_jobs") && job.status !== "rejected" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRemarkModal({ job, newStatus: "rejected" });
+                            setRemark("");
+                          }}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium cursor-pointer transition"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Reject</span>
                         </button>
                       )}
                     </div>
-                  ) : (
-                    canManage && (
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAssigningJob(job);
-                          }}
-                          className="text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-2.5 py-1 font-medium cursor-pointer inline-flex items-center gap-1"
-                        >
-                          <Users className="w-3 h-3 text-amber-600" /> Unassigned · Click to Assign
-                        </button>
-                      </div>
-                    )
                   )}
+                </div>
 
-                  <div className="flex items-center justify-between text-xs text-gray-400 mt-2.5 pt-2 border-t border-gray-100 flex-wrap gap-2">
-                    <p>
-                      Posted {job.posted_at} · {job.type}
-                      {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
-                      · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
-                    </p>
-                    {job.posted_by && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-[11px] shadow-xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        Posted by: {job.posted_by}
-                      </span>
+                {job.assigned_team_member_name ? (
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-2.5 py-1.5 w-fit">
+                      <Users className="w-3 h-3 text-blue-600" /> Managed by <strong className="font-semibold">{job.assigned_team_member_name}</strong>
+                    </div>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssigningJob(job);
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline ml-auto"
+                      >
+                        Re-assign
+                      </button>
                     )}
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ) : (
+                  canManage && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssigningJob(job);
+                        }}
+                        className="text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-2.5 py-1 font-medium cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <Users className="w-3 h-3 text-amber-600" /> Unassigned · Click to Assign
+                      </button>
+                    </div>
+                  )
+                )}
 
+                <div className="flex items-center justify-between text-xs text-gray-400 mt-2.5 pt-2 border-t border-gray-100 flex-wrap gap-2">
+                  <p>
+                    Posted {job.posted_at} · {job.type}
+                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
+                    · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
+                  </p>
+                  {job.posted_by && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-[11px] shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                      Posted by: {job.posted_by}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+          {/* In-Page Side View for Job Details (Right Column - Full Height, No Inner Scroller) */}
           {selectedJob && (
-            <div className="w-full lg:flex-1 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs mb-12">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+            <div
+              id="admin-job-detail-panel"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border border-gray-200 rounded-3xl shadow-lg flex flex-col h-fit sticky top-6 z-10 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500 ease-out"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0 bg-white">
                 <div className="flex items-center gap-2 min-w-0 pr-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedJob(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer shrink-0"
-                  >
-                    ← Back
-                  </button>
-                  <h3 className="font-bold text-gray-900 break-words">{selectedJob.title}</h3>
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">{selectedJob.title}</h3>
                   {selectedJob.is_hot && <Flame className="w-4 h-4 text-orange-500 shrink-0" />}
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedJob(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer transition shrink-0"
+                  title="Close (Esc)"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-5">
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge status={selectedJob.status} />
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
-                    {selectedJob.type}
-                  </span>
-                  {selectedJob.work_mode && selectedJob.work_mode !== selectedJob.type && (
+              {/* Natural Full Content (No Inner Scroller, Clean & Visible) */}
+              <div className="p-5 sm:p-6 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge status={selectedJob.status} />
+                    {(selectedJob.is_deleted || selectedJob.is_expired) && (
+                      <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full font-bold">
+                        Expired (Hidden from Candidates)
+                      </span>
+                    )}
                     <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
-                      {selectedJob.work_mode}
+                      {selectedJob.type}
                     </span>
-                  )}
-                  <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">
-                    {selectedJob.category}
-                  </span>
-                </div>
+                    {selectedJob.work_mode && selectedJob.work_mode !== selectedJob.type && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+                        {selectedJob.work_mode}
+                      </span>
+                    )}
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">
+                      {selectedJob.category}
+                    </span>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {[
-                    { label: "Company", val: selectedJob.company },
-                    { label: "Location", val: selectedJob.location },
-                    { label: "Salary", val: selectedJob.salary },
-                    { label: "Experience", val: selectedJob.exp },
-                    { label: "Openings", val: selectedJob.openings },
-                    { label: "Applicants", val: selectedJob.applicants ?? 0, isApplicants: true },
-                    { label: "Posted By", val: selectedJob.posted_by, isPostedBy: true },
-                    { label: "Posted On", val: selectedJob.posted_at },
-                    ...(selectedJob.deadline ? [{ label: "Deadline", val: selectedJob.deadline }] : []),
-                  ].map((r) => (
-                    <div key={r.label}>
-                      <p className="text-xs text-gray-400 font-medium mb-0.5">{r.label}</p>
-                      {r.isPostedBy ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-xs shadow-sm shadow-indigo-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                          {r.val || "System"}
+                  {/* Offered Salary & Payout Badge */}
+                  <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                          Offered Salary ({selectedJob.salary_type ? selectedJob.salary_type.toUpperCase() : "MONTHLY"})
                         </span>
-                      ) : r.isApplicants ? (
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-gray-900">{r.val || 0}</p>
-                          <Link
-                            href={route("admin.applications.index", { job_id: selectedJob.id })}
-                            className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md font-semibold inline-flex items-center gap-1 transition"
-                            title="View all applications for this job"
-                          >
-                            <Users className="w-3 h-3" /> View All
-                          </Link>
-                        </div>
-                      ) : (
-                        <p className="font-semibold text-gray-900">{r.val || "—"}</p>
+                        <p className="text-xl font-extrabold text-emerald-900 mt-0.5">
+                          {selectedJob.salary || "Not Disclosed"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {selectedJob.salary_type && (
+                          <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 capitalize border border-emerald-200">
+                            {selectedJob.salary_type}
+                          </span>
+                        )}
+                        {selectedJob.bonus_offered === "yes" && (
+                          <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            + Bonus Offered
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {[
+                      { label: "Company", val: selectedJob.company },
+                      { label: "Location", val: selectedJob.location },
+                      { label: "Experience", val: selectedJob.exp },
+                      { label: "Age Limit", val: (selectedJob.min_age || selectedJob.max_age) ? `${selectedJob.min_age || 18} - ${selectedJob.max_age || 60} Years` : "Any Age" },
+                      { label: "Openings", val: selectedJob.openings },
+                      { label: "Applicants", val: selectedJob.applicants ?? 0, isApplicants: true },
+                      { label: "Posted By", val: selectedJob.posted_by, isPostedBy: true },
+                      { label: "Posted On", val: selectedJob.posted_at },
+                      ...(selectedJob.deadline ? [{ label: "Deadline", val: selectedJob.deadline }] : []),
+                    ].map((r) => (
+                      <div key={r.label}>
+                        <p className="text-xs text-gray-400 font-medium mb-0.5">{r.label}</p>
+                        {r.isPostedBy ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-xs shadow-sm shadow-indigo-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            {r.val || "System"}
+                          </span>
+                        ) : r.isApplicants ? (
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-gray-900">{r.val || 0}</p>
+                            <Link
+                              href={route("admin.applications.index", { job_id: selectedJob.id })}
+                              className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md font-semibold inline-flex items-center gap-1 transition"
+                              title="View all applications for this job"
+                            >
+                              <Users className="w-3 h-3" /> View All
+                            </Link>
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-gray-900">{r.val || "—"}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/40">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Team Assignment</p>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setAssigningJob(selectedJob)}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1"
+                        >
+                          {selectedJob.assigned_team_member_name ? "Re-assign" : "Assign"}
+                        </button>
                       )}
                     </div>
-                  ))}
-                </div>
-
-                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Team Assignment</p>
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => setAssigningJob(selectedJob)}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1"
-                      >
-                        {selectedJob.assigned_team_member_name ? "Re-assign" : "Assign"}
-                      </button>
+                    {selectedJob.assigned_team_member_name ? (
+                      <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-blue-100 shadow-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-xs">
+                            {selectedJob.assigned_team_member_name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{selectedJob.assigned_team_member_name}</p>
+                            <p className="text-xs text-gray-400">Manages all applications for this job</p>
+                          </div>
+                        </div>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => setAssigningJob(selectedJob)}
+                            className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold rounded-lg transition cursor-pointer"
+                          >
+                            Re-assign
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-gray-400">Not assigned · Admin handles applications directly</p>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => setAssigningJob(selectedJob)}
+                            className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
+                          >
+                            Assign
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {selectedJob.assigned_team_member_name ? (
-                    <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-blue-100 shadow-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-xs">
-                          {selectedJob.assigned_team_member_name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{selectedJob.assigned_team_member_name}</p>
-                          <p className="text-xs text-gray-400">Manages all applications for this job</p>
-                        </div>
+
+                  {/* Work Schedule & Interview */}
+                  {(selectedJob.shift_timing || selectedJob.working_days || selectedJob.interview_details) && (
+                    <div className="border border-gray-100 rounded-xl p-3.5 bg-gray-50/60 space-y-2 text-xs">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        Work Schedule & Interview
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedJob.working_days && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Working Days</span>
+                            <span className="font-semibold text-gray-800">{selectedJob.working_days}</span>
+                          </div>
+                        )}
+                        {selectedJob.shift_timing && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Shift Timings</span>
+                            <span className="font-semibold text-gray-800">{selectedJob.shift_timing}</span>
+                          </div>
+                        )}
+                        {selectedJob.interview_details && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100 col-span-full">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Interview Schedule / Info</span>
+                            <span className="font-semibold text-gray-800">{selectedJob.interview_details}</span>
+                          </div>
+                        )}
                       </div>
-                      {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => setAssigningJob(selectedJob)}
-                          className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold rounded-lg transition cursor-pointer"
-                        >
-                          Re-assign
-                        </button>
-                      )}
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm text-gray-400">Not assigned · Admin handles applications directly</p>
-                      {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => setAssigningJob(selectedJob)}
-                          className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
-                        >
-                          Assign
-                        </button>
-                      )}
+                  )}
+
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
+                    <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                      {selectedJob.desc}
+                    </p>
+                  </div>
+
+                  {selectedJob.responsibilities && selectedJob.responsibilities.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Responsibilities</p>
+                      <ul className="space-y-1">
+                        {selectedJob.responsibilities.map((r, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex gap-2">
+                            <span className="text-blue-400">•</span>{r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedJob.requirements && selectedJob.requirements.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Requirements & Education</p>
+                      <ul className="space-y-1">
+                        {selectedJob.requirements.map((r, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex gap-2">
+                            <span className="text-green-400">✓</span>{r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Benefits</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.benefits.map((b, i) => (
+                          <span key={i} className="text-xs bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-xl">
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedJob.skills && selectedJob.skills.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Skills</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.skills.map((s) => (
+                          <span key={s} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Languages */}
+                  {selectedJob.languages && selectedJob.languages.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Languages</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.languages.map((lang, i) => (
+                          <span key={i} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-xl font-medium">
+                            🗣️ {lang}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Required Assets / Documents */}
+                  {selectedJob.assets && selectedJob.assets.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Mandatory Assets / Documents</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.assets.map((asset, i) => (
+                          <span key={i} className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-xl font-medium">
+                            📦 {asset}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Certifications */}
+                  {selectedJob.certifications && selectedJob.certifications.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Certifications</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.certifications.map((cert, i) => (
+                          <span key={i} className="text-xs bg-teal-50 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-xl font-medium">
+                            📜 {cert}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preferred Industries */}
+                  {selectedJob.preferred_industries && selectedJob.preferred_industries.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Preferred Industries</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedJob.preferred_industries.map((ind, i) => (
+                          <span key={i} className="text-xs bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-1 rounded-xl font-medium">
+                            🏢 {ind}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recruiter / Contact Details & Company Address */}
+                  {(selectedJob.contact_person || selectedJob.contact_phone || selectedJob.contact_email || selectedJob.company_address) && (
+                    <div className="border border-gray-100 rounded-xl p-3.5 bg-gray-50/60 space-y-2 text-xs">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        Recruiter & Company Contact
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedJob.contact_person && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Contact Person</span>
+                            <span className="font-semibold text-gray-800">{selectedJob.contact_person}</span>
+                          </div>
+                        )}
+                        {selectedJob.contact_phone && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Phone Number</span>
+                            <a href={`tel:${selectedJob.contact_phone}`} className="font-semibold text-blue-600 hover:underline">{selectedJob.contact_phone}</a>
+                          </div>
+                        )}
+                        {selectedJob.contact_email && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100 col-span-full">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Email Address</span>
+                            <a href={`mailto:${selectedJob.contact_email}`} className="font-semibold text-blue-600 hover:underline">{selectedJob.contact_email}</a>
+                          </div>
+                        )}
+                        {selectedJob.company_address && (
+                          <div className="p-2 rounded-lg bg-white border border-gray-100 col-span-full">
+                            <span className="text-gray-400 block text-[10px] uppercase font-bold">Interview / Office Address</span>
+                            <span className="text-gray-700">{selectedJob.company_address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedJob.remark && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-yellow-700 mb-1">Remarks / Note</p>
+                      <p className="text-sm text-yellow-800">{selectedJob.remark}</p>
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
-                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                    {selectedJob.desc}
-                  </p>
-                </div>
-
-                {selectedJob.responsibilities && selectedJob.responsibilities.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Responsibilities</p>
-                    <ul className="space-y-1">
-                      {selectedJob.responsibilities.map((r, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex gap-2">
-                          <span className="text-blue-400">•</span>{r}
-                        </li>
-                      ))}
-                    </ul>
+                {/* Footer Actions */}
+                {canModerateJob && (
+                  <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/70">
+                    {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
+                      <button
+                        type="button"
+                        onClick={() => updateStatus(selectedJob.uuid, "approved")}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Approve
+                      </button>
+                    )}
+                    {can("reject_jobs") && selectedJob.status !== "rejected" && (
+                      <button
+                        title="Reject"
+                        type="button"
+                        onClick={() => {
+                          setRemarkModal({ job: selectedJob, newStatus: "rejected" });
+                          setRemark("");
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
+                      >
+                        <XCircle className="w-4 h-4" /> Reject
+                      </button>
+                    )}
+                    {can("hold_jobs") && selectedJob.status !== "hold" && (
+                      <button
+                        title="Hold"
+                        type="button"
+                        onClick={() => {
+                          setRemarkModal({ job: selectedJob, newStatus: "hold" });
+                          setRemark("");
+                        }}
+                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-orange-400 text-orange-600 rounded-xl text-sm font-bold hover:bg-orange-50 cursor-pointer transition"
+                      >
+                        <Clock className="w-4 h-4" /> Hold
+                      </button>
+                    )}
+                    {can("deactivate_jobs") && (selectedJob.status === "deactivated" ? (
+                      <button
+                        title="Activate"
+                        type="button"
+                        onClick={() => updateStatus(selectedJob.uuid, "active")}
+                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-blue-400 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 cursor-pointer transition"
+                      >
+                        <Eye className="w-4 h-4" /> Activate
+                      </button>
+                    ) : (
+                      <button
+                        title="Deactivate"
+                        type="button"
+                        onClick={() => updateStatus(selectedJob.uuid, "deactivated")}
+                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-gray-300 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 cursor-pointer transition"
+                      >
+                        <EyeOff className="w-4 h-4" /> Deactivate
+                      </button>
+                    ))}
                   </div>
                 )}
-
-                {selectedJob.requirements && selectedJob.requirements.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Requirements</p>
-                    <ul className="space-y-1">
-                      {selectedJob.requirements.map((r, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex gap-2">
-                          <span className="text-green-400">✓</span>{r}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {selectedJob.benefits && selectedJob.benefits.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Benefits</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedJob.benefits.map((b, i) => (
-                        <span key={i} className="text-xs bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-xl">
-                          {b}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedJob.skills && selectedJob.skills.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Skills</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedJob.skills.map((s) => (
-                        <span key={s} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedJob.remark && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                    <p className="text-xs font-semibold text-yellow-700 mb-1">Remarks / Note</p>
-                    <p className="text-sm text-yellow-800">{selectedJob.remark}</p>
-                  </div>
-                )}
-              </div>
-
-              {canModerateJob && (
-                <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/50">
-                  {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
-                    <button
-                      type="button"
-                      onClick={() => updateStatus(selectedJob.uuid, "approved")}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Approve
-                    </button>
-                  )}
-                  {can("reject_jobs") && selectedJob.status !== "rejected" && (
-                    <button
-                      title="Reject"
-                      type="button"
-                      onClick={() => {
-                        setRemarkModal({ job: selectedJob, newStatus: "rejected" });
-                        setRemark("");
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
-                    >
-                      <XCircle className="w-4 h-4" /> Reject
-                    </button>
-                  )}
-                  {can("hold_jobs") && selectedJob.status !== "hold" && (
-                    <button
-                      title="Hold"
-                      type="button"
-                      onClick={() => {
-                        setRemarkModal({ job: selectedJob, newStatus: "hold" });
-                        setRemark("");
-                      }}
-                      className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-orange-400 text-orange-600 rounded-xl text-sm font-bold hover:bg-orange-50 cursor-pointer transition"
-                    >
-                      <Clock className="w-4 h-4" /> Hold
-                    </button>
-                  )}
-                  {can("deactivate_jobs") && (selectedJob.status === "deactivated" ? (
-                    <button
-                      title="Activate"
-                      type="button"
-                      onClick={() => updateStatus(selectedJob.uuid, "active")}
-                      className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-blue-400 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 cursor-pointer transition"
-                    >
-                      <Eye className="w-4 h-4" /> Activate
-                    </button>
-                  ) : (
-                    <button
-                      title="Deactivate"
-                      type="button"
-                      onClick={() => updateStatus(selectedJob.uuid, "deactivated")}
-                      className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-gray-300 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 cursor-pointer transition"
-                    >
-                      <EyeOff className="w-4 h-4" /> Deactivate
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>

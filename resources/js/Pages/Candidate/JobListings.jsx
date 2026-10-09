@@ -107,9 +107,9 @@ function JobDetailPanel({
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto w-full bg-white animate-in fade-in duration-150 overscroll-contain">
+    <div className="flex flex-col h-fit w-full bg-white overflow-hidden">
       {/* Top Header Bar */}
-      <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between z-10 shadow-2xs">
+      <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between z-10 shrink-0">
         {/* Left: Category Tag */}
         <div>
           {job.category_name && (
@@ -155,8 +155,8 @@ function JobDetailPanel({
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="px-5 sm:px-7 py-5 flex-1 space-y-5">
+      {/* Main Content Area (Natural Height, No Inner Scroller) */}
+      <div className="px-5 sm:px-7 py-5 space-y-5">
         {/* Company + Title */}
         <div className="flex items-start gap-4">
           <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shrink-0 shadow-sm shadow-blue-500/10 overflow-hidden">
@@ -214,12 +214,54 @@ function JobDetailPanel({
 
         {/* Salary Strip */}
         <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl px-4 py-3">
-          <p className="text-xs text-emerald-700 font-medium">Monthly / Annual Salary</p>
-          <p className="text-lg sm:text-xl font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
-            <IndianRupee className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <p className="text-xs text-emerald-800 font-bold uppercase tracking-wider">
+              Offered Salary ({job.salary_type ? job.salary_type.toUpperCase() : "MONTHLY"})
+            </p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {job.salary_type && (
+                <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {job.salary_type}
+                </span>
+              )}
+              {job.bonus_offered === "yes" && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  + Bonus
+                </span>
+              )}
+            </div>
+          </div>
+          <p className="text-lg sm:text-xl font-extrabold text-emerald-900 flex items-center gap-1">
+            {(!job.salary || !job.salary.includes("₹")) && (
+              <IndianRupee className="w-4 h-4 text-emerald-600 shrink-0" />
+            )}
             <span>{job.salary || "Competitive"}</span>
           </p>
         </div>
+
+        {/* Age Criteria */}
+        {(job.min_age || job.max_age) && (
+          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 flex items-center gap-2 text-xs text-blue-900">
+            <span className="font-bold">Age Criteria:</span>
+            <span>{job.min_age || 18} - {job.max_age || 60} Years</span>
+          </div>
+        )}
+
+        {/* Languages */}
+        {job.languages && job.languages.length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              Languages Known
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {job.languages.map((lang, i) => (
+                <span key={i} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-xl font-medium">
+                  🗣️ {lang}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Skills */}
         {skillsList.length > 0 && (
@@ -234,6 +276,38 @@ function JobDetailPanel({
                   className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-xl font-medium"
                 >
                   {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mandatory Assets / Documents */}
+        {job.assets && job.assets.length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              Mandatory Assets / Documents
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {job.assets.map((asset, i) => (
+                <span key={i} className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-xl font-medium">
+                  📦 {asset}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Certifications */}
+        {job.certifications && job.certifications.length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              Certifications
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {job.certifications.map((cert, i) => (
+                <span key={i} className="text-xs bg-teal-50 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-xl font-medium">
+                  📜 {cert}
                 </span>
               ))}
             </div>
@@ -809,6 +883,19 @@ export default function JobListings({
     }
   }, [filteredJobs]);
 
+  // Handle Escape key to close in-page job details
+  useEffect(() => {
+    if (selectedJob) {
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") setSelectedJob(null);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [selectedJob]);
+
   const hasActiveFilters =
     search.trim() !== "" ||
     location !== "all" ||
@@ -1087,129 +1174,28 @@ export default function JobListings({
                     Clear All Filters
                   </button>
                 </div>
-              ) : selectedJob ? (
-                /* Split View when a job is clicked */
-                <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
-                  {/* Left Column in split view: Job List */}
-                  <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 space-y-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto pr-1">
-                    {filteredJobs.map((job) => {
-                      const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
-                      const jobKey = job.uuid || job.id;
-                      const selectedKey = selectedJob ? selectedJob.uuid || selectedJob.id : null;
-                      const isSelected = selectedKey === jobKey;
-                      const isSaved = savedJobs.includes(job.uuid) || savedJobs.includes(job.id);
-                      const applied = isJobApplied(job);
-
-                      return (
-                        <div
-                          key={jobKey}
-                          onClick={() => handleItemClick(job)}
-                          className={`bg-white rounded-2xl border p-4 transition-all cursor-pointer shadow-2xs ${isSelected
-                            ? "border-blue-600 ring-2 ring-blue-100 bg-blue-50/30"
-                            : "border-gray-200 hover:border-blue-300 hover:shadow-xs"
-                            }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
-                              {job.company_image ? (
-                                <img
-                                  src={job.company_image}
-                                  alt={job.company}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                companyInitials
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-1.5">
-                                <div className="min-w-0 flex-1">
-                                  <h3 className="font-bold text-sm text-gray-900 truncate">
-                                    {job.title}
-                                  </h3>
-                                  <p className="text-xs text-blue-600 font-semibold truncate mt-0.5">
-                                    {job.company}
-                                  </p>
-                                </div>
-
-                                {/* Highlighted Save Button on Split Card */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleToggleSaveJob(e, job.uuid || job.id)}
-                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-bold transition cursor-pointer shrink-0 shadow-2xs ${isSaved
-                                    ? "bg-blue-50 hover:bg-red-50 border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 group/save"
-                                    : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 text-gray-500 hover:text-blue-600"
-                                    }`}
-                                  title={isSaved ? "Saved (Click to remove)" : "Save Job"}
-                                >
-                                  {isSaved ? (
-                                    <>
-                                      <BookmarkCheck className="w-3.5 h-3.5 fill-blue-600 text-blue-600 group-hover/save:hidden" />
-                                      <BookmarkX className="w-3.5 h-3.5 hidden group-hover/save:block text-red-600" />
-                                      <span className="text-[11px] group-hover/save:hidden"></span>
-                                      <span className="text-[11px] hidden group-hover/save:inline"></span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Bookmark className="w-3.5 h-3.5" />
-                                      <span className="text-[11px]"></span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1.5">
-                                <span className="flex items-center gap-0.5 truncate">
-                                  <MapPin className="w-3 h-3 text-gray-400" />
-                                  {job.location || "Multiple"}
-                                </span>
-                                <span>•</span>
-                                <span className="font-bold text-emerald-700">
-                                  {job.salary || "Competitive"}
-                                </span>
-                              </div>
-                              {applied && (
-                                <div className="mt-2">
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shadow-2xs">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Applied
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Right Column in split view: Job Detail Panel */}
-                  <div className="flex-1 w-full bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] flex flex-col overscroll-contain">
-                    <JobDetailPanel
-                      job={selectedJob}
-                      onClose={() => setSelectedJob(null)}
-                      isLoggedIn={isLoggedIn}
-                      onLoginRequired={(action) => setLoginGateAction(action)}
-                      onSaveJob={(id) => handleToggleSaveJob(null, id)}
-                      isSaved={savedJobs.includes(selectedJob.uuid) || savedJobs.includes(selectedJob.id)}
-                      isApplied={isJobApplied(selectedJob)}
-                      getCountdown={getCountdown}
-                    />
-                  </div>
-                </div>
               ) : (
-                /* Default View: Rich Responsive 3-Column Grid of Job Cards */
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {filteredJobs.map((job) => {
-                    const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
-                    const jobKey = job.uuid || job.id;
-                    const isSaved = savedJobs.includes(job.uuid) || savedJobs.includes(job.id);
-                    const applied = isJobApplied(job);
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                  {/* Left Column: Job Cards */}
+                  <div className={`w-full ${selectedJob ? "lg:w-[48%] xl:w-1/2" : "w-full"} transition-all duration-500 ease-out`}>
+                    <div className={selectedJob ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"}>
+                      {filteredJobs.map((job) => {
+                        const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
+                        const jobKey = job.uuid || job.id;
+                        const isSaved = savedJobs.includes(job.uuid) || savedJobs.includes(job.id);
+                        const applied = isJobApplied(job);
+                        const isCurrentSelected = selectedJob?.uuid === job.uuid || selectedJob?.id === job.id;
 
-                    return (
-                      <div
-                        key={jobKey}
-                        onClick={() => handleItemClick(job)}
-                        className="bg-white rounded-2xl border border-gray-200/90 p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs"
-                      >
+                        return (
+                          <div
+                            key={jobKey}
+                            onClick={() => handleItemClick(job)}
+                            className={`bg-white rounded-2xl border p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs ${
+                              isCurrentSelected
+                                ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
+                                : "border-gray-200/90"
+                            }`}
+                          >
                         <div>
                           {/* Card Header: Avatar + Title + Bookmark */}
                           <div className="flex items-start justify-between gap-3 mb-3">
@@ -1297,7 +1283,9 @@ export default function JobListings({
                           <div>
                             <span className="text-[10px] text-gray-400 block font-medium">Offered Salary</span>
                             <div className="text-sm font-extrabold text-emerald-700 flex items-center gap-0.5">
-                              <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+                              {(!job.salary || !job.salary.includes("₹")) && (
+                                <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              )}
                               <span>{job.salary || "Competitive"}</span>
                             </div>
                           </div>
@@ -1318,6 +1306,24 @@ export default function JobListings({
                       </div>
                     );
                   })}
+                    </div>
+                  </div>
+
+                  {/* Right Column: In-Page Side View for Job Details (Full Height, No Inner Scroller) */}
+                  {selectedJob && (
+                    <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-24 h-fit flex flex-col animate-in fade-in slide-in-from-right-4 duration-500 ease-out">
+                      <JobDetailPanel
+                        job={selectedJob}
+                        onClose={() => setSelectedJob(null)}
+                        isLoggedIn={isLoggedIn}
+                        onLoginRequired={(action) => setLoginGateAction(action)}
+                        onSaveJob={(id) => handleToggleSaveJob(null, id)}
+                        isSaved={savedJobs.includes(selectedJob.uuid) || savedJobs.includes(selectedJob.id)}
+                        isApplied={isJobApplied(selectedJob)}
+                        getCountdown={getCountdown}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </main>

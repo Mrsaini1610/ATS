@@ -14,117 +14,217 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
+use App\Services\GeocodingService;
+use App\Services\PushNotificationService;
 
 class JobController extends Controller
 {
     
     public function getHomeData(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    // 1. Fetch Selected Active Resume (fallback to latest)
-    $activeResume = $user ? ($user->defaultResume ?? $user->resumes()->latest()->first()) : null;
+        // 1. Candidate Location Coordinates (from request or saved profile)
+        $lat = $request->input('latitude') ?? $user?->app_latitude ?? $user?->latitude;
+        $lng = $request->input('longitude') ?? $user?->app_longitude ?? $user?->longitude;
+        $hasCoords = !empty($lat) && !empty($lng);
 
-    // 2. ALL CITIES LOCATIONS (Updated: Fetching all cities from 'cities' table)
-    $jobLocations = DB::table('cities')
-        ->select('uuid', 'name', 'latitude', 'longitude')
-        ->orderBy('name', 'asc')
-        ->get();
+        // 2. Candidate Profile Attributes for Recommended Jobs Matching (NO Resume)
+        $userTitles     = [];
+        $userSkills     = [];
+        $userCity       = $user?->city ?? null;
+        $userExp        = $user?->total_experience_years ?? null;
+        $userAge        = !empty($user?->dob) ? Carbon::parse($user->dob)->age : null;
 
-    // 3. RECOMMENDED JOBS (Weighted Scoring with Active Resume)
-    $userSkills  = is_array($user?->skills) ? $user->skills : json_decode($user?->skills ?? '[]', true);
-    $userCity    = $user?->city ?? null;
-    $userExp     = $user?->total_experience_years ?? null;
-    $userAge     = !empty($user?->dob) ? Carbon::parse($user->dob)->age : null;
-    $resumeTitle = $activeResume ? strtolower(trim($activeResume->title)) : null;
+        if ($user) {
+            // Titles from Profile & Experience
+            $candidateTitles = [
+                $user->job_title ?? null,
+                $user->latestExperience?->job_title ?? null,
+            ];
+            foreach ($candidateTitles as $t) {
+                if (!empty($t)) {
+                    $cleaned = trim($t);
+                    if ($cleaned !== '') {
+                        $userTitles[] = $cleaned;
+                    }
+                }
+            }
+            $userTitles = array_values(array_unique($userTitles));
 
-    // Resume Title / Skill Match (Highest Priority +6)
-    $resumeSql = "0";
-    if (!empty($resumeTitle)) {
-        $escapedTitle = addslashes($resumeTitle);
-        $resumeSql = "CASE WHEN LOWER(title) LIKE '%{$escapedTitle}%' OR LOWER(skills) LIKE '%{$escapedTitle}%' THEN 6 ELSE 0 END";
-    }
-
-    $skillSql = "0";
-    if (!empty($userSkills) && is_array($userSkills)) {
-        $skillCases = [];
-        foreach ($userSkills as $skill) {
-            $escapedSkill = addslashes(strtolower($skill));
-            $skillCases[] = "CASE WHEN LOWER(skills) LIKE '%{$escapedSkill}%' THEN 3 ELSE 0 END";
+            // Skills from User Profile
+            $rawSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+            if (!empty($rawSkills) && is_array($rawSkills)) {
+                foreach ($rawSkills as $sk) {
+                    $cleaned = trim((string)$sk);
+                    if ($cleaned !== '') {
+                        $userSkills[] = $cleaned;
+                    }
+                }
+            }
+            $userSkills = array_values(array_unique($userSkills));
         }
-        if (!empty($skillCases)) {
+
+        // Title SQL Match
+        $titleSql = "0";
+        if (!empty($userTitles)) {
+            $titleCases = [];
+            foreach ($userTitles as $t) {
+                $escapedTitle = addslashes(strtolower($t));
+                $titleCases[] = "CASE WHEN LOWER(title) LIKE '%{$escapedTitle}%' OR LOWER(skills) LIKE '%{$escapedTitle}%' THEN 6 ELSE 0 END";
+            }
+            $titleSql = "(" . implode(" + ", $titleCases) . ")";
+        }
+
+        // Skill SQL Match
+        $skillSql = "0";
+        if (!empty($userSkills)) {
+            $skillCases = [];
+            foreach ($userSkills as $skill) {
+                $escapedSkill = addslashes(strtolower($skill));
+                $skillCases[] = "CASE WHEN LOWER(skills) LIKE '%{$escapedSkill}%' THEN 3 ELSE 0 END";
+            }
             $skillSql = "(" . implode(" + ", $skillCases) . ")";
         }
+
+        // Location SQL Match
+        $locationSql = "0";
+        if (!empty($userCity)) {
+            $escapedCity = addslashes(strtolower($userCity));
+            $locationSql = "CASE WHEN LOWER(location) LIKE '%{$escapedCity}%' THEN 5 ELSE 0 END";
+        }
+
+        // Experience SQL Match
+        $expSql = "0";
+        if (!empty($userExp)) {
+            $escapedExp = addslashes((string)$userExp);
+            $expSql = "CASE WHEN experience LIKE '%{$escapedExp}%' THEN 2 ELSE 0 END";
+        }
+
+        // Age SQL Match
+        $ageSql = "0";
+        if (!is_null($userAge)) {
+            $ageSql = "CASE WHEN (min_age IS NULL OR min_age <= {$userAge}) AND (max_age IS NULL OR max_age >= {$userAge}) THEN 2 ELSE 0 END";
+        }
+
+        // Distance SQL (Haversine Formula)
+        $distanceSelect = "NULL as distance_km";
+        if ($hasCoords) {
+            $distanceSelect = "(6371 * acos(least(1.0, greatest(-1.0, cos(radians({$lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians({$lng})) + sin(radians({$lat})) * sin(radians(latitude)))))) as distance_km";
+        }
+
+        $recommendedJobs = JobPost::with(['company', 'category'])
+            ->whereIn('status', ['active', 'approved'])
+            ->where(function ($q) {
+                $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+            })
+            ->select('*')
+            ->selectRaw("({$titleSql} + {$skillSql} + {$locationSql} + {$expSql} + {$ageSql}) as raw_score")
+            ->selectRaw($distanceSelect)
+            ->orderByDesc('raw_score')
+            ->orderByDesc('id')
+            ->take(20)
+            ->get();
+
+        foreach ($recommendedJobs as $job) {
+            $dist = !is_null($job->distance_km) ? round((float)$job->distance_km, 1) : null;
+            $job->distance_km = $dist;
+            $job->is_nearby = ($dist !== null && $dist <= 15);
+            $score = 50;
+            if ($job->is_nearby) $score += 25;
+            if (!empty($job->raw_score) && $job->raw_score > 0) $score += min(23, (int)$job->raw_score * 3);
+            $job->match_score = min(98, $score);
+        }
+
+        // 3. CATEGORIES WITH POSTS (Only categories that have active/approved jobs)
+        $categories = Category::where('status', 'active')
+            ->withCount(['jobPosts' => function ($query) {
+                $query->whereIn('status', ['active', 'approved'])
+                      ->where(function ($sub) {
+                          $sub->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                      });
+            }])
+            ->having('job_posts_count', '>', 0)
+            ->orderBy('job_posts_count', 'desc')
+            ->get();
+
+        // 4. COMPANIES WITH POSTS (Only companies that have active/approved jobs)
+        $topCompanies = Company::where('status', 'active')
+            ->withCount(['jobPosts' => function ($query) {
+                $query->whereIn('status', ['active', 'approved'])
+                      ->where(function ($sub) {
+                          $sub->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                      });
+            }])
+            ->having('job_posts_count', '>', 0)
+            ->orderBy('job_posts_count', 'desc')
+            ->take(20)
+            ->get();
+
+        // 5. SKILLS WITH POSTS & TRENDING SKILLS
+        $activeJobPosts = JobPost::whereIn('status', ['active', 'approved'])
+            ->where(function ($q) {
+                $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+            })
+            ->whereNotNull('skills')
+            ->get(['id', 'skills']);
+
+        $skillCounts = [];
+        foreach ($activeJobPosts as $jp) {
+            $skillsArr = is_array($jp->skills) ? $jp->skills : json_decode($jp->skills ?? '[]', true);
+            if (empty($skillsArr) && is_string($jp->skills)) {
+                $skillsArr = array_map('trim', explode(',', $jp->skills));
+            }
+            if (is_array($skillsArr)) {
+                foreach ($skillsArr as $sk) {
+                    $cleanSk = trim((string)$sk);
+                    if ($cleanSk !== '') {
+                        $skillCounts[$cleanSk] = ($skillCounts[$cleanSk] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+        arsort($skillCounts);
+
+        $skillNames = array_keys($skillCounts);
+        $dbSkills = !empty($skillNames)
+            ? DB::table('skills')
+                ->whereIn('name', $skillNames)
+                ->get()
+                ->keyBy(function ($item) {
+                    return strtolower(trim($item->name));
+                })
+            : collect();
+
+        $skillsWithDetails = [];
+        foreach ($skillCounts as $name => $count) {
+            $matched = $dbSkills->get(strtolower(trim($name)));
+            $skillsWithDetails[] = [
+                'id'              => $matched?->id ?? null,
+                'uuid'            => $matched?->uuid ?? null,
+                'name'            => $matched?->name ?? $name,
+                'category'        => $matched?->category ?? null,
+                'demand'          => $matched?->demand ?? 'high',
+                'status'          => $matched?->status ?? 1,
+                'job_posts_count' => $count,
+            ];
+        }
+
+        $trendingSkills = array_slice($skillNames, 0, 15);
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Home data fetched successfully',
+            'data'    => [
+                'locations'        => [],
+                'recommended_jobs' => $recommendedJobs,
+                'categories'       => $categories,
+                'top_companies'    => $topCompanies,
+                'skills'           => $skillsWithDetails,
+                'trending_skills'  => $trendingSkills,
+            ],
+        ], 200);
     }
-
-    $locationSql = "0";
-    if (!empty($userCity)) {
-        $escapedCity = addslashes(strtolower($userCity));
-        $locationSql = "CASE WHEN LOWER(location) LIKE '%{$escapedCity}%' THEN 5 ELSE 0 END";
-    }
-
-    $expSql = "0";
-    if (!empty($userExp)) {
-        $escapedExp = addslashes((string)$userExp);
-        $expSql = "CASE WHEN experience LIKE '%{$escapedExp}%' THEN 2 ELSE 0 END";
-    }
-
-    $ageSql = "0";
-    if (!is_null($userAge)) {
-        $ageSql = "CASE WHEN (min_age IS NULL OR min_age <= {$userAge}) AND (max_age IS NULL OR max_age >= {$userAge}) THEN 2 ELSE 0 END";
-    }
-
-    $recommendedJobs = JobPost::with(['company', 'category'])
-        ->where('status', 'active')
-        ->select('*')
-        ->selectRaw("({$resumeSql} + {$skillSql} + {$locationSql} + {$expSql} + {$ageSql}) as match_score")
-        ->orderByDesc('match_score')
-        ->orderByDesc('id')
-        ->get();
-
-    // 4. CATEGORIES WITH JOB COUNT
-    $categories = Category::where('status', 'active')
-        ->withCount(['jobPosts' => function ($query) {
-            $query->where('status', 'active');
-        }])
-        ->orderBy('job_posts_count', 'desc')
-        ->get();
-
-    // 5. TOP COMPANIES
-    $topCompanies = Company::withCount(['jobPosts' => function ($query) {
-            $query->where('status', 'active');
-        }])
-        ->having('job_posts_count', '>', 0)
-        ->orderBy('job_posts_count', 'desc')
-        ->take(10)
-        ->get();
-
-    // 6. TRENDING SKILLS
-    $trendingSkills = JobPost::where('status', 'active')
-        ->whereNotNull('skills')
-        ->get()
-        ->pluck('skills')
-        ->flatten()
-        ->filter()
-        ->countBy()
-        ->sortDesc()
-        ->take(10)
-        ->keys()
-        ->values();
-
-    return response()->json([
-        'status'        => true,
-        'message'       => 'Home data fetched successfully',
-        'active_resume' => $activeResume,
-        'data'          => [
-            'locations'        => $jobLocations,
-            'recommended_jobs' => $recommendedJobs,
-            'categories'       => $categories,
-            'top_companies'    => $topCompanies,
-            'trending_skills'  => $trendingSkills
-        ],
-    ], 200);
-}
 
     /**
      * Search & Filter Jobs (Supports both Sectioned View and Paginated View)
@@ -144,8 +244,11 @@ class JobController extends Controller
         // 2. Base Query Setup
         $query = JobPost::with([
             'company:id,uuid,name,logo,location',
-            'category:id,uuid,name'
-        ])->where('status', 'active');
+            'category:id,uuid,name',
+        ])->whereIn('status', ['active', 'approved'])
+          ->where(function ($q) {
+              $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+          });
 
         // 3. Keyword Search (Title, Skills, Description, Company)
         if ($request->filled('search')) {
@@ -290,41 +393,177 @@ class JobController extends Controller
     }
 
     /**
-     * Get Jobs List (Matched against Active Default Resume & User Profile)
+     * Get Jobs List (Matched against User Profile & 15km Current App Location)
      */
     public function getJobs(Request $request)
     {
         $user = $request->user();
         $tab  = $request->query('tab', 'recommended');
 
-        $query = JobPost::with(['company', 'category'])->where('status', 'active');
+        // 1. Resolve Candidate Location (App GPS coordinates or User DB coordinates)
+        $lat = $request->input('latitude') ?? $request->input('lat');
+        $lng = $request->input('longitude') ?? $request->input('lng');
 
-        if ($user) {
-            $activeResume = $user->defaultResume ?? $user->resumes()->latest()->first();
-            $userSkills   = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
-            $userCity     = $user->city;
-            $resumeTitle  = $activeResume?->title;
-
-            if (!empty($userSkills) || !empty($userCity) || !empty($resumeTitle)) {
-                $query->where(function ($q) use ($userSkills, $userCity, $resumeTitle) {
-                    if (!empty($resumeTitle)) {
-                        $q->orWhere('title', 'LIKE', '%' . $resumeTitle . '%')
-                          ->orWhere('skills', 'LIKE', '%' . $resumeTitle . '%');
-                    }
-                    if (!empty($userSkills)) {
-                        foreach ($userSkills as $skill) {
-                            $q->orWhereJsonContains('skills', $skill)
-                              ->orWhere('skills', 'LIKE', '%' . $skill . '%')
-                              ->orWhere('title', 'LIKE', '%' . $skill . '%');
-                        }
-                    }
-                    if (!empty($userCity)) {
-                        $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
-                    }
-                });
-            }
+        if (($lat === null || $lng === null) && $user) {
+            $lat = $user->app_latitude ?? $user->latitude;
+            $lng = $user->app_longitude ?? $user->longitude;
         }
 
+        $lat = is_numeric($lat) ? (float) $lat : null;
+        $lng = is_numeric($lng) ? (float) $lng : null;
+        $hasCoords = ($lat !== null && $lng !== null);
+
+        // Update app location on user record if provided
+        if ($user && $hasCoords && ($user->app_latitude != $lat || $user->app_longitude != $lng)) {
+            $user->updateQuietly([
+                'app_latitude'    => $lat,
+                'app_longitude'   => $lng,
+                'app_last_active' => now(),
+            ]);
+        }
+
+        // 2. Extract Candidate Profile Attributes
+        $userTitles     = [];
+        $userSkills     = [];
+        $userEducations = [];
+        $userCity       = null;
+        $userArea       = null;
+        $userCategoryId = null;
+
+        if ($user) {
+            $userCity       = !empty($user->city) ? trim($user->city) : null;
+            $userArea       = !empty($user->area) ? trim($user->area) : null;
+            $userCategoryId = $user->category_id;
+
+            // Titles from Profile, Active Resume, and Latest Experience
+            $activeResume = $user->defaultResume ?? $user->resumes()->latest()->first();
+            $latestExp    = $user->latestExperience;
+
+            $candidateTitles = [
+                $user->job_title ?? null,
+                $activeResume?->title ?? null,
+                $latestExp?->job_title ?? null,
+            ];
+            foreach ($candidateTitles as $t) {
+                if (!empty($t)) {
+                    $cleaned = trim($t);
+                    if ($cleaned !== '') {
+                        $userTitles[] = $cleaned;
+                    }
+                }
+            }
+            $userTitles = array_values(array_unique($userTitles));
+
+            // Skills from User Profile & Resume
+            $rawSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+            if (!empty($rawSkills) && is_array($rawSkills)) {
+                foreach ($rawSkills as $sk) {
+                    $cleaned = trim((string)$sk);
+                    if ($cleaned !== '') {
+                        $userSkills[] = $cleaned;
+                    }
+                }
+            }
+            $userSkills = array_values(array_unique($userSkills));
+
+            // Educations from User table and user_educations relation
+            if (!empty($user->education)) {
+                $userEducations[] = trim($user->education);
+            }
+            try {
+                $eduRows = $user->educations()->get(['degree', 'field_of_study']);
+                foreach ($eduRows as $er) {
+                    if (!empty($er->degree)) {
+                        $userEducations[] = trim($er->degree);
+                    }
+                    if (!empty($er->field_of_study)) {
+                        $userEducations[] = trim($er->field_of_study);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore relation error
+            }
+            $userEducations = array_values(array_unique(array_filter($userEducations)));
+        }
+
+        // 3. Base Query: Only Active / Approved & Non-deleted Jobs
+        $baseQuery = JobPost::with(['company', 'category'])
+            ->whereIn('status', ['active', 'approved'])
+            ->where(function ($q) {
+                $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+            });
+
+        // 4. Recommended Matching Query
+        // Match: Within 15km OR Title Match OR Skills Match OR Education Match OR City/Area Match OR Category Match
+        $hasAnyCriteria = $hasCoords || !empty($userTitles) || !empty($userSkills) || !empty($userEducations) || !empty($userCity) || !empty($userCategoryId);
+
+        $recommendedQuery = (clone $baseQuery);
+
+        if ($hasAnyCriteria) {
+            $recommendedQuery->where(function ($q) use ($hasCoords, $lat, $lng, $userTitles, $userSkills, $userEducations, $userCity, $userArea, $userCategoryId) {
+                // Criterion A: Within 15 km of user's current coordinates
+                if ($hasCoords) {
+                    $haversine = "(6371 * acos(least(1.0, greatest(-1.0, cos(radians({$lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians({$lng})) + sin(radians({$lat})) * sin(radians(latitude))))))";
+                    $q->orWhere(function ($nearQ) use ($haversine) {
+                        $nearQ->whereNotNull('latitude')
+                              ->whereNotNull('longitude')
+                              ->whereRaw("{$haversine} <= 15");
+                    });
+                }
+
+                // Criterion B: City / Area Match
+                if (!empty($userCity)) {
+                    $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
+                }
+                if (!empty($userArea)) {
+                    $q->orWhere('location', 'LIKE', '%' . $userArea . '%');
+                }
+
+                // Criterion C: Job Title / Role Match
+                foreach ($userTitles as $t) {
+                    $escaped = addslashes($t);
+                    $q->orWhere('title', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('skills', 'LIKE', '%' . $escaped . '%');
+                }
+
+                // Criterion D: Skills Match
+                foreach ($userSkills as $s) {
+                    $escaped = addslashes($s);
+                    $q->orWhereJsonContains('skills', $s)
+                      ->orWhere('skills', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('title', 'LIKE', '%' . $escaped . '%');
+                }
+
+                // Criterion E: Education / Qualifications Match
+                foreach ($userEducations as $edu) {
+                    $escaped = addslashes($edu);
+                    $q->orWhere('qualifications', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('description', 'LIKE', '%' . $escaped . '%');
+                }
+
+                // Criterion F: Category Match
+                if (!empty($userCategoryId)) {
+                    $q->orWhere('category_id', $userCategoryId);
+                }
+            });
+        }
+
+        $jobsCollection = $recommendedQuery->latest('id')->get();
+
+        // Fallback: If recommended matching returned fewer than 5 jobs, supplement with general active jobs
+        // so candidate never sees a blank page while still seeing recommended jobs first!
+        if ($jobsCollection->count() < 10) {
+            $existingIds = $jobsCollection->pluck('id')->toArray();
+            $fallbackJobs = (clone $baseQuery)
+                ->whereNotIn('id', $existingIds)
+                ->latest('id')
+                ->limit(20)
+                ->get();
+
+            $jobsCollection = $jobsCollection->concat($fallbackJobs);
+        }
+
+        // 5. User Applications & Saved Status Maps
         $savedJobUuids = [];
         $userApplications = collect();
 
@@ -339,7 +578,8 @@ class JobController extends Controller
                 ->groupBy('job_id');
         }
 
-        $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
+        // 6. Map jobs, calculate Distance & Dynamic Match Score (0 - 100%)
+        $processedJobs = $jobsCollection->map(function ($job) use ($userApplications, $savedJobUuids, $hasCoords, $lat, $lng, $userTitles, $userSkills, $userEducations, $userCity, $userCategoryId) {
             $applications = $userApplications->get($job->id);
             $latestApplication = $applications ? $applications->first() : null;
 
@@ -349,7 +589,6 @@ class JobController extends Controller
 
             if ($latestApplication) {
                 $status = strtolower($latestApplication->status);
-
                 switch ($status) {
                     case 'pending':
                     case 'applied':
@@ -357,7 +596,6 @@ class JobController extends Controller
                     case 'cancelled':
                         $canApply = false;
                         break;
-
                     case 'rejected':
                         $reapplyAt = Carbon::parse($latestApplication->updated_at)->addDays(60);
                         $canApply  = now()->gte($reapplyAt);
@@ -365,37 +603,142 @@ class JobController extends Controller
                 }
             }
 
+            // A. Calculate Distance
+            $distanceKm = null;
+            $isNearby15km = false;
+            if ($hasCoords && $job->latitude !== null && $job->longitude !== null) {
+                $distanceKm = GeocodingService::haversineDistance($lat, $lng, (float)$job->latitude, (float)$job->longitude);
+                $isNearby15km = ($distanceKm <= 15.0);
+            }
+
+            // B. Calculate Match Score (Weighted)
+            $score = 50; // Base score
+            $matchReasons = [];
+
+            // 15km proximity boost
+            if ($isNearby15km) {
+                $score += ($distanceKm <= 5.0) ? 35 : 25;
+                $matchReasons[] = "Within 15km";
+            } elseif ($distanceKm !== null && $distanceKm <= 30.0) {
+                $score += 10;
+            }
+
+            // Title match boost
+            $jobTitleLower = strtolower($job->title ?? '');
+            foreach ($userTitles as $t) {
+                $tLower = strtolower($t);
+                if (str_contains($jobTitleLower, $tLower) || str_contains($tLower, $jobTitleLower)) {
+                    $score += 20;
+                    $matchReasons[] = "Title matched";
+                    break;
+                }
+            }
+
+            // Skills match boost
+            $jobSkills = is_array($job->skills) ? $job->skills : json_decode($job->skills ?? '[]', true);
+            if (!is_array($jobSkills)) {
+                $jobSkills = [];
+            }
+            $jobSkillsLower = array_map('strtolower', array_map('trim', $jobSkills));
+
+            $matchedSkillsCount = 0;
+            foreach ($userSkills as $us) {
+                $usLower = strtolower($us);
+                if (in_array($usLower, $jobSkillsLower) || str_contains(implode(' ', $jobSkillsLower), $usLower)) {
+                    $matchedSkillsCount++;
+                }
+            }
+            if ($matchedSkillsCount > 0) {
+                $score += min(25, $matchedSkillsCount * 10);
+                $matchReasons[] = "{$matchedSkillsCount} skills matched";
+            }
+
+            // Education match boost
+            $qualStr = is_array($job->qualifications) ? implode(' ', $job->qualifications) : (string)($job->qualifications ?? '');
+            $descStr = is_array($job->description) ? implode(' ', $job->description) : (string)($job->description ?? '');
+            $qualLower = strtolower($qualStr . ' ' . $descStr);
+            foreach ($userEducations as $ue) {
+                if (is_string($ue) && $ue !== '' && str_contains($qualLower, strtolower($ue))) {
+                    $score += 15;
+                    $matchReasons[] = "Education matched";
+                    break;
+                }
+            }
+
+            // Category boost
+            if (!empty($userCategoryId) && $job->category_id == $userCategoryId) {
+                $score += 10;
+            }
+
+            // City boost
+            if (!empty($userCity) && str_contains(strtolower($job->location ?? ''), strtolower($userCity))) {
+                $score += 10;
+            }
+
+            $finalScore = min(98, max(50, $score));
+
             $jobArray = $job->toArray();
             $jobArray['has_applied']        = !is_null($latestApplication);
             $jobArray['is_saved']          = in_array($job->uuid, $savedJobUuids);
             $jobArray['can_apply']         = $canApply;
             $jobArray['application_status'] = $status;
             $jobArray['reapply_at']         = $reapplyAt?->toISOString();
+            $jobArray['distance_km']        = $distanceKm !== null ? round($distanceKm, 1) : null;
+            $jobArray['is_nearby']          = $isNearby15km;
+            $jobArray['match_score']        = $finalScore;
+            $jobArray['match_reasons']      = $matchReasons;
 
             return $jobArray;
         });
 
+        // 7. Sort: Highest Match Score First, then Nearest Distance First, then Latest
+        $sortedJobs = $processedJobs->sort(function ($a, $b) {
+            // First priority: Match score descending
+            if ($a['match_score'] !== $b['match_score']) {
+                return $b['match_score'] <=> $a['match_score'];
+            }
+            // Second priority: Distance ascending (if both have distance)
+            if ($a['distance_km'] !== null && $b['distance_km'] !== null) {
+                return $a['distance_km'] <=> $b['distance_km'];
+            }
+            // Third priority: ID descending
+            return $b['id'] <=> $a['id'];
+        })->values();
+
+        // 8. Dynamic Filter Options for App
         $metaFilters = [
             'categories'  => Category::whereIn('id', function ($q) {
                 $q->select('category_id')
                   ->from('job_posts')
-                  ->where('status', 'active')
+                  ->whereIn('status', ['active', 'approved'])
+                  ->where(function ($sub) {
+                      $sub->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                  })
                   ->whereNotNull('category_id');
             })->select('id', 'name', 'uuid')->get(),
 
-            'locations'   => JobPost::where('status', 'active')
+            'locations'   => JobPost::whereIn('status', ['active', 'approved'])
+                ->where(function ($q) {
+                    $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                })
                 ->whereNotNull('location')
                 ->distinct()
                 ->pluck('location')
                 ->values(),
 
-            'job_types'   => JobPost::where('status', 'active')
+            'job_types'   => JobPost::whereIn('status', ['active', 'approved'])
+                ->where(function ($q) {
+                    $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                })
                 ->whereNotNull('job_type')
                 ->distinct()
                 ->pluck('job_type')
                 ->values(),
 
-            'experiences' => JobPost::where('status', 'active')
+            'experiences' => JobPost::whereIn('status', ['active', 'approved'])
+                ->where(function ($q) {
+                    $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+                })
                 ->whereNotNull('experience')
                 ->distinct()
                 ->pluck('experience')
@@ -403,11 +746,17 @@ class JobController extends Controller
         ];
 
         return response()->json([
-            'status'     => true,
-            'message'    => 'Recommended jobs fetched successfully',
-            'active_tab' => $tab,
-            'filters'    => $metaFilters,
-            'data'       => $jobs
+            'status'        => true,
+            'message'       => 'Recommended jobs fetched successfully',
+            'active_tab'    => $tab,
+            'user_location' => [
+                'latitude'  => $lat,
+                'longitude' => $lng,
+                'radius_km' => 15,
+            ],
+            'filters'       => $metaFilters,
+            'total_jobs'    => $sortedJobs->count(),
+            'data'          => $sortedJobs,
         ], 200);
     }
 
@@ -418,14 +767,15 @@ class JobController extends Controller
     {
         $user = $request->user();
 
-        $job = JobPost::with(['company', 'category', 'subCategory'])
+        $job = JobPost::with(['company', 'category'])
             ->where('uuid', $uuid)
             ->first();
 
-        if (!$job) {
+        if (!$job || $job->is_deleted == 1 || !in_array($job->status, ['active', 'approved'])) {
             return response()->json([
-                'status'  => false,
-                'message' => 'Job not found.'
+                'status'    => false,
+                'message'   => 'This job has been closed or removed by the employer.',
+                'is_closed' => true,
             ], 404);
         }
 
@@ -520,6 +870,13 @@ class JobController extends Controller
 
             $job->increment('applicants');
 
+            // Trigger push notification to candidate and audit log
+            try {
+                PushNotificationService::notifyApplicationSubmitted($application);
+            } catch (Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending application push notification: ' . $e->getMessage());
+            }
+
             $responseData = $application->toArray();
             $responseData['candidate_uuid'] = $user->uuid;
             $responseData['job_uuid']       = $job->uuid;
@@ -587,41 +944,150 @@ class JobController extends Controller
     }
 
     /**
-     * Saved Jobs ki list fetch karna
+     * Saved Jobs ki list fetch karna:
+     * - Deleted jobs (is_deleted = 1) filter out
+     * - Status active / approved only
+     * - Candidate profile se match hone wali jobs hi show karein
      */
     public function getSavedJobs(Request $request)
     {
         $user = $request->user();
         $perPage = $request->get('per_page', 15);
 
-        $savedJobs = SavedJob::where('user_uuid', $user->uuid)
-            ->latest()
-            ->paginate($perPage);
+        // 1. Candidate ke saved job UUIDs
+        $savedJobUuids = SavedJob::where('user_uuid', $user->uuid)
+            ->pluck('job_uuid')
+            ->toArray();
 
-        $jobUuids = $savedJobs->pluck('job_uuid')->toArray();
-        $jobPosts = JobPost::with(['company:id,uuid,name,logo,location', 'category:id,uuid,name'])
-            ->whereIn('uuid', $jobUuids)
-            ->get()
-            ->keyBy('uuid');
+        if (empty($savedJobUuids)) {
+            return response()->json([
+                'status'  => true,
+                'message' => 'Saved jobs retrieved successfully.',
+                'data'    => new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage)
+            ], 200);
+        }
+
+        // 2. Base Query: Only Active / Approved & Non-deleted JobPosts
+        $savedQuery = JobPost::with(['company:id,uuid,name,logo,location', 'category:id,uuid,name'])
+            ->whereIn('uuid', $savedJobUuids)
+            ->whereIn('status', ['active', 'approved'])
+            ->where(function ($q) {
+                $q->whereNull('is_deleted')->orWhere('is_deleted', 0);
+            });
+
+        // 3. Candidate Profile Match Filter (Skills, Title, City, Education, Category)
+        $lat = $request->input('latitude') ?? $request->input('lat');
+        $lng = $request->input('longitude') ?? $request->input('lng');
+        if (($lat === null || $lng === null) && $user) {
+            $lat = $user->app_latitude ?? $user->latitude;
+            $lng = $user->app_longitude ?? $user->longitude;
+        }
+        $lat = is_numeric($lat) ? (float) $lat : null;
+        $lng = is_numeric($lng) ? (float) $lng : null;
+        $hasCoords = ($lat !== null && $lng !== null);
+
+        $userCity       = !empty($user->city) ? trim($user->city) : null;
+        $userArea       = !empty($user->area) ? trim($user->area) : null;
+        $userCategoryId = $user->category_id;
+
+        $activeResume = $user->defaultResume ?? $user->resumes()->latest()->first();
+        $latestExp    = $user->latestExperience;
+        $candidateTitles = [
+            $user->job_title ?? null,
+            $activeResume?->title ?? null,
+            $latestExp?->job_title ?? null,
+        ];
+        $userTitles = [];
+        foreach ($candidateTitles as $t) {
+            if (!empty($t) && trim($t) !== '') {
+                $userTitles[] = trim($t);
+            }
+        }
+        $userTitles = array_values(array_unique($userTitles));
+
+        $rawSkills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+        $userSkills = [];
+        if (!empty($rawSkills) && is_array($rawSkills)) {
+            foreach ($rawSkills as $sk) {
+                if (!empty($sk) && trim((string)$sk) !== '') {
+                    $userSkills[] = trim((string)$sk);
+                }
+            }
+        }
+        $userSkills = array_values(array_unique($userSkills));
+
+        $userEducations = [];
+        if (!empty($user->education)) {
+            $userEducations[] = trim($user->education);
+        }
+        try {
+            $eduRows = $user->educations()->get(['degree', 'field_of_study']);
+            foreach ($eduRows as $er) {
+                if (!empty($er->degree)) $userEducations[] = trim($er->degree);
+                if (!empty($er->field_of_study)) $userEducations[] = trim($er->field_of_study);
+            }
+        } catch (\Throwable $e) {}
+        $userEducations = array_values(array_unique(array_filter($userEducations)));
+
+        $hasAnyCriteria = $hasCoords || !empty($userTitles) || !empty($userSkills) || !empty($userEducations) || !empty($userCity) || !empty($userCategoryId);
+
+        if ($hasAnyCriteria) {
+            $savedQuery->where(function ($q) use ($hasCoords, $lat, $lng, $userTitles, $userSkills, $userEducations, $userCity, $userArea, $userCategoryId) {
+                if ($hasCoords) {
+                    $haversine = "(6371 * acos(least(1.0, greatest(-1.0, cos(radians({$lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians({$lng})) + sin(radians({$lat})) * sin(radians(latitude))))))";
+                    $q->orWhere(function ($nearQ) use ($haversine) {
+                        $nearQ->whereNotNull('latitude')
+                              ->whereNotNull('longitude')
+                              ->whereRaw("{$haversine} <= 15");
+                    });
+                }
+                if (!empty($userCity)) {
+                    $q->orWhere('location', 'LIKE', '%' . $userCity . '%');
+                }
+                if (!empty($userArea)) {
+                    $q->orWhere('location', 'LIKE', '%' . $userArea . '%');
+                }
+                foreach ($userTitles as $t) {
+                    $escaped = addslashes($t);
+                    $q->orWhere('title', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('skills', 'LIKE', '%' . $escaped . '%');
+                }
+                foreach ($userSkills as $s) {
+                    $escaped = addslashes($s);
+                    $q->orWhereJsonContains('skills', $s)
+                      ->orWhere('skills', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('title', 'LIKE', '%' . $escaped . '%');
+                }
+                foreach ($userEducations as $edu) {
+                    $escaped = addslashes($edu);
+                    $q->orWhere('qualifications', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('description', 'LIKE', '%' . $escaped . '%');
+                }
+                if (!empty($userCategoryId)) {
+                    $q->orWhere('category_id', $userCategoryId);
+                }
+            });
+        }
 
         $appliedJobIds = JobApplication::where('candidate_id', $user->id)
             ->pluck('job_id')
             ->toArray();
 
-        $savedJobs->getCollection()->transform(function ($saved) use ($jobPosts, $appliedJobIds) {
-            $job = $jobPosts->get($saved->job_uuid);
-            if ($job) {
-                $job->has_applied = in_array($job->id, $appliedJobIds);
-                $job->is_saved    = true;
-            }
-            $saved->job = $job;
-            return $saved;
+        $paginatedJobs = $savedQuery->latest('id')->paginate($perPage);
+
+        $paginatedJobs->getCollection()->transform(function ($job) use ($appliedJobIds) {
+            $job->has_applied = in_array($job->id, $appliedJobIds);
+            $job->is_saved    = true;
+            return [
+                'job_uuid' => $job->uuid,
+                'job'      => $job,
+            ];
         });
 
         return response()->json([
             'status'  => true,
             'message' => 'Saved jobs retrieved successfully.',
-            'data'    => $savedJobs
+            'data'    => $paginatedJobs
         ], 200);
     }
 
@@ -670,9 +1136,13 @@ class JobController extends Controller
             $candidateUuid = $app->candidate?->uuid ?? $user->uuid;
             $jobUuid = $job?->uuid ?? null;
 
+            // Check if job is closed or deleted
+            $isJobClosed = !$job || $job->is_deleted == 1 || !in_array($job->status, ['active', 'approved']);
+
             $appData = $app->toArray();
             $appData['candidate_uuid'] = $candidateUuid;
             $appData['job_uuid']       = $jobUuid;
+            $appData['is_job_closed']  = $isJobClosed;
 
             unset(
                 $appData['id'],
@@ -689,6 +1159,9 @@ class JobController extends Controller
                 $jobData['application_status'] = $app->status;
                 $jobData['reapply_at']         = $reapplyAt?->toISOString();
                 $jobData['can_apply']          = $canApply;
+                $jobData['is_closed']          = $isJobClosed;
+                $jobData['is_deleted']         = (bool) ($job->is_deleted ?? false);
+                $jobData['job_status']         = $isJobClosed ? 'closed' : $job->status;
 
                 unset(
                     $jobData['id'],
@@ -707,7 +1180,17 @@ class JobController extends Controller
 
                 $appData['job_details'] = $jobData;
             } else {
-                $appData['job_details'] = null;
+                $appData['job_details'] = [
+                    'title'      => 'Closed Position',
+                    'company'    => 'Employer',
+                    'is_closed'  => true,
+                    'is_deleted' => true,
+                    'status'     => 'closed',
+                    'job_status' => 'closed',
+                    'location'   => 'Not available',
+                    'job_type'   => 'Closed',
+                    'skills'     => [],
+                ];
             }
 
             return $appData;

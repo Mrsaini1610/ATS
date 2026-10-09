@@ -19,4 +19,5 @@ Schedule::command('app:half-yearly-task-assign')->cron('0 4 1 1,7 *')->timezone(
 Schedule::command('app:yearly-task-assign')->yearly()->at('05:00')->timezone('Asia/Kolkata');
 Schedule::command('tasks:check-overdue')->dailyAt('12:00')->timezone('Asia/Kolkata');
 Schedule::command('tasks:check-stages')->daily()->timezone('Asia/Kolkata');
+Schedule::command('jobs:expire')->dailyAt('00:01')->timezone('Asia/Kolkata');
 // Schedule::command('app:demo-cron-test')->everySecond();

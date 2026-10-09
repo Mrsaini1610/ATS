@@ -71,236 +71,10 @@ Route::get('/faqs', fn() => redirect()->route('faq'));
 Route::get('/cookies', [PageController::class, 'cookies'])->name('cookies');
 Route::get('/cookie-policy', fn() => redirect()->route('cookies'));
 
-Route::get('/sitemap.xml', function () {
-    $baseUrl = url('/');
-    $now = now()->toAtomString();
+Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->name('sitemap');
 
-    $jobs = \App\Models\JobPost::where('status', 'approved')
-        ->latest('updated_at')
-        ->get(['uuid', 'updated_at']);
-
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-
-    $staticPages = [
-        ['url' => '', 'priority' => '1.0', 'changefreq' => 'daily'],
-        ['url' => '/jobs', 'priority' => '0.9', 'changefreq' => 'hourly'],
-        ['url' => '/job-search', 'priority' => '0.9', 'changefreq' => 'hourly'],
-        ['url' => '/companies', 'priority' => '0.8', 'changefreq' => 'daily'],
-        ['url' => '/categories', 'priority' => '0.8', 'changefreq' => 'weekly'],
-        ['url' => '/services', 'priority' => '0.8', 'changefreq' => 'weekly'],
-        ['url' => '/about', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => '/contact', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => '/faq', 'priority' => '0.7', 'changefreq' => 'weekly'],
-        ['url' => '/privacy-policy', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => '/terms', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => '/cookies', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => '/mobile-app', 'priority' => '0.6', 'changefreq' => 'monthly'],
-    ];
-
-    foreach ($staticPages as $p) {
-        $xml .= "  <url>\n";
-        $xml .= "    <loc>" . htmlspecialchars($baseUrl . $p['url']) . "</loc>\n";
-        $xml .= "    <lastmod>{$now}</lastmod>\n";
-        $xml .= "    <changefreq>{$p['changefreq']}</changefreq>\n";
-        $xml .= "    <priority>{$p['priority']}</priority>\n";
-        $xml .= "  </url>\n";
-    }
-
-    foreach ($jobs as $j) {
-        $lastmod = $j->updated_at ? $j->updated_at->toAtomString() : $now;
-        $xml .= "  <url>\n";
-        $xml .= "    <loc>" . htmlspecialchars($baseUrl . '/apply/' . $j->uuid) . "</loc>\n";
-        $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
-        $xml .= "    <changefreq>daily</changefreq>\n";
-        $xml .= "    <priority>0.8</priority>\n";
-        $xml .= "  </url>\n";
-    }
-
-    $xml .= '</urlset>';
-
-    return response($xml, 200)->header('Content-Type', 'text/xml');
-});
-
-Route::get('/apply/{job}', function ($jobKey) {
-    $job = \App\Models\JobPost::where('uuid', $jobKey)->first() ?: \App\Models\JobPost::find($jobKey);
-    if (!$job) {
-        return redirect()->route('job.listings');
-    }
-    $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-
-    if ($user) {
-        $alreadyApplied = \App\Models\JobApplication::where('candidate_id', $user->id)
-            ->where('job_id', $job->id)
-            ->exists();
-        if ($alreadyApplied) {
-            return redirect()->route('my-applications')->with('success', 'You have already applied for this job. You can track its live status below.');
-        }
-    }
-
-    if ($user) {
-        $user->load([
-            'resumes' => fn($q) => $q->where('is_delete', 0)->latest(),
-            'defaultResume' => fn($q) => $q->where('is_delete', 0),
-            'educations' => fn($q) => $q->where('is_delete', 0)->latest(),
-        ]);
-    }
-
-    $qualifications = $job->qualifications;
-    if (is_string($qualifications) && !empty($qualifications)) {
-        $qualifications = str_contains($qualifications, "\n")
-            ? array_filter(array_map('trim', explode("\n", $qualifications)))
-            : array_filter(array_map('trim', explode(",", $qualifications)));
-    }
-
-    return Inertia::render('Candidate/JobApply', [
-        'jobDataFromBackend' => [
-            ...$job->toArray(),
-            'id'           => $job->uuid,
-            'uuid'         => $job->uuid,
-            'requirements' => is_array($qualifications) ? array_values($qualifications) : [],
-        ],
-        'candidate' => $user,
-        'loggedIn'  => (bool) $user,
-    ]);
-})->name('jobs.apply');
-
-Route::post('/apply/{job}', function (\Illuminate\Http\Request $request, $jobKey) {
-    $job = \App\Models\JobPost::where('uuid', $jobKey)->first() ?: \App\Models\JobPost::find($jobKey);
-    if (!$job) {
-        return back()->withErrors(['message' => 'Job not found.']);
-    }
-    $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-    if (!$user) {
-        return redirect()->route('login');
-    }
-
-    $resumeUrl = null;
-    if ($request->hasFile('cvFile')) {
-        $stored = $request->file('cvFile')->store('resumes', 'public');
-        $resumeUrl = asset('storage/' . $stored);
-
-        // Also save to user's resumes
-        try {
-            \App\Models\UserResume::create([
-                'user_uuid'  => $user->uuid,
-                'title'      => $request->file('cvFile')->getClientOriginalName(),
-                'file_path'  => 'storage/' . $stored,
-                'file_type'  => $request->file('cvFile')->getClientOriginalExtension(),
-                'is_default' => true,
-            ]);
-        } catch (\Throwable $e) {
-            // Ignore resume table error
-        }
-    } elseif ($request->filled('selectedResumeId')) {
-        $selectedResume = \App\Models\UserResume::where('user_uuid', $user->uuid)
-            ->where(function ($q) use ($request) {
-                $q->where('id', $request->selectedResumeId)
-                  ->orWhere('uuid', $request->selectedResumeId);
-            })->first();
-
-        if ($selectedResume && $selectedResume->file_path) {
-            $fp = $selectedResume->file_path;
-            if (str_starts_with($fp, 'http://') || str_starts_with($fp, 'https://')) {
-                $resumeUrl = $fp;
-            } elseif (str_starts_with($fp, 'storage/')) {
-                $resumeUrl = asset($fp);
-            } else {
-                $resumeUrl = asset('storage/' . $fp);
-            }
-        }
-    } else {
-        $defaultResume = $user->defaultResume ?? $user->resumes()->latest()->first();
-        if ($defaultResume && $defaultResume->file_path) {
-            $fp = $defaultResume->file_path;
-            if (str_starts_with($fp, 'http://') || str_starts_with($fp, 'https://')) {
-                $resumeUrl = $fp;
-            } elseif (str_starts_with($fp, 'storage/')) {
-                $resumeUrl = asset($fp);
-            } else {
-                $resumeUrl = asset('storage/' . $fp);
-            }
-        }
-    }
-
-    // Parse Candidate Skills (array or string)
-    $skillsInput = $request->input('skills');
-    $candidateSkills = is_array($skillsInput)
-        ? $skillsInput
-        : (is_string($skillsInput) && !empty($skillsInput)
-            ? array_filter(array_map('trim', explode(',', $skillsInput)))
-            : ($user->skills ?? []));
-
-    $application = \App\Models\JobApplication::updateOrCreate(
-        [
-            'candidate_id' => $user->id,
-            'job_id'       => $job->id,
-        ],
-        [
-            'candidate_uuid'       => $user->uuid,
-            'resume_url'           => $resumeUrl,
-            'cover_letter'         => $request->input('coverLetter') ?: $request->input('whyApply'),
-            'candidate_name'       => $request->input('fullName') ?: ($user->full_name ?? $user->name),
-            'candidate_email'      => $request->input('email') ?: $user->email,
-            'candidate_phone'      => $request->input('phone') ?: $user->phone,
-            'candidate_skills'     => array_values($candidateSkills),
-            'candidate_experience' => $request->input('experience') ?: $user->total_experience_years,
-            'current_salary'       => $request->input('currentSalary'),
-            'expected_salary'      => $request->input('expectedSalary'),
-            'last_company'         => $request->input('lastCompany'),
-            'notice_period'        => $request->input('notice'),
-            'last_working_day'     => $request->input('lastWorkingDay') ?: null,
-            'city'                 => $request->input('city'),
-            'answers'              => [
-                'currentTitle'        => $request->input('currentTitle'),
-                'city'                => $request->input('city'),
-                'experience'          => $request->input('experience'),
-                'qualification'       => $request->input('qualification'),
-                'educationDegree'     => $request->input('educationDegree'),
-                'educationInstitute'  => $request->input('educationInstitute'),
-                'skills'              => array_values($candidateSkills),
-                'currentSalary'       => $request->input('currentSalary'),
-                'expectedSalary'      => $request->input('expectedSalary'),
-                'lastCompany'         => $request->input('lastCompany'),
-                'notice'              => $request->input('notice'),
-                'lastWorkingDay'      => $request->input('lastWorkingDay'),
-                'selectedResumeId'    => $request->input('selectedResumeId'),
-                'portfolio'           => $request->input('portfolio'),
-                'linkedin'            => $request->input('linkedin'),
-                'whyApply'            => $request->input('whyApply'),
-            ],
-            'status'               => 'applied'
-        ]
-    );
-
-    if ($application->wasRecentlyCreated) {
-        $job->increment('applicants');
-    }
-
-    // Update user profile with latest details
-    try {
-        $userUpdateData = array_filter([
-            'full_name'              => $request->input('fullName'),
-            'city'                   => $request->input('city'),
-            'job_title'              => $request->input('currentTitle'),
-            'total_experience_years' => $request->input('experience'),
-            'current_ctc'            => $request->input('currentSalary'),
-            'expected_ctc'           => $request->input('expectedSalary'),
-            'notice_period_days'     => $request->input('notice'),
-            'portfolio'              => $request->input('portfolio'),
-            'linkedin'               => $request->input('linkedin'),
-            'education'              => $request->input('educationDegree') ?: $request->input('qualification'),
-        ]);
-        if (!empty($candidateSkills)) {
-            $userUpdateData['skills'] = array_values($candidateSkills);
-        }
-        $user->update($userUpdateData);
-    } catch (\Throwable $e) {
-        // Ignore user update error
-    }
-
-    return back()->with('submitted', true);
-})->name('jobs.apply.submit');
+Route::get('/apply/{job}', [JobController::class, 'apply'])->name('jobs.apply');
+Route::post('/apply/{job}', [JobController::class, 'submitApplication'])->name('jobs.apply.submit');
 
 Route::get('/location/states', [LocationController::class, 'getState']);
 Route::get('/location/cities', [LocationController::class, 'getCitybyState']);
@@ -332,32 +106,7 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/profile/resume/download', [ProfileController::class, 'downloadResume'])->name('profile.resume.download');
     Route::get('/applications/{application}', [ProfileController::class, 'show'])->name('applications.show');
 
-    Route::get('/my-applications', function () {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-
-        $allApplications = \App\Models\JobApplication::where('candidate_id', $user->id)->get();
-        $statusCounts = [
-            'all' => $allApplications->count(),
-            'applied' => $allApplications->where('status', 'applied')->count(),
-            'viewed' => $allApplications->where('status', 'viewed')->count(),
-            'shortlisted' => $allApplications->filter(fn($a) => in_array($a->status, ['shortlisted', 'calling_approved', 'offer_letter_generated', 'interview_scheduled']))->count(),
-            'hired' => $allApplications->where('status', 'hired')->count(),
-            'rejected' => $allApplications->filter(fn($a) => in_array($a->status, ['rejected', 'calling_rejected', 'not_selected']))->count(),
-        ];
-
-        $applications = \App\Models\JobApplication::with(['job', 'jobPost'])
-            ->where('candidate_id', $user->id)
-            ->latest()
-            ->paginate(15);
-
-        return Inertia::render('Candidate/MyApplications', [
-            'applications' => $applications,
-            'statusCounts' => $statusCounts,
-        ]);
-    })->name('my-applications');
+    Route::get('/my-applications', [JobController::class, 'myApplications'])->name('my-applications');
 
     Route::get('/applied-jobs', fn() => redirect()->route('my-applications'))->name('applied-jobs');
     Route::get('/applied', fn() => redirect()->route('my-applications'));
@@ -365,147 +114,13 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/my-application', fn() => redirect()->route('my-applications'));
     Route::get('/my-jobs', fn() => redirect()->route('my-applications'));
 
-    Route::delete('/my-applications/{id}/withdraw', function ($id) {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-        $application = \App\Models\JobApplication::where('candidate_id', $user->id)
-            ->where(function ($q) use ($id) {
-                $q->where('id', $id)->orWhere('uuid', $id);
-            })
-            ->first();
-        if ($application) {
-            $application->delete();
-            return back()->with('success', 'Application withdrawn successfully.');
-        }
-        return back()->with('error', 'Application not found.');
-    })->name('my-applications.withdraw');
+    Route::delete('/my-applications/{id}/withdraw', [JobController::class, 'withdrawApplication'])->name('my-applications.withdraw');
 
-    Route::get('/savedjobs', function () {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
+    Route::get('/savedjobs', [JobController::class, 'savedJobs'])->name('savedjobs');
 
-        $appliedApplications = \App\Models\JobApplication::with('jobPost')->where('candidate_id', $user->id)->get();
-        $appliedJobIds = [];
-        foreach ($appliedApplications as $app) {
-            if ($app->job_id) {
-                $appliedJobIds[] = (int) $app->job_id;
-                $appliedJobIds[] = (string) $app->job_id;
-            }
-            if ($app->jobPost?->uuid) {
-                $appliedJobIds[] = $app->jobPost->uuid;
-            }
-            if ($app->jobPost?->id) {
-                $appliedJobIds[] = (int) $app->jobPost->id;
-                $appliedJobIds[] = (string) $app->jobPost->id;
-            }
-        }
-        $appliedJobIds = array_values(array_unique($appliedJobIds));
-
-        $savedJobs = \App\Models\SavedJob::where('user_uuid', $user->uuid)
-            ->latest()
-            ->get()
-            ->map(function ($sj) use ($appliedJobIds) {
-                $job = \App\Models\JobPost::where('uuid', $sj->job_uuid)->first()
-                    ?: \App\Models\JobPost::find($sj->job_uuid);
-                if (!$job) return null;
-                $salaryText = 'Competitive';
-                if ($job->min_salary && $job->max_salary) {
-                    $salaryText = '₹' . number_format($job->min_salary) . ' - ₹' . number_format($job->max_salary);
-                } elseif ($job->min_salary) {
-                    $salaryText = '₹' . number_format($job->min_salary) . '+';
-                }
-
-                $isApplied = in_array($job->id, $appliedJobIds) || in_array((string)$job->id, $appliedJobIds) || in_array($job->uuid, $appliedJobIds);
-
-                return [
-                    'id'                   => $job->id,
-                    'uuid'                 => $job->uuid,
-                    'title'                => $job->title,
-                    'company'              => $job->company,
-                    'company_about'        => $job->company_about,
-                    'company_size'         => $job->company_size,
-                    'company_image'        => $job->company_image,
-                    'company_address'      => $job->company_address,
-                    'location'             => $job->location,
-                    'salary'               => $salaryText,
-                    'salary_type'          => $job->salary_type,
-                    'job_type'             => $job->job_type,
-                    'type'                 => $job->job_type,
-                    'openings'             => $job->openings ?: 1,
-                    'experience'           => $job->experience ?: 'Fresher',
-                    'exp'                  => $job->experience ?: 'Fresher',
-                    'working_days'         => $job->working_days,
-                    'shift_timing'         => $job->shift_timing,
-                    'interview_details'    => $job->interview_details,
-                    'skills'               => is_array($job->skills) ? $job->skills : (is_string($job->skills) ? (json_decode($job->skills, true) ?: []) : []),
-                    'qualifications'       => is_array($job->qualifications) ? $job->qualifications : (is_string($job->qualifications) ? (json_decode($job->qualifications, true) ?: []) : []),
-                    'requirements'         => is_array($job->qualifications) ? $job->qualifications : (is_string($job->qualifications) ? (json_decode($job->qualifications, true) ?: []) : []),
-                    'perks'                => is_array($job->perks) ? $job->perks : (is_string($job->perks) ? (json_decode($job->perks, true) ?: []) : []),
-                    'benefits'             => is_array($job->perks) ? $job->perks : (is_string($job->perks) ? (json_decode($job->perks, true) ?: []) : []),
-                    'key_responsibilities' => is_array($job->key_responsibilities) ? $job->key_responsibilities : (is_string($job->key_responsibilities) ? (json_decode($job->key_responsibilities, true) ?: []) : []),
-                    'desc'                 => $job->description,
-                    'description'          => $job->description,
-                    'posted'               => $job->created_at ? $job->created_at->diffForHumans() : 'Recently',
-                    'created_at_human'     => $job->created_at ? $job->created_at->diffForHumans() : 'Recently',
-                    'badge'                => $job->badge,
-                    'hot'                  => ($job->badge === 'hot' || $job->badge === 'featured'),
-                    'contact_person'       => $job->contact_person,
-                    'contact_phone'        => $job->contact_phone,
-                    'contact_email'        => $job->contact_email,
-                    'is_applied'           => $isApplied,
-                ];
-            })->filter()->values();
-
-        return Inertia::render('Candidate/savedjobs', [
-            'savedJobs'   => $savedJobs,
-            'appliedJobs' => $appliedJobIds,
-        ]);
-    })->name('savedjobs');
-
-    Route::post('/jobs/{job}/save', function ($jobId) {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-        $job = \App\Models\JobPost::find($jobId) ?: \App\Models\JobPost::where('uuid', $jobId)->first();
-        if ($job) {
-            \App\Models\SavedJob::firstOrCreate([
-                'user_uuid' => $user->uuid,
-                'job_uuid'  => $job->uuid,
-            ]);
-        }
-        return back();
-    })->name('jobs.save');
-
-    Route::post('/jobs/{job}/unsave', function ($jobId) {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-        $job = \App\Models\JobPost::find($jobId) ?: \App\Models\JobPost::where('uuid', $jobId)->first();
-        $targetUuids = array_filter([(string) $jobId, $job?->uuid]);
-        \App\Models\SavedJob::where('user_uuid', $user->uuid)
-            ->whereIn('job_uuid', $targetUuids)
-            ->delete();
-        return back();
-    })->name('jobs.unsave');
-
-    Route::delete('/saved-jobs/{job}', function ($jobId) {
-        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-        $job = \App\Models\JobPost::find($jobId) ?: \App\Models\JobPost::where('uuid', $jobId)->first();
-        $targetUuids = array_filter([(string) $jobId, $job?->uuid]);
-        \App\Models\SavedJob::where('user_uuid', $user->uuid)
-            ->whereIn('job_uuid', $targetUuids)
-            ->delete();
-        return back();
-    })->name('jobs.saved.delete');
+    Route::post('/jobs/{job}/save', [JobController::class, 'saveJob'])->name('jobs.save');
+    Route::post('/jobs/{job}/unsave', [JobController::class, 'unsaveJob'])->name('jobs.unsave');
+    Route::delete('/saved-jobs/{job}', [JobController::class, 'deleteSavedJob'])->name('jobs.saved.delete');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
@@ -560,7 +175,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // ==========================================
 
         // 1. Profile & Notifications
-        Route::get('/profile', fn () => Inertia::render('Admin/AdminProfile'))->name('profile');
+        Route::get('/profile', [AdminPageController::class, 'profile'])->name('profile');
         Route::put('/profile', [AdminPageController::class, 'updateProfile'])->name('profile.update');
         Route::put('/profile/password', [AdminPageController::class, 'updatePassword'])->name('profile.password');
         Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('notifications');
@@ -648,10 +263,4 @@ Route::prefix('admin')->name('admin.')->group(function () {
 // ==========================================
 // UTILITY / CACHE ROUTES
 // ==========================================
-Route::get('/clear', function () {
-    Artisan::call('cache:clear');
-    Artisan::call('route:clear');
-    Artisan::call('view:clear');
-    Artisan::call('optimize:clear');
-    return 'Application cache and routes cleared successfully!';
-});
+Route::get('/clear', [PageController::class, 'clearCache'])->name('clear.cache');

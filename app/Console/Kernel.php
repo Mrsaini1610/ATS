@@ -20,6 +20,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('app:yearly-task-assign')->yearly()->at('05:00');
         $schedule->command('tasks:check-overdue')->dailyAt('12:00');
         $schedule->command('tasks:check-stages')->daily();
+        $schedule->command('jobs:expire')->dailyAt('00:01');
         $schedule->command('app:demo-cron-test')->everyMinute();
     }
 

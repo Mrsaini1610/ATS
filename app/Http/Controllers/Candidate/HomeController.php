@@ -24,15 +24,15 @@ class HomeController extends Controller
 
         // 1. Stats Data (Dynamic)
         $stats = [
-            'activeJobs'  => JobPost::whereIn('status', ['active', 'approved'])->count(),
-            'companies'   => Company::where('status', 'active')->count() ?: (JobPost::distinct('company')->whereNotNull('company')->count('company') ?: 0),
+            'activeJobs'  => JobPost::activeForCandidate()->count(),
+            'companies'   => Company::where('status', 'active')->count() ?: (JobPost::activeForCandidate()->distinct('company')->whereNotNull('company')->count('company') ?: 0),
             'jobSeekers'  => Member::where('status', 1)->count() ?: 1250,
             'successRate' => '95%',
         ];
 
         // 2. Recent Jobs (Latest active jobs in descending order)
         $recentJobsQuery = JobPost::with(['category'])
-            ->whereIn('status', ['active', 'approved'])
+            ->activeForCandidate()
             ->orderByDesc('id')
             ->take(12);
 
@@ -51,7 +51,7 @@ class HomeController extends Controller
             $candidateAddress = strtolower(trim($user->address ?: ''));
 
             $allActiveJobs = JobPost::with(['category'])
-                ->whereIn('status', ['active', 'approved'])
+                ->activeForCandidate()
                 ->get();
 
             $scoredJobs = $allActiveJobs->map(function ($job) use ($user, $candidateTitle, $candidateSkills, $candidateExp, $candidateCity, $candidateAddress) {
@@ -178,7 +178,7 @@ class HomeController extends Controller
                         $q->where('company_uuid', $comp->uuid)
                           ->orWhere('company', $comp->name);
                     })
-                    ->whereIn('status', ['active', 'approved'])
+                    ->activeForCandidate()
                     ->count();
 
                 return [
@@ -201,7 +201,7 @@ class HomeController extends Controller
         if ($topCompanies->count() < 4) {
             $existingNames = $topCompanies->pluck('name')->toArray();
             $jobCompanies = JobPost::select('company', DB::raw('count(*) as jobs_count'))
-                ->whereIn('status', ['active', 'approved'])
+                ->activeForCandidate()
                 ->whereNotNull('company')
                 ->where('company', '!=', '')
                 ->whereNotIn('company', $existingNames)
@@ -288,11 +288,27 @@ class HomeController extends Controller
     private function formatJobsData($jobs)
     {
         return $jobs->map(function ($job) {
+            $salaryType = $job->salary_type ?: 'monthly';
+            $unitLabel = match (strtolower((string) $salaryType)) {
+                'monthly'    => 'month',
+                'weekly'     => 'week',
+                'quarterly'  => 'quarter',
+                'halfyearly' => 'half-year',
+                'yearly'     => 'year',
+                default      => strtolower((string) $salaryType),
+            };
+
             $salaryText = 'Competitive';
             if ($job->min_salary && $job->max_salary) {
-                $salaryText = '₹' . number_format($job->min_salary) . ' - ₹' . number_format($job->max_salary);
+                $minFmt = number_format((float) $job->min_salary);
+                $maxFmt = number_format((float) $job->max_salary);
+                $salaryText = ($job->min_salary == $job->max_salary)
+                    ? "₹{$minFmt} / {$unitLabel}"
+                    : "₹{$minFmt} - ₹{$maxFmt} / {$unitLabel}";
             } elseif ($job->min_salary) {
-                $salaryText = '₹' . number_format($job->min_salary) . '+';
+                $salaryText = "₹" . number_format((float) $job->min_salary) . "+ / {$unitLabel}";
+            } elseif ($job->max_salary) {
+                $salaryText = "Up to ₹" . number_format((float) $job->max_salary) . " / {$unitLabel}";
             }
 
             return [

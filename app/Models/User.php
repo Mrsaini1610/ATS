@@ -151,4 +151,14 @@ class User extends Authenticatable
     {
         return $this->candidateNotifications()->whereNull('read_at')->count();
     }
+
+    public function fcmTokens()
+    {
+        return $this->hasMany(FcmToken::class, 'user_id')->where('guard', 'api');
+    }
+
+    public function latestFcmToken()
+    {
+        return $this->hasOne(FcmToken::class, 'user_id')->where('guard', 'api')->latestOfMany();
+    }
 }

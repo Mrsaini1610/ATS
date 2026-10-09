@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Briefcase,
   MapPin,
+  IndianRupee,
   DollarSign,
   User,
   Mail,
@@ -79,6 +80,76 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
           .map((s) => s.trim()).filter(Boolean)
       : [];
 
+  const salaryType = (job?.salary_type || "monthly").toLowerCase();
+  const salaryConfigs = {
+    monthly: {
+      typeLabel: "Monthly",
+      expectedLabel: "Expected Monthly Salary (₹)",
+      currentLabel: "Current Monthly Salary (₹)",
+      expectedPlaceholder: job?.min_salary ? `e.g. ${Math.round(job.min_salary)}` : "e.g. 25000",
+      currentPlaceholder: "e.g. 20000",
+      minAmount: 1000,
+      maxAmount: 5000000,
+      minText: "₹1,000",
+      maxText: "₹50 Lakh",
+      rangeHint: "Min ₹1,000 · Max ₹50L / month",
+      unit: "/ month",
+    },
+    weekly: {
+      typeLabel: "Weekly",
+      expectedLabel: "Expected Weekly Salary (₹)",
+      currentLabel: "Current Weekly Salary (₹)",
+      expectedPlaceholder: job?.min_salary ? `e.g. ${Math.round(job.min_salary)}` : "e.g. 6000",
+      currentPlaceholder: "e.g. 5000",
+      minAmount: 500,
+      maxAmount: 1000000,
+      minText: "₹500",
+      maxText: "₹10 Lakh",
+      rangeHint: "Min ₹500 · Max ₹10L / week",
+      unit: "/ week",
+    },
+    quarterly: {
+      typeLabel: "Quarterly",
+      expectedLabel: "Expected Quarterly Salary (₹)",
+      currentLabel: "Current Quarterly Salary (₹)",
+      expectedPlaceholder: job?.min_salary ? `e.g. ${Math.round(job.min_salary)}` : "e.g. 75000",
+      currentPlaceholder: "e.g. 60000",
+      minAmount: 3000,
+      maxAmount: 15000000,
+      minText: "₹3,000",
+      maxText: "₹1.5 Crore",
+      rangeHint: "Min ₹3,000 · Max ₹1.5 Cr / quarter",
+      unit: "/ quarter",
+    },
+    halfyearly: {
+      typeLabel: "Half-Yearly",
+      expectedLabel: "Expected Half-Yearly Salary (₹)",
+      currentLabel: "Current Half-Yearly Salary (₹)",
+      expectedPlaceholder: job?.min_salary ? `e.g. ${Math.round(job.min_salary)}` : "e.g. 150000",
+      currentPlaceholder: "e.g. 120000",
+      minAmount: 5000,
+      maxAmount: 25000000,
+      minText: "₹5,000",
+      maxText: "₹2.5 Crore",
+      rangeHint: "Min ₹5,000 · Max ₹2.5 Cr / half-year",
+      unit: "/ half-year",
+    },
+    yearly: {
+      typeLabel: "Annual",
+      expectedLabel: "Expected Annual Salary / CTC (₹)",
+      currentLabel: "Current Annual Salary / CTC (₹)",
+      expectedPlaceholder: job?.min_salary ? `e.g. ${Math.round(job.min_salary)}` : "e.g. 500000",
+      currentPlaceholder: "e.g. 400000",
+      minAmount: 10000,
+      maxAmount: 500000000,
+      minText: "₹10,000",
+      maxText: "₹50 Crore",
+      rangeHint: "Min ₹10K · Max ₹50 Cr / year",
+      unit: "/ year",
+    },
+  };
+  const salaryConfig = salaryConfigs[salaryType] || salaryConfigs.monthly;
+
   // Candidate Resumes from Profile
   const candidateResumes = candidate?.resumes || [];
   const defaultResume =
@@ -128,30 +199,18 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
     return "/jobs";
   });
 
-  // Guard against reopening the apply process via the browser Back button
+  // Remember referrer URL if candidate came from somewhere
   useEffect(() => {
     if (typeof window !== "undefined") {
-      if (sessionStorage.getItem("just_applied_" + jobKey)) {
-        window.location.replace(previousUrl || "/jobs");
-        return;
-      }
+      sessionStorage.removeItem("just_applied_" + jobKey);
 
       const ref = document.referrer;
       if (ref && !ref.includes("/apply/") && (ref.startsWith(window.location.origin) || ref.startsWith("/"))) {
         sessionStorage.setItem("apply_from_url_" + jobKey, ref);
         setPreviousUrl(ref);
       }
-
-      const handlePageShow = (e) => {
-        if (e.persisted || sessionStorage.getItem("just_applied_" + jobKey)) {
-          window.location.replace(previousUrl || "/jobs");
-        }
-      };
-
-      window.addEventListener("pageshow", handlePageShow);
-      return () => window.removeEventListener("pageshow", handlePageShow);
     }
-  }, [jobKey, previousUrl]);
+  }, [jobKey]);
 
   useEffect(() => {
     if (loggedIn) {
@@ -311,23 +370,23 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
           errs.lastCompany = "Last / Current company name is required";
         }
 
-        // Salary Limit Validations (Min ₹10,000 - Max ₹5 Crore)
+        // Salary Limit Validations based on salary_type
         const currNum = Number(form.currentSalary);
         if (!form.currentSalary || form.currentSalary.trim() === "") {
-          errs.currentSalary = "Current salary is required (numbers only)";
-        } else if (currNum < 10000) {
-          errs.currentSalary = "Current annual salary must be at least ₹10,000";
-        } else if (currNum > 50000000) {
-          errs.currentSalary = "Current annual salary cannot exceed ₹5,00,00,000 (5 Crore)";
+          errs.currentSalary = `Current ${salaryConfig.typeLabel.toLowerCase()} salary is required (numbers only)`;
+        } else if (currNum < salaryConfig.minAmount) {
+          errs.currentSalary = `Current ${salaryConfig.typeLabel.toLowerCase()} salary must be at least ${salaryConfig.minText}`;
+        } else if (currNum > salaryConfig.maxAmount) {
+          errs.currentSalary = `Current ${salaryConfig.typeLabel.toLowerCase()} salary cannot exceed ${salaryConfig.maxText}`;
         }
 
         const expNum = Number(form.expectedSalary);
         if (!form.expectedSalary || form.expectedSalary.trim() === "") {
-          errs.expectedSalary = "Expected salary is required (numbers only)";
-        } else if (expNum < 10000) {
-          errs.expectedSalary = "Expected annual salary must be at least ₹10,000";
-        } else if (expNum > 50000000) {
-          errs.expectedSalary = "Expected annual salary cannot exceed ₹5,00,00,000 (5 Crore)";
+          errs.expectedSalary = `Expected ${salaryConfig.typeLabel.toLowerCase()} salary is required (numbers only)`;
+        } else if (expNum < salaryConfig.minAmount) {
+          errs.expectedSalary = `Expected ${salaryConfig.typeLabel.toLowerCase()} salary must be at least ${salaryConfig.minText}`;
+        } else if (expNum > salaryConfig.maxAmount) {
+          errs.expectedSalary = `Expected ${salaryConfig.typeLabel.toLowerCase()} salary cannot exceed ${salaryConfig.maxText}`;
         }
 
         if (!form.notice || !form.notice.trim()) {
@@ -342,10 +401,10 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
         // Fresher: Expected salary is optional but if filled, must be between limits
         if (form.expectedSalary) {
           const expNum = Number(form.expectedSalary);
-          if (expNum < 10000) {
-            errs.expectedSalary = "Expected salary must be at least ₹10,000";
-          } else if (expNum > 50000000) {
-            errs.expectedSalary = "Expected salary cannot exceed ₹5,00,00,000 (5 Crore)";
+          if (expNum < salaryConfig.minAmount) {
+            errs.expectedSalary = `Expected ${salaryConfig.typeLabel.toLowerCase()} salary must be at least ${salaryConfig.minText}`;
+          } else if (expNum > salaryConfig.maxAmount) {
+            errs.expectedSalary = `Expected ${salaryConfig.typeLabel.toLowerCase()} salary cannot exceed ${salaryConfig.maxText}`;
           }
         }
       }
@@ -389,15 +448,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
 
     router.post(`/apply/${job.id}`, form, {
       forceFormData: true,
-      preserveScroll: true,
-      onSuccess: () => {
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("just_applied_" + jobKey, "true");
-          window.history.replaceState(null, "", previousUrl);
-        }
-        setSubmitted(true);
-        setIsSubmitting(false);
-      },
+      preserveScroll: false,
       onError: (backendErrors) => {
         setErrors(backendErrors || {});
         setIsSubmitting(false);
@@ -526,7 +577,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
               "@type": "QuantitativeValue",
               minValue: Number(job.min_salary),
               maxValue: Number(job.max_salary || job.min_salary),
-              unitText: job.salary_type === "yearly" ? "YEAR" : "MONTH",
+              unitText: job.salary_type === "yearly" ? "YEAR" : (job.salary_type === "weekly" ? "WEEK" : "MONTH"),
             },
           },
         }
@@ -586,14 +637,21 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                   <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                   <span className="truncate">{job.job_type || job.type || "Full Time"}</span>
                 </div>
-                <div className="p-2 rounded-xl bg-emerald-50/70 flex items-center gap-1.5 text-emerald-800 font-bold col-span-2">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>
-                    {job.salary ||
-                      (job.min_salary && job.max_salary
-                        ? `₹${Number(job.min_salary).toLocaleString("en-IN")} - ₹${Number(job.max_salary).toLocaleString("en-IN")}`
-                        : "Competitive Package")}
-                  </span>
+                <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between text-emerald-900 font-bold col-span-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <IndianRupee className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="truncate">
+                      {job.salary ||
+                        (job.min_salary && job.max_salary
+                          ? `₹${Number(job.min_salary).toLocaleString("en-IN")} - ₹${Number(job.max_salary).toLocaleString("en-IN")} ${salaryConfig.unit}`
+                          : "Competitive Package")}
+                    </span>
+                  </div>
+                  {job.salary_type && (
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                      {job.salary_type}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1037,13 +1095,13 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                           )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Current Salary (Salary Limit Fixed: max 9 digits, clean input) */}
+                            {/* Current Salary */}
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <label className="block text-xs font-semibold text-gray-700">
-                                  Current Annual Salary (₹) <span className="text-red-500">*</span>
+                                  {salaryConfig.currentLabel} <span className="text-red-500">*</span>
                                 </label>
-                                <span className="text-[10px] text-gray-400">Min ₹10K · Max ₹5 Cr</span>
+                                <span className="text-[10px] text-gray-400">{salaryConfig.rangeHint}</span>
                               </div>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
@@ -1056,7 +1114,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                                   maxLength={9}
                                   value={form.currentSalary}
                                   onChange={(e) => handleSalaryChange("currentSalary", e.target.value)}
-                                  placeholder="e.g. 500000"
+                                  placeholder={salaryConfig.currentPlaceholder}
                                   className={`w-full pl-8 pr-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-1 bg-white ${
                                     errors.currentSalary
                                       ? "border-red-400 focus:ring-red-400 bg-red-50/10"
@@ -1069,13 +1127,13 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                               )}
                             </div>
 
-                            {/* Expected Salary (Salary Limit Fixed: max 9 digits, clean input) */}
+                            {/* Expected Salary */}
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <label className="block text-xs font-semibold text-gray-700">
-                                  Expected Annual Salary (₹) <span className="text-red-500">*</span>
+                                  {salaryConfig.expectedLabel} <span className="text-red-500">*</span>
                                 </label>
-                                <span className="text-[10px] text-gray-400">Min ₹10K · Max ₹5 Cr</span>
+                                <span className="text-[10px] text-gray-400">{salaryConfig.rangeHint}</span>
                               </div>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
@@ -1088,7 +1146,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                                   maxLength={9}
                                   value={form.expectedSalary}
                                   onChange={(e) => handleSalaryChange("expectedSalary", e.target.value)}
-                                  placeholder="e.g. 700000"
+                                  placeholder={salaryConfig.expectedPlaceholder}
                                   className={`w-full pl-8 pr-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-1 bg-white ${
                                     errors.expectedSalary
                                       ? "border-red-400 focus:ring-red-400 bg-red-50/10"
@@ -1121,9 +1179,9 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                           <div className="mt-3 max-w-xs">
                             <div className="flex items-center justify-between mb-1">
                               <label className="block text-xs font-semibold text-gray-700">
-                                Expected Annual Salary (₹) <span className="text-gray-400 font-normal">(Optional)</span>
+                                {salaryConfig.expectedLabel} <span className="text-gray-400 font-normal">(Optional)</span>
                               </label>
-                              <span className="text-[10px] text-gray-400">Max ₹5 Cr</span>
+                              <span className="text-[10px] text-gray-400">{salaryConfig.rangeHint}</span>
                             </div>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
@@ -1136,7 +1194,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                                 maxLength={9}
                                 value={form.expectedSalary}
                                 onChange={(e) => handleSalaryChange("expectedSalary", e.target.value)}
-                                placeholder="e.g. 350000"
+                                placeholder={salaryConfig.expectedPlaceholder}
                                 className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                               />
                             </div>
@@ -1660,28 +1718,28 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                                 </div>
                               )}
                               <div>
-                                <span className="text-gray-400 block text-[11px]">Current Salary</span>
+                                <span className="text-gray-400 block text-[11px]">Current Salary ({salaryConfig.typeLabel})</span>
                                 <span className="font-semibold text-emerald-700">
                                   {form.currentSalary
-                                    ? `₹ ${Number(form.currentSalary).toLocaleString("en-IN")}`
+                                    ? `₹ ${Number(form.currentSalary).toLocaleString("en-IN")} ${salaryConfig.unit}`
                                     : "—"}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-gray-400 block text-[11px]">Expected Salary</span>
+                                <span className="text-gray-400 block text-[11px]">Expected Salary ({salaryConfig.typeLabel})</span>
                                 <span className="font-semibold text-emerald-700">
                                   {form.expectedSalary
-                                    ? `₹ ${Number(form.expectedSalary).toLocaleString("en-IN")}`
+                                    ? `₹ ${Number(form.expectedSalary).toLocaleString("en-IN")} ${salaryConfig.unit}`
                                     : "—"}
                                 </span>
                               </div>
                             </>
                           ) : (
                             <div>
-                              <span className="text-gray-400 block text-[11px]">Expected Salary</span>
+                              <span className="text-gray-400 block text-[11px]">Expected Salary ({salaryConfig.typeLabel})</span>
                               <span className="font-semibold text-emerald-700">
                                 {form.expectedSalary
-                                  ? `₹ ${Number(form.expectedSalary).toLocaleString("en-IN")}`
+                                  ? `₹ ${Number(form.expectedSalary).toLocaleString("en-IN")} ${salaryConfig.unit}`
                                   : "As per company standards"}
                               </span>
                             </div>

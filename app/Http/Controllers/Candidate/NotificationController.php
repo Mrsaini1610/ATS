@@ -245,14 +245,14 @@ class NotificationController extends Controller
         }
 
         // 3. Matched jobs in user city or category
-        $matchedJobs = JobPost::whereIn('status', ['active', 'approved'])
+        $matchedJobs = JobPost::activeForCandidate()
             ->when($user->city, fn($q) => $q->where('location', 'like', "%{$user->city}%"))
             ->latest()
             ->take(2)
             ->get();
 
         if ($matchedJobs->isEmpty()) {
-            $matchedJobs = JobPost::whereIn('status', ['active', 'approved'])
+            $matchedJobs = JobPost::activeForCandidate()
                 ->latest()
                 ->take(2)
                 ->get();

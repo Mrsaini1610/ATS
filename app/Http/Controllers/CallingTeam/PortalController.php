@@ -7,6 +7,7 @@ use App\Models\JobApplication;
 use App\Models\Member;
 use App\Models\Notification;
 use App\Models\SuperAdminPasswordLog;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -434,6 +435,12 @@ class PortalController extends Controller
             'status' => 'unread',
             'data' => array_merge($this->notificationData($application), $extraData),
         ]);
+
+        try {
+            PushNotificationService::notifyApplicationStatusChange($application, $application->status);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('CallingTeam notifyCandidate push error: ' . $e->getMessage());
+        }
     }
 
     private function notificationData(JobApplication $application): array

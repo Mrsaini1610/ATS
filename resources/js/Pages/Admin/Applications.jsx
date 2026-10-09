@@ -15,6 +15,16 @@ import {
   MapPin,
   Building2,
   Send,
+  Briefcase,
+  GraduationCap,
+  ExternalLink,
+  Download,
+  Globe,
+  Linkedin,
+  Clock,
+  User,
+  Tag,
+  Sparkles,
 } from "lucide-react";
 
 const STATUS_CFG = {
@@ -415,7 +425,13 @@ export default function Applications({
       !search ||
       (a.userName || "").toLowerCase().includes(q) ||
       (a.jobTitle || "").toLowerCase().includes(q) ||
-      (a.company || "").toLowerCase().includes(q);
+      (a.company || "").toLowerCase().includes(q) ||
+      (a.userPhone || "").toLowerCase().includes(q) ||
+      (a.userEmail || "").toLowerCase().includes(q) ||
+      (a.userCity || "").toLowerCase().includes(q) ||
+      (a.currentTitle || "").toLowerCase().includes(q) ||
+      (a.lastCompany || "").toLowerCase().includes(q) ||
+      (Array.isArray(a.skills) && a.skills.some((s) => (s || "").toLowerCase().includes(q)));
 
     const matchesStatus = statusFilter === "all" || a.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -551,23 +567,33 @@ export default function Applications({
           />
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-5 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Applications Table */}
-          <div className={`flex-1 w-full min-w-0 ${selectedApp ? "hidden lg:block" : ""}`}>
+          <div className={`w-full min-w-0 ${selectedApp ? "hidden lg:block lg:w-1/2 xl:w-7/12" : "w-full"}`}>
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   {filtered.length > 0 && (
                     <thead className="bg-gray-50/75 border-b border-gray-100">
                       <tr>
-                        {["Candidate", "Job", "Status", "Applied", "Assigned Staff", ""].map((h) => (
-                          <th
-                            key={h}
-                            className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide"
-                          >
-                            {h}
-                          </th>
-                        ))}
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                          Candidate
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                          Job Applied
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                          Status
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                          Applied
+                        </th>
+                        <th className={`text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap ${selectedApp ? "hidden xl:table-cell" : ""}`}>
+                          Assigned Staff
+                        </th>
+                        <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                          {/* Actions */}
+                        </th>
                       </tr>
                     </thead>
                   )}
@@ -581,19 +607,53 @@ export default function Applications({
                         onClick={() => setSelectedApp(app)}
                       >
                         <td className="px-4 py-3.5">
-                          <p className="font-semibold text-gray-900">{app.userName}</p>
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3" />
-                            {app.userPhone}
-                          </p>
+                          <p className="font-semibold text-gray-900 leading-tight">{app.userName}</p>
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 flex-wrap">
+                            <span className="flex items-center gap-1 text-gray-500">
+                              <Phone className="w-3 h-3 text-gray-400 shrink-0" />
+                              {app.userPhone}
+                            </span>
+                            {app.userCity && (
+                              <span className="text-gray-400">
+                                · 📍 {app.userCity}
+                              </span>
+                            )}
+                          </div>
+                          {(app.experience || app.expectedSalary) && (
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {app.experience && (
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                                  {app.experience}
+                                </span>
+                              )}
+                              {app.expectedSalary && (
+                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                  ₹{Number(app.expectedSalary).toLocaleString("en-IN")}
+                                  <span className="text-[9px] font-normal text-emerald-600 ml-0.5">
+                                    {app.jobSalaryType === "yearly" ? "/yr" : "/mo"}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <p className="font-medium text-gray-800 truncate max-w-[160px]">
+                          <p className="font-semibold text-gray-800 leading-tight">
                             {app.jobTitle}
                           </p>
-                          <p className="text-xs text-gray-400">{app.company}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{app.company}</p>
+                          {app.currentTitle && (
+                            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">
+                              Role: {app.currentTitle}
+                            </p>
+                          )}
+                          {selectedApp && app.assignedToName && (
+                            <p className="text-[10px] text-blue-600 xl:hidden mt-0.5 font-medium">
+                              Staff: {app.assignedToName}
+                            </p>
+                          )}
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
                             className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
                               STATUS_CFG[app.status]?.color || "bg-gray-100 text-gray-600"
@@ -602,21 +662,34 @@ export default function Applications({
                             {STATUS_CFG[app.status]?.label || app.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-gray-400">{app.appliedAt}</td>
-                        <td className="px-4 py-3.5 text-xs">
+                        <td className="px-4 py-3.5 text-xs text-gray-500 font-medium whitespace-nowrap">
+                          {app.appliedAt}
+                        </td>
+                        <td className={`px-4 py-3.5 text-xs ${selectedApp ? "hidden xl:table-cell" : ""}`}>
                           {app.assignedToName ? (
-                            <span className="text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                            <span className="text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap">
                               {app.assignedToName}
                             </span>
                           ) : (
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <div
-                            className="flex gap-1 justify-end"
+                            className="flex gap-1 justify-end items-center"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {app.resumeUrl && (
+                              <a
+                                href={app.resumeUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                title="View Candidate Resume PDF"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </a>
+                            )}
                             {!isTeamMember && (
                               <button
                                 type="button"
@@ -631,14 +704,14 @@ export default function Applications({
                               href={followUpWA(app)}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition cursor-pointer"
                               title="Chat on WhatsApp"
                             >
                               <MessageCircle className="w-4 h-4" />
                             </a>
                             <a
                               href={`tel:${app.userPhone}`}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                               title="Call Candidate"
                             >
                               <Phone className="w-4 h-4" />
@@ -660,49 +733,355 @@ export default function Applications({
             </div>
           </div>
 
-          {/* Application Detail Side Drawer */}
+          {/* Application Detail Side View (Natural Full Height, No Inner Scroller) */}
           {selectedApp && (
-            <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-2">
+            <div
+              id="admin-application-detail-panel"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border border-gray-200 rounded-3xl shadow-lg flex flex-col h-fit sticky top-6 z-10 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white shrink-0">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
                   <button
                     type="button"
                     onClick={() => setSelectedApp(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg lg:hidden cursor-pointer shrink-0"
                   >
                     ← Back
                   </button>
-                  <h3 className="font-bold text-gray-900 text-sm">Application Detail</h3>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
+                        Application #{selectedApp.id}
+                      </h3>
+                      <span
+                        className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold shrink-0 ${
+                          STATUS_CFG[selectedApp.status]?.color || "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {STATUS_CFG[selectedApp.status]?.label || selectedApp.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Applied: {selectedApp.appliedAt}</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedApp(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer shrink-0 transition"
+                  title="Close (Esc)"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-5 pb-10">
-                <div>
-                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg mb-3 shadow-md shadow-blue-600/30">
+              {/* Natural Full Content (No Inner Scroller, Clean & Visible) */}
+              <div className="p-5 sm:p-6 space-y-4">
+                {/* Hero Candidate Profile Card */}
+                <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-purple-50/50 border border-blue-100">
+                  <div className="w-13 h-13 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-blue-500/20 shrink-0">
                     {(selectedApp.userName || "U").slice(0, 2).toUpperCase()}
                   </div>
-                  <p className="font-bold text-gray-900 text-base">{selectedApp.userName}</p>
-                  <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
-                    <Phone className="w-3.5 h-3.5 text-gray-400" />
-                    {selectedApp.userPhone}
-                  </p>
-                  {selectedApp.userEmail && (
-                    <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                      <Mail className="w-3 h-3 text-gray-400" />
-                      {selectedApp.userEmail}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-0.5">📍 {selectedApp.userCity || "India"}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="font-extrabold text-gray-900 text-base sm:text-lg leading-tight truncate">
+                        {selectedApp.userName}
+                      </h4>
+                      {selectedApp.currentTitle && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                          {selectedApp.currentTitle}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 space-y-1 text-xs text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <a href={`tel:${selectedApp.userPhone}`} className="hover:text-blue-600 font-medium">
+                          {selectedApp.userPhone}
+                        </a>
+                      </div>
+                      {selectedApp.userEmail && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <a href={`mailto:${selectedApp.userEmail}`} className="hover:text-blue-600 font-medium truncate">
+                            {selectedApp.userEmail}
+                          </a>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">
+                          {[selectedApp.userCity, selectedApp.userArea, selectedApp.userState].filter(Boolean).join(", ") || "India"}
+                        </span>
+                      </div>
+                      {(selectedApp.userGender || selectedApp.userDob) && (
+                        <div className="flex items-center gap-2 text-gray-400 text-[11px] pt-0.5">
+                          {selectedApp.userGender && <span className="capitalize">{selectedApp.userGender}</span>}
+                          {selectedApp.userGender && selectedApp.userDob && <span>·</span>}
+                          {selectedApp.userDob && <span>DOB: {selectedApp.userDob}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Quick Actions */}
+                {/* Candidate Resume Action Box */}
+                <div className="border border-gray-200 rounded-2xl p-4 bg-white shadow-xs">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 text-sm">Resume / CV Document</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {selectedApp.resumeUrl ? "Candidate uploaded resume" : "No resume document uploaded"}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedApp.resumeUrl ? (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={selectedApp.resumeUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> View PDF
+                        </a>
+                        <a
+                          href={selectedApp.resumeUrl}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                          title="Download Resume"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Not available</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compensation & Experience Highlights */}
+                <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Compensation & Availability
+                    </span>
+                    {selectedApp.noticePeriod && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-orange-100 text-orange-800 border border-orange-200">
+                        Notice: {selectedApp.noticePeriod}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3">
+                      <span className="text-[10px] font-bold text-emerald-800 block uppercase">
+                        Expected Salary
+                      </span>
+                      <p className="text-base font-extrabold text-emerald-900 mt-0.5">
+                        {selectedApp.expectedSalary
+                          ? `₹${Number(selectedApp.expectedSalary).toLocaleString("en-IN")}`
+                          : "Not specified"}
+                      </p>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-xl p-3">
+                      <span className="text-[10px] font-bold text-gray-500 block uppercase">
+                        Current Salary
+                      </span>
+                      <p className="text-base font-extrabold text-gray-900 mt-0.5">
+                        {selectedApp.currentSalary
+                          ? `₹${Number(selectedApp.currentSalary).toLocaleString("en-IN")}`
+                          : "—"}
+                      </p>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-xl p-3 col-span-2 sm:col-span-1">
+                      <span className="text-[10px] font-bold text-gray-500 block uppercase">
+                        Total Experience
+                      </span>
+                      <p className="text-base font-extrabold text-gray-900 mt-0.5">
+                        {selectedApp.experience || "Fresher"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedApp.lastWorkingDay && (
+                    <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-900 px-3 py-2 rounded-xl border border-amber-200 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Last Working Day: <strong>{selectedApp.lastWorkingDay}</strong></span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Professional Background */}
+                {(selectedApp.currentTitle || selectedApp.lastCompany || selectedApp.experience) && (
+                  <div className="border border-gray-200 rounded-2xl p-4 bg-white space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <Briefcase className="w-3.5 h-3.5 text-gray-400" />
+                      Professional Details
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Current / Latest Role</span>
+                        <span className="font-semibold text-gray-900 text-sm">{selectedApp.currentTitle || "—"}</span>
+                      </div>
+                      <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Previous / Current Company</span>
+                        <span className="font-semibold text-gray-900 text-sm">{selectedApp.lastCompany || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Candidate Skills */}
+                {selectedApp.skills && selectedApp.skills.length > 0 && (
+                  <div className="border border-gray-200 rounded-2xl p-4 bg-white space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <Tag className="w-3.5 h-3.5 text-blue-500" />
+                      Candidate Skills ({selectedApp.skills.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedApp.skills.map((skill, i) => (
+                        <span
+                          key={i}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-100"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Education Background */}
+                {(selectedApp.qualification || selectedApp.educationDegree || selectedApp.educationInstitute) && (
+                  <div className="border border-gray-200 rounded-2xl p-4 bg-white space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <GraduationCap className="w-4 h-4 text-purple-600" />
+                      Education & Qualifications
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      {selectedApp.qualification && (
+                        <div className="flex items-baseline justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <span className="text-gray-400">Level:</span>
+                          <span className="font-semibold text-gray-900">{selectedApp.qualification}</span>
+                        </div>
+                      )}
+                      {selectedApp.educationDegree && (
+                        <div className="flex items-baseline justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <span className="text-gray-400">Degree / Branch:</span>
+                          <span className="font-semibold text-gray-900">{selectedApp.educationDegree}</span>
+                        </div>
+                      )}
+                      {selectedApp.educationInstitute && (
+                        <div className="flex items-baseline justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <span className="text-gray-400">College / Institute:</span>
+                          <span className="font-semibold text-gray-900 text-right">{selectedApp.educationInstitute}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cover Letter / Statement */}
+                {selectedApp.coverLetter && (
+                  <div className="border border-amber-200 rounded-2xl p-4 bg-amber-50/40 space-y-2">
+                    <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block">
+                      Candidate Note / Why Apply
+                    </span>
+                    <p className="text-xs text-gray-800 leading-relaxed italic whitespace-pre-line bg-white/80 p-3 rounded-xl border border-amber-100">
+                      "{selectedApp.coverLetter}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Links: LinkedIn & Portfolio */}
+                {(selectedApp.linkedin || selectedApp.portfolio) && (
+                  <div className="flex gap-2">
+                    {selectedApp.linkedin && (
+                      <a
+                        href={selectedApp.linkedin.startsWith("http") ? selectedApp.linkedin : `https://${selectedApp.linkedin}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition"
+                      >
+                        <Linkedin className="w-3.5 h-3.5" /> LinkedIn
+                      </a>
+                    )}
+                    {selectedApp.portfolio && (
+                      <a
+                        href={selectedApp.portfolio.startsWith("http") ? selectedApp.portfolio : `https://${selectedApp.portfolio}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold transition"
+                      >
+                        <Globe className="w-3.5 h-3.5" /> Portfolio
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Applied Job Details */}
+                <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/70 space-y-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                    Job Details
+                  </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-extrabold text-gray-900 text-sm sm:text-base">{selectedApp.jobTitle}</p>
+                      <p className="text-xs font-semibold text-blue-600 mt-0.5">{selectedApp.company}</p>
+                    </div>
+                    {selectedApp.jobType && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                        {selectedApp.jobType}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 pt-1 border-t border-gray-200/60 flex-wrap">
+                    {selectedApp.jobLocation && (
+                      <span className="flex items-center gap-1">📍 {selectedApp.jobLocation}</span>
+                    )}
+                    {selectedApp.jobSalary && (
+                      <span className="flex items-center gap-1 font-semibold text-emerald-700">
+                        💰 {selectedApp.jobSalary} ({selectedApp.jobSalaryType})
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interview Information (if scheduled) */}
+                {(selectedApp.interviewDate || selectedApp.interviewMode || selectedApp.status === "interview_scheduled") && (
+                  <div className="border border-purple-200 rounded-2xl p-4 bg-purple-50/50 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 font-bold text-purple-800 uppercase tracking-wider">
+                      <Calendar className="w-4 h-4 text-purple-600" />
+                      Interview Details
+                    </div>
+                    <div className="space-y-1.5 text-gray-700">
+                      {selectedApp.interviewDate && (
+                        <p><strong>Scheduled:</strong> {selectedApp.interviewDate}</p>
+                      )}
+                      {selectedApp.interviewMode && (
+                        <p><strong>Mode:</strong> {selectedApp.interviewMode}</p>
+                      )}
+                      {selectedApp.interviewAddress && (
+                        <p><strong>Address / Link:</strong> {selectedApp.interviewAddress}</p>
+                      )}
+                      {selectedApp.interviewContact && (
+                        <p><strong>Contact Person:</strong> {selectedApp.interviewContact}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Recruiter Actions */}
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
                     Quick Actions
@@ -712,7 +1091,7 @@ export default function Applications({
                       href={followUpWA(selectedApp)}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-center gap-1.5 py-2 bg-green-50 text-green-700 rounded-xl text-xs font-semibold hover:bg-green-100 border border-green-200 transition"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-green-50 text-green-700 rounded-xl text-xs font-semibold hover:bg-green-100 border border-green-200 transition"
                     >
                       <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                     </a>
@@ -723,7 +1102,7 @@ export default function Applications({
                           `Regarding your application – ${selectedApp.jobTitle}`,
                           `Dear ${selectedApp.userName},\n\nThis is ATS recruitment team regarding your application for ${selectedApp.jobTitle} at ${selectedApp.company}.\n\nWe would like to connect with you for next steps.\n\n– ATS Team`
                         )}
-                        className="flex items-center justify-center gap-1.5 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100 border border-blue-200 transition"
+                        className="flex items-center justify-center gap-1.5 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100 border border-blue-200 transition"
                       >
                         <Mail className="w-3.5 h-3.5" /> Email
                       </a>
@@ -733,37 +1112,29 @@ export default function Applications({
                         href={interviewWA(selectedApp)}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-semibold hover:bg-purple-100 border border-purple-200 transition"
+                        className="flex items-center justify-center gap-1.5 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-xs font-semibold hover:bg-purple-100 border border-purple-200 transition col-span-2"
                       >
-                        <Calendar className="w-3.5 h-3.5" /> Interview Info
+                        <Calendar className="w-3.5 h-3.5" /> Send Interview WA Reminder
                       </a>
                     )}
-                    {selectedApp.status === "hired" && (
+                    {(selectedApp.status === "hired" || selectedApp.status === "offer_letter_generated") && (
                       <button
                         type="button"
                         onClick={() => setOfferApp(selectedApp)}
-                        className="flex items-center justify-center gap-1.5 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-semibold hover:bg-amber-100 border border-amber-200 transition cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-semibold hover:bg-amber-100 border border-amber-200 transition cursor-pointer col-span-2"
                       >
-                        <FileText className="w-3.5 h-3.5" /> Offer Letter
+                        <FileText className="w-3.5 h-3.5" /> Generate / Send Offer Letter
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Job Info */}
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <p className="text-xs text-gray-400 mb-0.5">Applied For</p>
-                  <p className="font-semibold text-gray-900 text-sm">{selectedApp.jobTitle}</p>
-                  <p className="text-xs text-blue-600">{selectedApp.company}</p>
-                  <p className="text-xs text-gray-400 mt-1">Applied: {selectedApp.appliedAt}</p>
-                </div>
-
                 {/* Assignment Info */}
                 {selectedApp.assignedToName ? (
-                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2.5 border border-blue-100">
-                    <Users className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3.5 py-2.5 border border-blue-100">
+                    <Users className="w-4 h-4 text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-blue-400">Assigned staff</p>
+                      <p className="text-[11px] text-blue-400">Assigned Recruiter</p>
                       <p className="text-sm font-semibold text-blue-800 truncate">
                         {selectedApp.assignedToName}
                       </p>
@@ -772,7 +1143,7 @@ export default function Applications({
                       <button
                         type="button"
                         onClick={() => setAssigningApp(selectedApp)}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium shrink-0 cursor-pointer"
+                        className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 bg-white border border-blue-200 rounded-lg shrink-0 cursor-pointer"
                       >
                         Change
                       </button>
@@ -783,30 +1154,17 @@ export default function Applications({
                     <button
                       type="button"
                       onClick={() => setAssigningApp(selectedApp)}
-                      className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 font-medium cursor-pointer transition"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 font-semibold cursor-pointer transition"
                     >
                       <Users className="w-3.5 h-3.5" /> Assign Staff Member
                     </button>
                   )
                 )}
 
-                {/* Status Update */}
+                {/* Status Update Pipeline */}
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
-                    Current Status
-                  </p>
-                  <span
-                    className={`text-sm font-bold px-3 py-1.5 rounded-xl inline-block ${
-                      STATUS_CFG[selectedApp.status]?.color || "bg-gray-100"
-                    }`}
-                  >
-                    {STATUS_CFG[selectedApp.status]?.label || selectedApp.status}
-                  </span>
-                </div>
-
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
-                    Change Status
+                    Update Pipeline Status
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {ALL_STATUSES.map((s) => (
@@ -814,9 +1172,9 @@ export default function Applications({
                         key={s}
                         type="button"
                         onClick={() => updateStatus(selectedApp.uuid, s)}
-                        className={`text-xs py-1.5 px-2 rounded-lg font-medium border transition-all cursor-pointer ${
+                        className={`text-xs py-2 px-2 rounded-xl font-semibold border transition-all cursor-pointer ${
                           selectedApp.status === s
-                            ? "ring-2 ring-blue-500 " + STATUS_CFG[s].color
+                            ? "ring-2 ring-blue-500 font-bold " + STATUS_CFG[s].color
                             : "border-gray-200 text-gray-600 hover:bg-gray-50"
                         }`}
                       >
@@ -826,11 +1184,11 @@ export default function Applications({
                   </div>
                 </div>
 
-                {/* Remarks */}
+                {/* Remarks & History */}
                 {selectedApp.remark && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                    <p className="text-xs font-semibold text-yellow-700 mb-1">Last Remark</p>
-                    <p className="text-sm text-yellow-800">{selectedApp.remark}</p>
+                    <p className="text-xs font-semibold text-yellow-700 mb-1">Previous Remark / Note</p>
+                    <p className="text-sm text-yellow-800 whitespace-pre-line">{selectedApp.remark}</p>
                   </div>
                 )}
                 <div>
@@ -841,14 +1199,14 @@ export default function Applications({
                     value={remark}
                     onChange={(e) => setRemark(e.target.value)}
                     rows={3}
-                    placeholder="e.g. Cleared round 1, candidate agreed on salary…"
+                    placeholder="e.g. Cleared round 1, agreed on offered CTC, documents verified…"
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none mb-2"
                   />
                   <button
                     type="button"
                     onClick={() => saveRemark(selectedApp.uuid)}
                     disabled={!remark.trim()}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Send className="w-3.5 h-3.5" /> Save Remark
                   </button>

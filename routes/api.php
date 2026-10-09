@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\JobController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CityController;
+use App\Http\Controllers\Api\NotificationController;
 // use App\Http\Controllers\Api\TownController;
 
 // Route::get('/sync-towns', [TownController::class, 'syncTownsFromOverpass']);
@@ -21,8 +22,9 @@ Route::get('/import-cities', [CityController::class, 'importCities']);
 Route::get('/sync-states', [CityController::class, 'fetchAndSyncStates']);
 Route::get('/sync-cities', [CityController::class, 'fetchAndSyncCities']);
 
+Route::post('/find-state', [CityController::class, 'getState']);
+Route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
 Route::post('/find-towns-by-city', [CityController::class, 'getTownsByCity']);
-
 Route::post('/profile/city-areas', [CityController::class, 'getCityAreas']);
 
 
@@ -38,11 +40,21 @@ Route::controller(AuthController::class)->group(function () {
 // Protected Endpoints (Requires valid Bearer Token)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
-Route::post('/find-state', [CityController::class, 'getState']);
-Route::post('/find-cityby-state', [CityController::class, 'getCitybyState']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
-Route::post('/user/update-location', [CityController::class, 'updateLocation']);
+    Route::post('/user/update-location', [CityController::class, 'updateLocation']);
+    Route::post('/user/update-fcm-token', [AuthController::class, 'updateFcmToken']);
+
+    // ==========================================
+    // Candidate / User Notifications
+    // ==========================================
+    Route::prefix('notifications')->group(function () {
+        Route::match(['get', 'post'], '/', [NotificationController::class, 'index']);
+        Route::post('/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('/clear-all', [NotificationController::class, 'clearAll']);
+        Route::match(['post', 'put'], '/{id}/read', [NotificationController::class, 'markRead']);
+        Route::match(['delete', 'post'], '/{id}', [NotificationController::class, 'destroy']);
+    });
 
 Route::middleware(['admin.auth'])->prefix('admin/notifications')->name('api.admin.notifications.')->group(function () {
     Route::get('/', [AdminNotificationController::class, 'index'])->name('index');

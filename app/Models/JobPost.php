@@ -65,7 +65,8 @@ class JobPost extends Model
         'resubmitted_at',
         'approval_logs',
         'interview_details',
-        'assigned_to'
+        'assigned_to',
+        'is_deleted',
     ];
 
     protected $casts = [
@@ -79,6 +80,7 @@ class JobPost extends Model
         'min_age'               => 'integer',
         'max_age'               => 'integer',
         'applicants'            => 'integer',
+        'is_deleted'            => 'boolean',
         'skills'                => 'array',
         'languages'             => 'array',
         'perks'                 => 'array',
@@ -93,6 +95,29 @@ class JobPost extends Model
         'approved_at'           => 'datetime',
         'resubmitted_at'        => 'datetime',
     ];
+
+    public function scopeActiveForCandidate($query)
+    {
+        return $query->whereIn('status', ['active', 'approved'])
+            ->where(function ($q) {
+                $q->where('is_deleted', 0)->orWhereNull('is_deleted');
+            })
+            ->where(function ($q) {
+                $q->whereNull('last_date')
+                  ->orWhereDate('last_date', '>=', now()->toDateString());
+            });
+    }
+
+    public function isExpired(): bool
+    {
+        if ($this->is_deleted) {
+            return true;
+        }
+        if ($this->last_date) {
+            return \Carbon\Carbon::parse($this->last_date)->endOfDay()->isPast();
+        }
+        return false;
+    }
 
     protected static function booted()
     {

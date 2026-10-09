@@ -5,7 +5,7 @@ export default function HeroSection({ user }) {
   const displayName = user?.full_name ? user.full_name.split(" ")[0] : (user?.name ? user.name.split(" ")[0] : null);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 px-4 pt-10 pb-12 rounded-b-3xl sm:rounded-b-[2.5rem]">
+    <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 px-4 pt-10 pb-12">
       {/* Decorative Grid SVG */}
       <div className="absolute inset-0 opacity-10 pointer-events-none">
         <svg width="100%" height="100%">

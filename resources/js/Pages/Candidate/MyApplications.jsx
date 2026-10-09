@@ -499,10 +499,6 @@ export default function MyApplications({
                           />
                           {statusCfg.label}
                         </span>
-
-                        <span className="text-[11px] text-gray-400 font-mono">
-                          ID: #{app.id}
-                        </span>
                       </div>
                     </div>
 
@@ -732,10 +728,6 @@ export default function MyApplications({
                       <span className="text-gray-500 font-normal flex items-center gap-0.5">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
                         {job.location || "India"}
-                      </span>
-                      <span>•</span>
-                      <span className="font-mono text-gray-400 text-xs">
-                        Application #{selectedApp.id}
                       </span>
                     </p>
                   </div>

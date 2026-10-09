@@ -9,55 +9,61 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class NotificationLog extends Model
 {
-    use HasFactory, SoftDeletes,HasUuids;
+    use HasFactory, SoftDeletes, HasUuids;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
+    protected $table = 'notification_logs';
 
     protected $fillable = [
-        'id',
         'uuid',
+        'receiver_id',
+        'sender_id',
         'type',
-        'morphs',
-        'data',
+        'channel',
         'title',
         'message',
-        'channel',
+        'data',
+        'token',
+        'device_id',
         'status',
         'error',
         'redirect_url',
-        'read_at',
+        'response_payload',
         'sent_at',
-        'sender_id',
-        'receiver_id',
+        'read_at',
     ];
+
     protected $casts = [
-        'data' => 'array',
-        'morphs' => 'array',
-        'sent_at' => 'datetime',
-        'read_at' => 'datetime',
+        'data'             => 'array',
+        'response_payload' => 'array',
+        'sent_at'          => 'datetime',
+        'read_at'          => 'datetime',
     ];
-     public function uniqueIds()
+
+    public function uniqueIds(): array
     {
         return ['uuid'];
     }
+
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');
     }
+
     public function receiver()
     {
         return $this->belongsTo(User::class, 'receiver_id');
     }
+
     public function markAsRead()
     {
         $this->update(['read_at' => now(), 'status' => 'read']);
     }
+
     public function markAsFailed(string $error)
     {
         $this->update([
             'status' => 'failed',
-            'error' => $error
+            'error'  => $error,
         ]);
     }
 }

@@ -22,7 +22,7 @@ class JobApplicationController extends Controller
         }
 
         $query = JobApplication::query()
-            ->with(['jobPost.companyRelation', 'assignedCallingMember', 'candidate'])
+            ->with(['jobPost.companyRelation', 'assignedCallingMember', 'candidate.defaultResume'])
             ->latest();
 
         if ($request->filled('job_id')) {
@@ -61,23 +61,139 @@ class JobApplicationController extends Controller
         }
 
         $applications = $query->get()->map(function ($app) {
+            $answers = is_array($app->answers) ? $app->answers : (json_decode($app->answers ?? '[]', true) ?: []);
+
+            // Skills
+            $skills = $app->candidate_skills;
+            if (empty($skills) && !empty($answers['skills'])) {
+                $skills = $answers['skills'];
+            }
+            if (is_string($skills)) {
+                $decoded = json_decode($skills, true);
+                $skills = is_array($decoded) ? $decoded : array_filter(array_map('trim', explode(',', $skills)));
+            }
+            if (empty($skills) && !empty($app->candidate?->skills)) {
+                $skills = $app->candidate->skills;
+            }
+            if (!is_array($skills)) {
+                $skills = [];
+            }
+
+            // Experience
+            $experience = $app->candidate_experience ?: ($answers['experience'] ?? ($app->candidate?->total_experience_years ?? null));
+
+            // Salaries
+            $currentSalary = $app->current_salary ?: ($answers['currentSalary'] ?? ($app->candidate?->current_ctc ?? null));
+            $expectedSalary = $app->expected_salary ?: ($answers['expectedSalary'] ?? ($app->candidate?->expected_ctc ?? null));
+
+            // Designation & Company
+            $currentTitle = $answers['currentTitle'] ?? ($app->candidate?->job_title ?? null);
+            $lastCompany = $app->last_company ?: ($answers['lastCompany'] ?? null);
+
+            // Notice & Last Working Day
+            $noticePeriod = $app->notice_period ?: ($answers['notice'] ?? ($app->candidate?->notice_period_days ? $app->candidate->notice_period_days . ' Days' : null));
+            $lastWorkingDayRaw = $app->last_working_day ?: ($answers['lastWorkingDay'] ?? null);
+            $lastWorkingDay = null;
+            if ($lastWorkingDayRaw) {
+                try {
+                    $lastWorkingDay = \Carbon\Carbon::parse($lastWorkingDayRaw)->format('d M Y');
+                } catch (\Throwable $e) {
+                    $lastWorkingDay = $lastWorkingDayRaw;
+                }
+            }
+
+            // Education
+            $qualification = $answers['qualification'] ?? ($app->candidate?->education ?? null);
+            $educationDegree = $answers['educationDegree'] ?? null;
+            $educationInstitute = $answers['educationInstitute'] ?? null;
+
+            // Cover letter / Statement
+            $coverLetter = $app->cover_letter ?: ($answers['whyApply'] ?? null);
+
+            // Portfolio & LinkedIn
+            $portfolio = $answers['portfolio'] ?? ($app->candidate?->portfolio ?? null);
+            $linkedin = $answers['linkedin'] ?? ($app->candidate?->linkedin ?? null);
+
+            // Location
+            $userCity = $app->city ?: ($answers['city'] ?? ($app->candidate?->city ?? 'India'));
+            $userArea = $app->candidate?->area ?? null;
+            $userState = $app->candidate?->state ?? null;
+
+            // Resume URL
+            $resumeUrl = $app->resume_url;
+            if (!empty($resumeUrl)) {
+                if (!str_starts_with($resumeUrl, 'http://') && !str_starts_with($resumeUrl, 'https://')) {
+                    $cleanPath = ltrim($resumeUrl, '/');
+                    if (str_starts_with($cleanPath, 'storage/')) {
+                        $resumeUrl = asset($cleanPath);
+                    } else {
+                        $resumeUrl = asset('storage/' . $cleanPath);
+                    }
+                }
+            } else {
+                $resumeUrl = $app->candidate?->defaultResume?->file_url ?? ($app->candidate?->resumes?->first()?->file_url ?? null);
+            }
+
+            // Job post salary string
+            $jobPost = $app->jobPost;
+            $jobSalaryMin = $jobPost?->min_salary;
+            $jobSalaryMax = $jobPost?->max_salary;
+            $jobSalaryType = $jobPost?->salary_type ?? 'monthly';
+            $jobSalaryText = null;
+            if ($jobSalaryMin || $jobSalaryMax) {
+                if ($jobSalaryMin && $jobSalaryMax) {
+                    $jobSalaryText = '₹' . number_format($jobSalaryMin) . ' - ₹' . number_format($jobSalaryMax);
+                } elseif ($jobSalaryMin) {
+                    $jobSalaryText = 'From ₹' . number_format($jobSalaryMin);
+                } else {
+                    $jobSalaryText = 'Up to ₹' . number_format($jobSalaryMax);
+                }
+            }
+
             return [
-                'id'             => $app->id,
-                'uuid'           => $app->uuid,
-                'jobId'          => $app->job_id,
-                'userName'       => $app->candidate_name ?? ($app->candidate->full_name ?? 'Applicant'),
-                'userPhone'      => $app->candidate_phone ?? ($app->candidate->phone ?? '—'),
-                'userEmail'      => $app->candidate_email ?? ($app->candidate->email ?? null),
-                'userCity'       => $app->candidate->city ?? 'India',
-                'jobTitle'       => $app->jobPost->title ?? 'General Position',
-                'company'        => $app->jobPost->company ?? ($app->jobPost->companyRelation->name ?? 'ATS Client'),
-                'status'         => $app->status ?? 'applied',
-                'appliedAt'      => $app->created_at ? $app->created_at->format('d M Y') : 'Recent',
-                'assignedTo'     => $app->assigned_calling_team_member_id,
-                'assignedToName' => $app->assignedCallingMember->name ?? null,
-                'remark'         => $app->admin_notes ?? $app->call_notes ?? null,
-                'interviewDate'  => $app->interview_date_time ? $app->interview_date_time->format('d M Y, h:i A') : null,
-                'resumeUrl'      => $app->resume_url,
+                'id'                 => $app->id,
+                'uuid'               => $app->uuid,
+                'jobId'              => $app->job_id,
+                'userName'           => $app->candidate_name ?? ($app->candidate->full_name ?? 'Applicant'),
+                'userPhone'          => $app->candidate_phone ?? ($app->candidate->phone ?? '—'),
+                'userEmail'          => $app->candidate_email ?? ($app->candidate->email ?? null),
+                'userCity'           => $userCity,
+                'userArea'           => $userArea,
+                'userState'          => $userState,
+                'userGender'         => $app->candidate?->gender ?? null,
+                'userDob'            => $app->candidate?->dob ? $app->candidate->dob->format('d M Y') : null,
+                'jobTitle'           => $jobPost->title ?? 'General Position',
+                'company'            => $jobPost->company ?? ($jobPost->companyRelation->name ?? 'ATS Client'),
+                'jobLocation'        => $jobPost->location ?? null,
+                'jobType'            => $jobPost->job_type ?? null,
+                'jobSalary'          => $jobSalaryText,
+                'jobSalaryType'      => $jobSalaryType,
+                'status'             => $app->status ?? 'applied',
+                'appliedAt'          => $app->created_at ? $app->created_at->format('d M Y') : 'Recent',
+                'assignedTo'         => $app->assigned_calling_team_member_id,
+                'assignedToName'     => $app->assignedCallingMember->name ?? null,
+                'remark'             => $app->admin_notes ?? $app->call_notes ?? null,
+                'interviewDate'      => $app->interview_date_time ? $app->interview_date_time->format('d M Y, h:i A') : null,
+                'interviewMode'      => $app->interview_mode,
+                'interviewAddress'   => $app->interview_address,
+                'interviewContact'   => $app->interview_contact_person,
+                'resumeUrl'          => $resumeUrl,
+                'currentTitle'       => $currentTitle,
+                'experience'         => $experience,
+                'currentSalary'      => $currentSalary,
+                'expectedSalary'     => $expectedSalary,
+                'lastCompany'        => $lastCompany,
+                'noticePeriod'       => $noticePeriod,
+                'lastWorkingDay'     => $lastWorkingDay,
+                'skills'             => $skills,
+                'qualification'      => $qualification,
+                'educationDegree'    => $educationDegree,
+                'educationInstitute' => $educationInstitute,
+                'coverLetter'        => $coverLetter,
+                'portfolio'          => $portfolio,
+                'linkedin'           => $linkedin,
+                'offerSalaryPackage' => $app->offer_salary_package,
+                'offerJoiningDate'   => $app->offer_joining_date ? $app->offer_joining_date->format('d M Y') : null,
             ];
         });
 

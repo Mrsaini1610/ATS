@@ -8,6 +8,8 @@ use App\Models\Admin;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Skill;
+use App\Models\User;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -62,34 +64,86 @@ class AdminJobController extends Controller
         }
 
         $jobs = $query->get()->map(function ($job) {
-            $salary = ($job->min_lpa && $job->max_lpa)
-                ? "₹{$job->min_lpa} - ₹{$job->max_lpa} LPA"
-                : ($job->min_lpa ? "₹{$job->min_lpa} LPA" : "Not Disclosed");
+            $salaryType = $job->salary_type ?: 'monthly';
+            $unitLabel = match (strtolower((string) $salaryType)) {
+                'monthly'    => 'month',
+                'weekly'     => 'week',
+                'quarterly'  => 'quarter',
+                'halfyearly' => 'half-year',
+                'yearly'     => 'year',
+                default      => strtolower((string) $salaryType),
+            };
+
+            $salary = 'Not Disclosed';
+            if ($job->min_salary && $job->max_salary) {
+                $minFmt = number_format((float) $job->min_salary);
+                $maxFmt = number_format((float) $job->max_salary);
+                $salary = ($job->min_salary == $job->max_salary)
+                    ? "₹{$minFmt} / {$unitLabel}"
+                    : "₹{$minFmt} - ₹{$maxFmt} / {$unitLabel}";
+            } elseif ($job->min_salary) {
+                $minFmt = number_format((float) $job->min_salary);
+                $salary = "₹{$minFmt}+ / {$unitLabel}";
+            } elseif ($job->max_salary) {
+                $maxFmt = number_format((float) $job->max_salary);
+                $salary = "Up to ₹{$maxFmt} / {$unitLabel}";
+            } elseif ($job->min_lpa && $job->max_lpa) {
+                $salary = "₹{$job->min_lpa} - ₹{$job->max_lpa} LPA";
+            } elseif ($job->min_lpa) {
+                $salary = "₹{$job->min_lpa} LPA";
+            }
 
             return [
                 'id'                        => $job->id,
                 'uuid'                      => $job->uuid,
                 'title'                     => $job->title,
                 'company'                   => $job->companyRelation?->name ?? $job->company ?? 'N/A',
+                'company_about'             => $job->company_about ?? '',
+                'company_size'              => $job->company_size ?? '',
+                'company_address'           => $job->company_address ?? '',
                 'location'                  => $job->location ?? 'Remote',
                 'salary'                    => $salary,
+                'min_salary'                => $job->min_salary,
+                'max_salary'                => $job->max_salary,
+                'salary_type'               => $salaryType,
+                'bonus_offered'             => $job->bonus_offered ?? 'no',
+                'shift_timing'              => $job->shift_timing,
+                'working_days'              => $job->working_days,
+                'interview_details'         => $job->interview_details,
                 'status'                    => $job->status ?? 'pending',
                 'work_mode'                 => $job->job_type,
                 'type'                      => $job->job_type ?? 'Full Time',
-                'exp'                       => $job->experience ?? '0-1 yr',
+                'exp'                       => $job->experience ?? 'Any',
+                'experience'                => $job->experience ?? 'Any',
+                'min_experience'            => $job->min_experience,
+                'max_experience'            => $job->max_experience,
+                'min_age'                   => $job->min_age,
+                'max_age'                   => $job->max_age,
                 'openings'                  => $job->openings ?? 1,
                 'applicants'                => max((int) ($job->applications_count ?? 0), (int) ($job->applicants ?? 0)),
                 'is_hot'                    => $job->badge === 'hot' || $job->badge === 'featured',
+                'is_deleted'                => (bool) $job->is_deleted,
+                'is_expired'                => (bool) ($job->is_deleted || ($job->last_date && \Carbon\Carbon::parse($job->last_date)->endOfDay()->isPast())),
+                'deadline'                  => $job->last_date ? $job->last_date->format('d M Y') : null,
+                'last_date'                 => $job->last_date ? $job->last_date->format('d M Y') : null,
                 'posted_at'                 => $job->created_at ? $job->created_at->format('d M Y') : 'Recent',
                 'posted_by'                 => $job->creator?->name ?? 'System',
                 'category'                  => $job->category?->name ?? 'General',
                 'desc'                      => $job->description ?? '',
+                'description'               => $job->description ?? '',
                 'remark'                    => $job->rejection_reason,
-                'skills'                    => is_array($job->skills) ? $job->skills : [],
-                'languages'                 => is_array($job->languages) ? $job->languages : [],
+                'skills'                    => is_array($job->skills) ? $job->skills : (json_decode($job->skills, true) ?: []),
+                'languages'                 => is_array($job->languages) ? $job->languages : (json_decode($job->languages, true) ?: []),
                 'responsibilities'          => is_array($job->key_responsibilities) ? $job->key_responsibilities : [],
-                'requirements'              => is_array($job->qualifications) ? $job->qualifications : [],
+                'requirements'              => is_array($job->qualifications) ? $job->qualifications : (json_decode($job->qualifications, true) ?: []),
+                'qualifications'            => is_array($job->qualifications) ? $job->qualifications : (json_decode($job->qualifications, true) ?: []),
                 'benefits'                  => is_array($job->perks) ? $job->perks : [],
+                'assets'                    => is_array($job->assets) ? $job->assets : (json_decode($job->assets, true) ?: []),
+                'certifications'            => is_array($job->certifications) ? $job->certifications : (json_decode($job->certifications, true) ?: []),
+                'preferred_industries'      => is_array($job->preferred_industries) ? $job->preferred_industries : (json_decode($job->preferred_industries, true) ?: []),
+                'contact_person'            => $job->contact_person,
+                'contact_phone'             => $job->contact_phone,
+                'contact_email'             => $job->contact_email,
                 'assigned_team_member_uuid' => $job->assignedMember ? (string) ($job->assignedMember->uuid ?? $job->assignedMember->id) : null,
                 'assigned_team_member_id'   => $job->assigned_to,
                 'assigned_team_member_name' => $job->assignedMember?->name,
@@ -211,6 +265,8 @@ class AdminJobController extends Controller
             'shift_timing'         => $request->input('shiftTiming', '9:30 AM - 6:30 PM'),
             'interview_details'    => $request->input('interviewDetails', ''),
             'experience'           => $request->input('exp', 'Any'),
+            'min_experience'       => $request->filled('minExp') ? (float) $request->input('minExp') : null,
+            'max_experience'       => $request->filled('maxExp') ? (float) $request->input('maxExp') : null,
             'min_age'              => $request->input('minAge') ? max(0, (int) $request->input('minAge')) : null,
             'max_age'              => $request->input('maxAge') ? max(0, (int) $request->input('maxAge')) : null,
             'openings'             => max(1, (int) ($validated['openings'] ?? $request->input('openings', 1))),
@@ -220,6 +276,8 @@ class AdminJobController extends Controller
             'languages'            => $request->input('languages', []),
             'qualifications'       => $request->input('qualifications', []),
             'assets'               => $request->input('assets', []),
+            'certifications'       => $request->input('certifications', []),
+            'preferred_industries' => $request->input('preferredIndustry', []),
             'contact_person'       => $request->input('contactPersonName'),
             'contact_phone'        => $request->input('contactPhone'),
             'contact_email'        => $request->input('contactEmail'),
@@ -262,6 +320,22 @@ class AdminJobController extends Controller
         } elseif ($validated['status'] === 'approved' || $validated['status'] === 'active') {
             $updateData['approved_at'] = now();
             $updateData['approved_by'] = auth('admin')->id();
+
+            // Trigger push notifications to matching candidates in the same city
+            try {
+                if (!empty($job->location)) {
+                    $candidates = User::whereNotNull('city')
+                        ->where('city', 'LIKE', '%' . $job->location . '%')
+                        ->take(25)
+                        ->get();
+
+                    foreach ($candidates as $cand) {
+                        PushNotificationService::notifyJobMatch($cand, $job);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending job match push notifications: ' . $e->getMessage());
+            }
         }
 
         $job->update($updateData);

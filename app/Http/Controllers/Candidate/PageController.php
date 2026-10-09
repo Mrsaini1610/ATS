@@ -9,6 +9,7 @@ use App\Models\JobPost;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\ContactMessage;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 class PageController extends Controller
@@ -58,7 +59,7 @@ class PageController extends Controller
         });
 
     // 2. Top Skills
-    $topSkills = JobPost::whereIn('status', ['active', 'approved'])
+    $topSkills = JobPost::activeForCandidate()
         ->whereNotNull('skills')
         ->pluck('skills')
         ->flatten()
@@ -92,7 +93,7 @@ class PageController extends Controller
                       ->orWhere('company_uuid', $company);
                 }
             })
-            ->whereIn('status', ['active', 'approved'])
+            ->activeForCandidate()
             ->with('category')
             ->latest()
             ->get();
@@ -104,11 +105,27 @@ class PageController extends Controller
         }
 
         $jobs = $jobPosts->map(function ($j) {
+            $salaryType = $j->salary_type ?: 'monthly';
+            $unitLabel = match (strtolower((string) $salaryType)) {
+                'monthly'    => 'month',
+                'weekly'     => 'week',
+                'quarterly'  => 'quarter',
+                'halfyearly' => 'half-year',
+                'yearly'     => 'year',
+                default      => strtolower((string) $salaryType),
+            };
+
             $salaryText = 'Competitive';
             if ($j->min_salary && $j->max_salary) {
-                $salaryText = '₹' . number_format($j->min_salary) . ' - ₹' . number_format($j->max_salary);
+                $minFmt = number_format((float) $j->min_salary);
+                $maxFmt = number_format((float) $j->max_salary);
+                $salaryText = ($j->min_salary == $j->max_salary)
+                    ? "₹{$minFmt} / {$unitLabel}"
+                    : "₹{$minFmt} - ₹{$maxFmt} / {$unitLabel}";
             } elseif ($j->min_salary) {
-                $salaryText = '₹' . number_format($j->min_salary) . '+';
+                $salaryText = "₹" . number_format((float) $j->min_salary) . "+ / {$unitLabel}";
+            } elseif ($j->max_salary) {
+                $salaryText = "Up to ₹" . number_format((float) $j->max_salary) . " / {$unitLabel}";
             }
             return [
                 'id'       => $j->uuid ?: $j->id,
@@ -156,14 +173,14 @@ class PageController extends Controller
                         $q->where('company_uuid', $comp->uuid)
                           ->orWhere('company', $comp->name);
                     })
-                    ->whereIn('status', ['active', 'approved'])
+                    ->activeForCandidate()
                     ->count();
 
                 $openRoles = JobPost::where(function ($q) use ($comp) {
                         $q->where('company_uuid', $comp->uuid)
                           ->orWhere('company', $comp->name);
                     })
-                    ->whereIn('status', ['active', 'approved'])
+                    ->activeForCandidate()
                     ->pluck('title')
                     ->take(3)
                     ->toArray();
@@ -187,9 +204,9 @@ class PageController extends Controller
 
         if ($companies->isEmpty()) {
             $companies = JobPost::query()
+                ->activeForCandidate()
                 ->whereNotNull('company')
                 ->where('company', '!=', '')
-                ->whereIn('status', ['active', 'approved'])
                 ->select([
                     'company as name',
                     DB::raw('COUNT(*) as jobs_count'),
@@ -203,7 +220,7 @@ class PageController extends Controller
                 ->get()
                 ->map(function ($item) {
                     $openRoles = JobPost::where('company', $item->name)
-                        ->whereIn('status', ['active', 'approved'])
+                        ->activeForCandidate()
                         ->pluck('title')
                         ->take(3)
                         ->toArray();
@@ -285,5 +302,66 @@ class PageController extends Controller
     public function cookies()
     {
         return Inertia::render('Candidate/Cookies');
+    }
+
+    public function sitemap()
+    {
+        $baseUrl = url('/');
+        $now = now()->toAtomString();
+
+        $jobs = JobPost::where('status', 'approved')
+            ->latest('updated_at')
+            ->get(['uuid', 'updated_at']);
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+        $staticPages = [
+            ['url' => '', 'priority' => '1.0', 'changefreq' => 'daily'],
+            ['url' => '/jobs', 'priority' => '0.9', 'changefreq' => 'hourly'],
+            ['url' => '/job-search', 'priority' => '0.9', 'changefreq' => 'hourly'],
+            ['url' => '/companies', 'priority' => '0.8', 'changefreq' => 'daily'],
+            ['url' => '/categories', 'priority' => '0.8', 'changefreq' => 'weekly'],
+            ['url' => '/services', 'priority' => '0.8', 'changefreq' => 'weekly'],
+            ['url' => '/about', 'priority' => '0.7', 'changefreq' => 'monthly'],
+            ['url' => '/contact', 'priority' => '0.7', 'changefreq' => 'monthly'],
+            ['url' => '/faq', 'priority' => '0.7', 'changefreq' => 'weekly'],
+            ['url' => '/privacy-policy', 'priority' => '0.5', 'changefreq' => 'monthly'],
+            ['url' => '/terms', 'priority' => '0.5', 'changefreq' => 'monthly'],
+            ['url' => '/cookies', 'priority' => '0.5', 'changefreq' => 'monthly'],
+            ['url' => '/mobile-app', 'priority' => '0.6', 'changefreq' => 'monthly'],
+        ];
+
+        foreach ($staticPages as $p) {
+            $xml .= "  <url>\n";
+            $xml .= "    <loc>" . htmlspecialchars($baseUrl . $p['url']) . "</loc>\n";
+            $xml .= "    <lastmod>{$now}</lastmod>\n";
+            $xml .= "    <changefreq>{$p['changefreq']}</changefreq>\n";
+            $xml .= "    <priority>{$p['priority']}</priority>\n";
+            $xml .= "  </url>\n";
+        }
+
+        foreach ($jobs as $j) {
+            $lastmod = $j->updated_at ? $j->updated_at->toAtomString() : $now;
+            $xml .= "  <url>\n";
+            $xml .= "    <loc>" . htmlspecialchars($baseUrl . '/apply/' . $j->uuid) . "</loc>\n";
+            $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
+            $xml .= "    <changefreq>daily</changefreq>\n";
+            $xml .= "    <priority>0.8</priority>\n";
+            $xml .= "  </url>\n";
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'text/xml');
+    }
+
+    public function clearCache()
+    {
+        Artisan::call('cache:clear');
+        Artisan::call('route:clear');
+        Artisan::call('view:clear');
+        Artisan::call('optimize:clear');
+        return 'Application cache and routes cleared successfully!';
     }
 }

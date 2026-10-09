@@ -10,6 +10,7 @@ use App\Models\Member;
 use App\Models\Notification;
 use App\Models\SiteSetting;
 use App\Services\GeocodingService;
+use App\Services\PushNotificationService;
 use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -769,6 +770,13 @@ class JobController extends Controller
                 'reviewed_at' => now(),
                 'reviewed_by' => $adminId,
             ]);
+
+            // Dispatch push notification to candidate and record log
+            try {
+                PushNotificationService::notifyApplicationStatusChange($application, $validated['status']);
+            } catch (\Throwable $e) {
+                Log::warning('Failed sending status push notification: ' . $e->getMessage());
+            }
 
             Log::info('Admin job application status updated successfully.', [
                 'application_id' => $application->id,

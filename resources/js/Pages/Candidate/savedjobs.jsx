@@ -71,7 +71,7 @@ function JobDetailPanel({
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-150">
+    <div className="flex flex-col h-fit bg-white rounded-3xl overflow-hidden">
       {/* Top Header Actions (Clean toolbar with Share, Remove, Close) */}
       <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-end gap-2 z-10 shrink-0">
         {/* Share Button */}
@@ -118,8 +118,8 @@ function JobDetailPanel({
         </button>
       </div>
 
-      {/* Main Scrollable Content */}
-      <div className="overflow-y-auto flex-1 px-5 sm:px-7 py-6 space-y-6">
+      {/* Main Content Area (Natural Height, No Inner Scroller) */}
+      <div className="px-5 sm:px-7 py-6 space-y-6">
         {/* Company & Role Overview */}
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white font-extrabold text-base sm:text-lg shrink-0 shadow-md shadow-blue-500/15 overflow-hidden">
@@ -185,9 +185,16 @@ function JobDetailPanel({
         {/* Salary Strip */}
         <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wider">
-              Offered Salary / CTC
-            </p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-xs text-emerald-800 font-bold uppercase tracking-wider">
+                Offered Salary ({job.salary_type ? job.salary_type.toUpperCase() : "MONTHLY"})
+              </p>
+              {job.salary_type && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {job.salary_type}
+                </span>
+              )}
+            </div>
             <p className="text-xl sm:text-2xl font-extrabold text-emerald-900 flex items-center gap-1 mt-0.5">
               <span>{job.salary || "Competitive"}</span>
             </p>
@@ -446,6 +453,19 @@ export default function SavedJobs({
     setSavedJobs(list);
   }, [propSavedJobs, pageProps?.savedJobs]);
 
+  // Handle Escape key to close in-page job details
+  useEffect(() => {
+    if (selectedJob) {
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") setSelectedJob(null);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [selectedJob]);
+
   // Show temporary toast message
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -612,127 +632,28 @@ export default function SavedJobs({
               <span>Browse Active Vacancies</span>
             </Link>
           </div>
-        ) : selectedJob ? (
-          /* ============================================================== */
-          /*  ON THE SAME SCREEN: CARDS LIST (LEFT) + DETAIL VIEW (RIGHT)   */
-          /*  - NO duplicate top toolbar!                                   */
-          /*  - Click any card on left to switch view instantly             */
-          /*  - Click "Close" on right panel to return to 4 cards grid      */
-          /* ============================================================== */
-          <div className="flex flex-col lg:flex-row gap-5 items-start animate-in fade-in duration-150">
-            {/* Left Column: Saved Jobs Cards */}
-            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 space-y-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto pr-1">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">
-                Saved Jobs ({savedJobs.length})
-              </p>
-              {savedJobs.map((job) => {
-                const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
-                const jobKey = job.uuid || job.id;
-                const isCurrent =
-                  selectedJob?.id === job.id || selectedJob?.uuid === job.uuid;
-                const isJobApplied = checkIsApplied(job);
-
-                return (
-                  <div
-                    key={jobKey}
-                    onClick={() => setSelectedJob(job)}
-                    className={`bg-white rounded-2xl border p-4 transition-all cursor-pointer shadow-xs ${isCurrent
-                      ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30"
-                      : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
-                      }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden shadow-xs">
-                        {job.company_image ? (
-                          <img
-                            src={job.company_image}
-                            alt={job.company}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          companyInitials
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-1.5">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-bold text-sm text-gray-900 truncate">
-                              {job.title}
-                            </h4>
-                            <p className="text-xs text-blue-600 font-semibold truncate mt-0.5">
-                              {job.company}
-                            </p>
-                          </div>
-
-                          {/* Highlighted Save Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnsave(jobKey);
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-red-50 border border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 group/save shadow-2xs"
-                            title="Saved (Click to remove)"
-                          >
-                            <BookmarkCheck className="w-3.5 h-3.5 fill-blue-600 group-hover/save:hidden" />
-                            <BookmarkX className="w-3.5 h-3.5 hidden group-hover/save:block text-red-600" />
-                            <span className="text-[11px] group-hover/save:hidden"></span>
-                            <span className="text-[11px] hidden group-hover/save:inline"></span>
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-1.5">
-                          <span className="truncate">{job.location || "Multiple"}</span>
-                          <span>•</span>
-                          <span className="font-bold text-emerald-700">{job.salary}</span>
-                        </div>
-                        {isJobApplied && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-2 border border-emerald-200 shadow-2xs">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Applied
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right Column: Full Details Panel on the same screen */}
-            <div className="flex-1 w-full bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] flex flex-col">
-              <JobDetailPanel
-                job={selectedJob}
-                onClose={() => setSelectedJob(null)}
-                onApply={handleApply}
-                onUnsave={handleUnsave}
-                isApplied={checkIsApplied(selectedJob)}
-                isLoggedIn={isLoggedIn}
-                onLoginRequired={(action) => setLoginGateAction(action)}
-                onShare={handleShare}
-                copied={copiedId === (selectedJob.uuid || selectedJob.id)}
-              />
-            </div>
-          </div>
         ) : (
-          /* ============================================================== */
-          /*  DEFAULT VIEW: 4 CARDS PER ROW (ACROSS WIDE SCREEN)            */
-          /*  - Mobile: 1 Column                                            */
-          /*  - Tablet: 2 Columns                                           */
-          /*  - Medium: 3 Columns                                           */
-          /*  - Desktop / Laptop: 4 Columns                                 */
-          /* ============================================================== */
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-            {savedJobs.map((job) => {
-              const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
-              const jobKey = job.uuid || job.id;
-              const isJobApplied = checkIsApplied(job);
-              const skillsList = Array.isArray(job.skills) ? job.skills : [];
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Left Column: Saved Job Cards */}
+            <div className={`w-full ${selectedJob ? "lg:w-[48%] xl:w-1/2" : "w-full"} transition-all duration-500 ease-out`}>
+              <div className={selectedJob ? "space-y-4" : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5"}>
+                {savedJobs.map((job) => {
+                  const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
+                  const jobKey = job.uuid || job.id;
+                  const isJobApplied = checkIsApplied(job);
+                  const skillsList = Array.isArray(job.skills) ? job.skills : [];
+                  const isCurrentSelected = selectedJob?.uuid === job.uuid || selectedJob?.id === job.id;
 
-              return (
-                <div
-                  key={jobKey}
-                  onClick={() => setSelectedJob(job)}
-                  className="bg-white rounded-2xl border border-gray-200/90 hover:border-blue-400 hover:shadow-lg transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between cursor-pointer group shadow-xs relative"
-                >
+                  return (
+                    <div
+                      key={jobKey}
+                      onClick={() => setSelectedJob(job)}
+                      className={`bg-white rounded-2xl border p-4 sm:p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-xs relative ${
+                        isCurrentSelected
+                          ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
+                          : "border-gray-200/90"
+                      }`}
+                    >
                   <div>
                     {/* Header: Avatar + Title + Applied Badge + Unsave Button */}
                     <div className="flex items-start justify-between gap-2.5 mb-3">
@@ -791,7 +712,9 @@ export default function SavedJobs({
                         <span className="truncate">{job.location || "Multiple Locations"}</span>
                       </div>
                       <div className="flex items-center gap-1 font-bold text-emerald-700 text-sm">
-                        <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        {(!job.salary || !job.salary.includes("₹")) && (
+                          <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        )}
                         <span>{job.salary || "Competitive"}</span>
                       </div>
                     </div>
@@ -873,7 +796,26 @@ export default function SavedJobs({
               );
             })}
           </div>
+        </div>
+
+        {/* Right Column: In-Page Side View for Job Details (Full Height, No Inner Scroller) */}
+        {selectedJob && (
+          <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-24 h-fit flex flex-col animate-in fade-in slide-in-from-right-4 duration-500 ease-out">
+            <JobDetailPanel
+              job={selectedJob}
+              onClose={() => setSelectedJob(null)}
+              onApply={handleApply}
+              onUnsave={handleUnsave}
+              isApplied={checkIsApplied(selectedJob)}
+              isLoggedIn={isLoggedIn}
+              onLoginRequired={(action) => setLoginGateAction(action)}
+              onShare={handleShare}
+              copied={copiedId === (selectedJob.uuid || selectedJob.id)}
+            />
+          </div>
         )}
+      </div>
+    )}
       </div>
     </HomepageLayout>
   );
