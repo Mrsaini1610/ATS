@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use App\Services\MailService;
 use Inertia\Inertia;
 
 class JobController extends Controller
@@ -129,8 +130,19 @@ class JobController extends Controller
             ? \App\Models\SavedJob::where('user_uuid', $user->uuid)->pluck('job_uuid')->toArray()
             : [];
 
-        // 9. Fetch and format jobs data with UUID support
-        $jobs = $query->latest()->get()->map(function ($job) use ($appliedJobMap, $appliedJobIds) {
+        // 9. Fetch and format jobs data with sorting & UUID support
+        $sort = strtolower((string) ($request->input('sort') ?? $request->query('sort') ?? 'latest'));
+        if ($sort === 'popular' || $sort === 'most_applied') {
+            $query->orderByDesc('applicants')->orderByDesc('id');
+        } elseif ($sort === 'salary_high') {
+            $query->orderByDesc('max_salary')->orderByDesc('id');
+        } elseif ($sort === 'salary_low') {
+            $query->orderBy('min_salary')->orderByDesc('id');
+        } else {
+            $query->latest('id');
+        }
+
+        $jobs = $query->get()->map(function ($job) use ($appliedJobMap, $appliedJobIds) {
             $application = $appliedJobMap[$job->id] ?? $appliedJobMap[$job->uuid] ?? null;
             $isApplied = !empty($application) || in_array($job->id, $appliedJobIds) || in_array($job->uuid, $appliedJobIds);
 
@@ -472,6 +484,14 @@ class JobController extends Controller
             $user->update($userUpdateData);
         } catch (\Throwable $e) {
             // Ignore user update error
+        }
+
+        // Trigger MailService: sends confirmation email to candidate, in-app + push,
+        // and notifies Creator Admin, Assigned Team Member, and Super Admin via Email + In-App!
+        try {
+            MailService::sendJobApplied($application);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Web Candidate application email/notifications error: ' . $e->getMessage());
         }
 
         return redirect()->route('my-applications')->with('success', 'Your application has been submitted successfully.');

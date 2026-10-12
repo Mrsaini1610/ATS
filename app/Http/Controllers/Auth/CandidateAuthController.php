@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Services\GeocodingService;
+use App\Services\MailService;
 
 class CandidateAuthController extends Controller
 {
@@ -226,6 +227,13 @@ class CandidateAuthController extends Controller
             'is_online'              => true,
             'last_active'            => now(),
         ]);
+
+        // Dispatch Welcome Email and Super Admin Notification
+        try {
+            MailService::sendWelcomeCandidate($user);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Candidate welcome email trigger error: ' . $e->getMessage());
+        }
 
         // Destination redirect
         $redirectUrl = route('home');

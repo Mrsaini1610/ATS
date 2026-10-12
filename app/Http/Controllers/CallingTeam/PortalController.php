@@ -8,6 +8,7 @@ use App\Models\Member;
 use App\Models\Notification;
 use App\Models\SuperAdminPasswordLog;
 use App\Services\PushNotificationService;
+use App\Services\MailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -275,6 +276,13 @@ class PortalController extends Controller
             'interview_contact_person' => $validated['interview_contact_person'] ?? null,
         ]);
 
+        // Send Interview Confirmation Email & Push & Super Admin Notification via MailService
+        try {
+            MailService::sendInterviewScheduled($application, $validated);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('CallingTeam interview email trigger error: ' . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Interview scheduled successfully.',
@@ -329,6 +337,17 @@ class PortalController extends Controller
             'hiring_decision_reason' => $validated['decision_reason'] ?? null,
             'call_notes' => $validated['call_notes'] ?? null,
         ]);
+
+        // Send Status Change Email & Push & Super Admin Alert via MailService
+        try {
+            MailService::sendApplicationStatusChanged(
+                $application,
+                $application->status,
+                $validated['decision_reason'] ?? $validated['call_notes'] ?? null
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('CallingTeam final decision email trigger error: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

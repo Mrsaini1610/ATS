@@ -735,6 +735,7 @@ export default function JobListings({
   const [selectedJobType, setSelectedJobType] = useState(filters?.job_type || "all");
   const [selectedExperience, setSelectedExperience] = useState(filters?.experience || "all");
   const [salaryRange, setSalaryRange] = useState(filters?.salary || "all");
+  const [sortBy, setSortBy] = useState(filters?.sort || "latest");
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -793,7 +794,7 @@ export default function JobListings({
   }, [experiences, jobs]);
 
   const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
+    const list = jobs.filter((job) => {
       const q = search.toLowerCase().trim();
       if (q) {
         const titleMatch = job.title && job.title.toLowerCase().includes(q);
@@ -869,7 +870,30 @@ export default function JobListings({
 
       return true;
     });
-  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, salaryRange]);
+
+    return [...list].sort((a, b) => {
+      if (sortBy === "popular") {
+        const appA = Number(a.applicants || 0);
+        const appB = Number(b.applicants || 0);
+        if (appA !== appB) return appB - appA;
+        return (Number(b.id) || 0) - (Number(a.id) || 0);
+      }
+      if (sortBy === "salary_high") {
+        const salA = parseFloat(a.max_salary || a.min_salary || 0);
+        const salB = parseFloat(b.max_salary || b.min_salary || 0);
+        if (salA !== salB) return salB - salA;
+        return (Number(b.id) || 0) - (Number(a.id) || 0);
+      }
+      if (sortBy === "salary_low") {
+        const salA = parseFloat(a.min_salary || a.max_salary || 0);
+        const salB = parseFloat(b.min_salary || b.max_salary || 0);
+        if (salA !== salB) return salA - salB;
+        return (Number(b.id) || 0) - (Number(a.id) || 0);
+      }
+      // Default: 'latest' -> Newest posts first
+      return (Number(b.id) || 0) - (Number(a.id) || 0);
+    });
+  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, salaryRange, sortBy]);
 
   useEffect(() => {
     if (selectedJob) {
@@ -1139,22 +1163,39 @@ export default function JobListings({
 
             {/* Right Main Job Area */}
             <main className="flex-1 min-w-0 w-full space-y-4">
-              {/* Results Status Bar */}
-              {/* <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-gray-200/80 shadow-2xs">
-                <p className="text-xs sm:text-sm text-gray-600">
-                  Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> open positions
-                </p>
+              {/* Results Status & Sorting Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-gray-200/80 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs sm:text-sm text-gray-600">
+                    Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> open positions
+                  </p>
 
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer ml-2"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+
+                {/* Sort By Dropdown */}
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-xs text-gray-500 font-medium">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="text-xs font-semibold bg-gray-50 text-gray-800 border border-gray-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                   >
-                    Clear all filters
-                  </button>
-                )}
-              </div> */}
+                    <option value="latest">🕒 Latest Jobs</option>
+                    <option value="popular">🔥 Most Popular / Applied</option>
+                    <option value="salary_high">💰 Salary: High to Low</option>
+                    <option value="salary_low">💵 Salary: Low to High</option>
+                  </select>
+                </div>
+              </div>
 
               {/* No Jobs Found State */}
               {filteredJobs.length === 0 ? (

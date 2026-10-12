@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Skill;
 use App\Models\User;
 use App\Services\PushNotificationService;
+use App\Services\MailService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -244,7 +245,7 @@ class AdminJobController extends Controller
             $skills = array_values(array_unique($skills));
         }
 
-        JobPost::create([
+        $job = JobPost::create([
             'title'                => $validated['title'],
             'company_uuid'         => $company->uuid,
             'company_id'           => $company->id ?? null,
@@ -285,6 +286,13 @@ class AdminJobController extends Controller
             'status'               => $request->input('is_draft') ? 'deactivated' : 'pending',
             'created_by'           => auth('admin')->id(),
         ]);
+
+        // Send Email & Notifications to Super Admin, Creator Admin, Assigned Member, and Matching Candidates
+        try {
+            MailService::sendNewJobCreated($job);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending new job created email/notifications: ' . $e->getMessage());
+        }
 
         return redirect()->route('admin.jobs.index')->with('success', 'Job post successfully created.');
     }
@@ -338,7 +346,15 @@ class AdminJobController extends Controller
             }
         }
 
+        $oldStatus = $job->status;
         $job->update($updateData);
+
+        // Notify Super Admin, Creator, and Assignee regarding status change
+        try {
+            MailService::sendJobStatusUpdated($job, $oldStatus, $validated['status'], $validated['remark'] ?? null);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending job status update email/notifications: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', "Job status changed to {$validated['status']}.");
     }
@@ -371,6 +387,13 @@ class AdminJobController extends Controller
         }
 
         $job->update(['assigned_to' => $adminId]);
+
+        if ($adminId) {
+            try {
+                MailService::notifyAdmin($adminId, "Job Assigned: {$job->title}", "You have been assigned to manage '{$job->title}'.", ['job_id' => $job->id]);
+                MailService::notifySuperAdmin("Job Assigned to Team Member", "Job '{$job->title}' assigned to team member ID {$adminId}.", ['job_id' => $job->id]);
+            } catch (\Throwable $e) {}
+        }
 
         return redirect()->back()->with('success', $adminId ? 'Team member assigned successfully.' : 'Assignment removed.');
     }

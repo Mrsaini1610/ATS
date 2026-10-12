@@ -68,14 +68,20 @@
     min-height: 100%;
     overscroll-behavior-y: none;
     scroll-behavior: smooth;
+    overflow-x: clip;
   }
   
   body {
     min-height: 100%;
     overscroll-behavior-y: none;
+    overflow-x: clip;
     @apply bg-background text-foreground;
     font-family: "Inter", sans-serif;
   }
+}
+
+.overflow-x-clip {
+  overflow-x: clip;
 }
 
 /* Brand Color Utilities — Calibrated to ATS.com Logo (#0c3da4) */

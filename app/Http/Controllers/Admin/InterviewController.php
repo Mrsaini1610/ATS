@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Interview;
 use App\Models\Admin;
 use App\Models\JobPost;
+use App\Services\MailService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -155,7 +156,7 @@ class InterviewController extends Controller
             'interviewer.required'    => 'Please specify who will conduct the interview.',
         ]);
 
-        Interview::create([
+        $interview = Interview::create([
             'candidate_name'  => $validated['candidateName'],
             'candidate_phone' => $validated['candidatePhone'],
             'job_title'       => $validated['jobTitle'] ?? null,
@@ -171,6 +172,13 @@ class InterviewController extends Controller
             'status'          => 'scheduled',
         ]);
 
+        // Dispatch MailService: Email to candidate, Push & In-app, Interviewer alert, and Super Admin alert
+        try {
+            MailService::sendInterviewScheduled($interview, $validated);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending interview scheduled email/notifications: ' . $e->getMessage());
+        }
+
         return redirect()->back()->with('success', 'Interview scheduled successfully.');
     }
 
@@ -181,6 +189,13 @@ class InterviewController extends Controller
         ]);
 
         $interview->update(['status' => $validated['status']]);
+
+        // Dispatch interview status update to Super Admin and candidate
+        try {
+            MailService::sendInterviewStatusUpdated($interview, $validated['status']);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending interview status update email/notifications: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Interview status updated.');
     }

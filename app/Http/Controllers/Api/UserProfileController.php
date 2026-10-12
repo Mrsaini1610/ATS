@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Throwable;
 use App\Services\GeocodingService;
+use App\Services\MailService;
 
 class UserProfileController extends Controller
 {
@@ -45,11 +46,82 @@ public function getProfile(Request $request, GeocodingService $geocodingService)
     $userData['current_city'] = $currentCity;
     $userData['current_area'] = $currentArea;
 
+    $completionData = $this->calculateProfileCompletion($user);
+    $userData['completion_percentage'] = $completionData['percentage'];
+    $userData['is_profile_complete']   = $completionData['is_complete'];
+    $userData['missing_fields']        = $completionData['missing_fields'];
+
+    if ($user->is_profile_complete !== $completionData['is_complete']) {
+        $user->is_profile_complete = $completionData['is_complete'];
+        $user->saveQuietly();
+    }
+
     return response()->json([
         'status'  => true,
         'message' => 'Profile fetched successfully',
         'data'    => $userData
     ], 200);
+}
+
+/**
+ * Calculate candidate profile completion percentage rigorously checking
+ * Personal Info, Photo, Title/Bio, Skills, Education, Experience, and Resume.
+ */
+public function calculateProfileCompletion($user): array
+{
+    $hasName = !empty($user->full_name) && !str_starts_with($user->full_name, 'Candidate ');
+    $hasEmail = !empty($user->email);
+    $hasPhone = !empty($user->phone);
+    $hasGender = !empty($user->gender);
+    $hasDob = !empty($user->dob);
+    $hasCity = !empty($user->city);
+    $hasPhoto = !empty($user->profile_picture);
+    $hasTitleOrBio = !empty($user->job_title) || !empty($user->bio);
+
+    $skills = is_array($user->skills) ? $user->skills : json_decode($user->skills ?? '[]', true);
+    $hasSkills = !empty($skills);
+
+    // Education check: Must have at least one education entry in educations table OR education field
+    $hasEducation = $user->educations()->where('is_delete', 0)->exists() || !empty($user->education);
+
+    // Experience check: Must have at least one work experience OR be explicitly marked as fresher
+    $expYears = $user->total_experience_years;
+    $isFresher = ($expYears !== null && ((float)$expYears === 0.0 || (string)$expYears === '0'))
+        || strtolower((string)$expYears) === 'fresher'
+        || strtolower((string)$expYears) === 'fresh graduate';
+    $hasExperience = $user->experiences()->where('is_delete', 0)->exists() || $isFresher;
+
+    // Resume check: Must have at least one resume record
+    $hasResume = $user->resumes()->where('is_delete', 0)->exists();
+
+    $weights = [
+        'personal_info' => ['weight' => 25, 'met' => ($hasName && $hasEmail && $hasPhone && $hasCity && $hasGender && $hasDob)],
+        'profile_photo' => ['weight' => 10, 'met' => $hasPhoto],
+        'title_or_bio'  => ['weight' => 10, 'met' => $hasTitleOrBio],
+        'skills'        => ['weight' => 15, 'met' => $hasSkills],
+        'education'     => ['weight' => 15, 'met' => $hasEducation],
+        'experience'    => ['weight' => 15, 'met' => $hasExperience],
+        'resume'        => ['weight' => 10, 'met' => $hasResume],
+    ];
+
+    $score = 0;
+    $missing = [];
+    foreach ($weights as $key => $data) {
+        if ($data['met']) {
+            $score += $data['weight'];
+        } else {
+            $missing[] = $key;
+        }
+    }
+
+    $percentage = min(100, $score);
+    $isComplete = $percentage >= 100;
+
+    return [
+        'percentage'     => $percentage,
+        'is_complete'    => $isComplete,
+        'missing_fields' => $missing,
+    ];
 }
 /**
  * Helper to parse address from raw Google components or formatted string fallback.
@@ -185,10 +257,34 @@ private function parseAddressComponents(array $geoResult): array
 
             $user->update($data);
 
+            $completionData = $this->calculateProfileCompletion($user);
+            $user->is_profile_complete = $completionData['is_complete'];
+            $user->saveQuietly();
+
+            // Send Welcome Email & Super Admin notification if candidate has email and profile complete
+            if (!empty($user->email) && $completionData['is_complete']) {
+                try {
+                    MailService::sendWelcomeCandidate($user);
+                } catch (Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('App Candidate welcome email trigger error: ' . $e->getMessage());
+                }
+            }
+
+            $freshUser = $user->fresh([
+                'educations',
+                'experiences',
+                'resumes',
+                'certificates'
+            ])->toArray();
+            $freshUser['completion_percentage'] = $completionData['percentage'];
+            $freshUser['is_profile_complete']   = $completionData['is_complete'];
+            $freshUser['missing_fields']        = $completionData['missing_fields'];
+
             return response()->json([
                 'status'  => true,
                 'message' => 'Profile updated successfully',
-                'user'    => $user->fresh()
+                'user'    => $freshUser,
+                'data'    => $freshUser
             ], 200);
 
         } catch (Throwable $e) {

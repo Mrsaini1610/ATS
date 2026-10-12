@@ -45,7 +45,7 @@ export default function GuestLayout({ children }) {
             <div className="flex min-h-screen flex-col items-center  bg-gray-100 dark:bg-gray-900 relative px-4 sm:px-6 lg:px-8">
 
                 {/* Login Navbar */}
-                <div className="w-full absolute top-0 left-0 flex items-center justify-between p-3 bg-white dark:bg-gray-800 shadow sm:px-8 border-b-2 dark:border-gray-600">
+                <div className="w-full fixed top-0 left-0 z-50 flex items-center justify-between p-3 bg-white dark:bg-gray-800 shadow sm:px-8 border-b-2 dark:border-gray-600">
 
                     {/* Logo */}
                     <Link href={route('home')}>

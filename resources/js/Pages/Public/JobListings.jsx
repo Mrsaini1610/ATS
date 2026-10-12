@@ -398,6 +398,7 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
     const [searchQuery, setSearchQuery] = useState(filters.search ?? '');
     const [selectedType, setSelectedType] = useState(filters.job_type ?? '');
     const [selectedLocation, setSelectedLocation] = useState(filters.location ?? '');
+    const [sortBy, setSortBy] = useState('latest');
     const [filteredJobs, setFilteredJobs] = useState(jobs || []);
     const isAuthenticated = !!auth?.user;
     const [savedJobs, setSavedJobs] = useState([]);
@@ -408,7 +409,7 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
         setSelectedLocation(filters.location ?? '');
     }, [filters.job_type, filters.location, filters.search]);
 
-    // Filter jobs based on search and filters
+    // Filter jobs based on search, filters, and sorting
     useEffect(() => {
         let filtered = jobs || [];
 
@@ -435,8 +436,32 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
             );
         }
 
+        // Sorting
+        filtered = [...filtered].sort((a, b) => {
+            if (sortBy === 'popular') {
+                const appA = Number(a.applicants || 0);
+                const appB = Number(b.applicants || 0);
+                if (appA !== appB) return appB - appA;
+                return (Number(b.id) || 0) - (Number(a.id) || 0);
+            }
+            if (sortBy === 'salary_high') {
+                const salA = parseFloat(a.max_salary || a.min_salary || 0);
+                const salB = parseFloat(b.max_salary || b.min_salary || 0);
+                if (salA !== salB) return salB - salA;
+                return (Number(b.id) || 0) - (Number(a.id) || 0);
+            }
+            if (sortBy === 'salary_low') {
+                const salA = parseFloat(a.min_salary || a.max_salary || 0);
+                const salB = parseFloat(b.min_salary || b.max_salary || 0);
+                if (salA !== salB) return salA - salB;
+                return (Number(b.id) || 0) - (Number(a.id) || 0);
+            }
+            // Default: 'latest' (highest id / created_at first)
+            return (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+
         setFilteredJobs(filtered);
-    }, [jobs, searchQuery, selectedType, selectedLocation]);
+    }, [jobs, searchQuery, selectedType, selectedLocation, sortBy]);
 
     // Get unique locations from jobs
     const jobTypes = ['Full Time', 'Part Time', 'Contract', 'Internship', 'Freelance', 'Remote'];
@@ -616,7 +641,29 @@ function PublicJobListingsContent({ auth, jobs, filters = {} }) {
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+                    {/* Results Count & Sorting Header */}
+                    <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200'}`}>
+                        <p className={`text-sm ${subTextColor}`}>
+                            Showing <span className={`font-bold ${textColor}`}>{filteredJobs.length}</span> jobs
+                        </p>
+                        <div className="flex items-center gap-2 ml-auto">
+                            <span className={`text-xs font-medium ${subTextColor}`}>Sort by:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className={`text-xs font-semibold rounded-lg px-2.5 py-1.5 border focus:outline-none cursor-pointer transition-colors ${
+                                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-50 text-gray-800 border-gray-300'
+                                }`}
+                            >
+                                <option value="latest">🕒 Latest Jobs</option>
+                                <option value="popular">🔥 Most Popular / Applied</option>
+                                <option value="salary_high">💰 Salary: High to Low</option>
+                                <option value="salary_low">💵 Salary: Low to High</option>
+                            </select>
+                        </div>
+                    </div>
+
                     {!filteredJobs || filteredJobs.length === 0 ? (
                         <div className={`text-center py-16 rounded-xl border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                             <Briefcase className={`w-16 h-16 mx-auto mb-4 ${subTextColor}`} />

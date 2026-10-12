@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Kreait\Firebase\Factory;
 use Throwable;
+use App\Services\MailService;
 
 class AuthController extends Controller
 {
@@ -234,6 +235,13 @@ class AuthController extends Controller
 
             // 5. Load candidate relations
             $user->load(['educations', 'experiences', 'resumes', 'certificates']);
+
+            // Send welcome mail if candidate has email and profile complete
+            if (!empty($user->email) && $user->isProfileComplete()) {
+                try {
+                    MailService::sendWelcomeCandidate($user);
+                } catch (Throwable $e) {}
+            }
 
             return response()->json([
                 'status'              => true,

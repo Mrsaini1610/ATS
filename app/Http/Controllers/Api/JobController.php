@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Throwable;
 use App\Services\GeocodingService;
 use App\Services\PushNotificationService;
+use App\Services\MailService;
 
 class JobController extends Controller
 {
@@ -346,8 +347,20 @@ class JobController extends Controller
                 ->groupBy('job_id');
         }
 
-        // 10. Fetch Results
-        $jobs = $query->latest()->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
+        // 10. Fetch Results with Sorting (latest, popular/most_applied, salary_high, salary_low)
+        $sort = strtolower((string) ($request->input('sort') ?? $request->query('sort') ?? 'latest'));
+        if ($sort === 'popular' || $sort === 'most_applied') {
+            $query->orderByDesc('applicants')->orderByDesc('id');
+        } elseif ($sort === 'salary_high') {
+            $query->orderByDesc('max_salary')->orderByDesc('id');
+        } elseif ($sort === 'salary_low') {
+            $query->orderBy('min_salary')->orderByDesc('id');
+        } else {
+            // Default: 'latest' (newest posts first)
+            $query->latest('id');
+        }
+
+        $jobs = $query->get()->map(function ($job) use ($userApplications, $savedJobUuids) {
             $applications = $userApplications->get($job->id);
             $latestApplication = $applications ? $applications->first() : null;
 
@@ -691,18 +704,52 @@ class JobController extends Controller
             return $jobArray;
         });
 
-        // 7. Sort: Highest Match Score First, then Nearest Distance First, then Latest
-        $sortedJobs = $processedJobs->sort(function ($a, $b) {
-            // First priority: Match score descending
-            if ($a['match_score'] !== $b['match_score']) {
-                return $b['match_score'] <=> $a['match_score'];
+        // 7. Sort: Based on user requested sort ('latest', 'popular' / 'most_applied', 'recommended', 'salary_high', 'salary_low')
+        $sort = strtolower((string) ($request->input('sort') ?? $request->query('sort') ?? 'latest'));
+        $sortedJobs = $processedJobs->sort(function ($a, $b) use ($sort) {
+            // Popular / Most Applied: highest applicants count first
+            if ($sort === 'popular' || $sort === 'most_applied') {
+                $appA = (int) ($a['applicants'] ?? 0);
+                $appB = (int) ($b['applicants'] ?? 0);
+                if ($appA !== $appB) {
+                    return $appB <=> $appA;
+                }
+                return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
             }
-            // Second priority: Distance ascending (if both have distance)
-            if ($a['distance_km'] !== null && $b['distance_km'] !== null) {
-                return $a['distance_km'] <=> $b['distance_km'];
+
+            // Recommended / Match Score: highest match score first, then distance
+            if ($sort === 'recommended' || $sort === 'match') {
+                if ($a['match_score'] !== $b['match_score']) {
+                    return $b['match_score'] <=> $a['match_score'];
+                }
+                if ($a['distance_km'] !== null && $b['distance_km'] !== null) {
+                    return $a['distance_km'] <=> $b['distance_km'];
+                }
+                return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
             }
-            // Third priority: ID descending
-            return $b['id'] <=> $a['id'];
+
+            // Salary High to Low
+            if ($sort === 'salary_high') {
+                $salA = (float) ($a['max_salary'] ?? $a['min_salary'] ?? 0);
+                $salB = (float) ($b['max_salary'] ?? $b['min_salary'] ?? 0);
+                if ($salA !== $salB) {
+                    return $salB <=> $salA;
+                }
+                return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
+            }
+
+            // Salary Low to High
+            if ($sort === 'salary_low') {
+                $salA = (float) ($a['min_salary'] ?? $a['max_salary'] ?? 0);
+                $salB = (float) ($b['min_salary'] ?? $b['max_salary'] ?? 0);
+                if ($salA !== $salB) {
+                    return $salA <=> $salB;
+                }
+                return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
+            }
+
+            // Default: 'latest' -> Most recently posted jobs first!
+            return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
         })->values();
 
         // 8. Dynamic Filter Options for App
@@ -807,7 +854,24 @@ class JobController extends Controller
             'job_uuid'       => 'required|exists:job_posts,uuid',
             'candidate_uuid' => 'nullable|exists:users,uuid',
             'resume_url'     => 'nullable|string',
-            'cover_letter'   => 'nullable|string'
+            'cover_letter'   => 'nullable|string',
+            'full_name'      => 'nullable|string|max:255',
+            'email'          => 'nullable|email|max:255',
+            'phone'          => 'nullable|string|max:50',
+            'city'           => 'nullable|string|max:255',
+            'current_title'  => 'nullable|string|max:255',
+            'experience'     => 'nullable|string|max:255',
+            'current_salary' => 'nullable|string|max:255',
+            'expected_salary'=> 'nullable|string|max:255',
+            'last_company'   => 'nullable|string|max:255',
+            'notice_period'  => 'nullable|string|max:255',
+            'last_working_day'=> 'nullable|string|max:255',
+            'qualification'  => 'nullable|string|max:255',
+            'education_degree'=> 'nullable|string|max:255',
+            'education_institute'=> 'nullable|string|max:255',
+            'portfolio'      => 'nullable|string|max:255',
+            'linkedin'       => 'nullable|string|max:255',
+            'why_apply'      => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -828,11 +892,43 @@ class JobController extends Controller
             ], 404);
         }
 
-        // Resume URL pick: passed in body OR fallback to user's active/default resume
-        $resumeUrl = $request->resume_url;
-        if (empty($resumeUrl)) {
-            $defaultResume = $user->defaultResume ?? $user->resumes()->latest()->first();
-            $resumeUrl = $defaultResume?->file_path;
+        // 1. Resolve Resume (Direct File Upload, Selected Resume ID, URL, or Profile Default)
+        $resumeUrl = null;
+        if ($request->hasFile('cv_file') || $request->hasFile('resume_file')) {
+            $file = $request->file('cv_file') ?? $request->file('resume_file');
+            $stored = $file->store('resumes', 'public');
+            $resumeUrl = asset('storage/' . $stored);
+
+            try {
+                \App\Models\UserResume::create([
+                    'user_uuid'  => $user->uuid,
+                    'title'      => $file->getClientOriginalName(),
+                    'file_path'  => 'storage/' . $stored,
+                    'file_type'  => $file->getClientOriginalExtension(),
+                    'is_default' => true,
+                ]);
+            } catch (\Throwable $e) {
+                // Ignore resume table error
+            }
+        } elseif ($request->filled('resume_id') || $request->filled('selected_resume_id')) {
+            $rId = $request->input('resume_id') ?: $request->input('selected_resume_id');
+            $selectedResume = \App\Models\UserResume::where('user_uuid', $user->uuid)
+                ->where(function ($q) use ($rId) {
+                    $q->where('id', $rId)->orWhere('uuid', $rId);
+                })->first();
+
+            if ($selectedResume && $selectedResume->file_path) {
+                $fp = $selectedResume->file_path;
+                $resumeUrl = str_starts_with($fp, 'http') ? $fp : asset(str_starts_with($fp, 'storage/') ? $fp : 'storage/' . $fp);
+            }
+        } elseif (!empty($request->resume_url)) {
+            $resumeUrl = $request->resume_url;
+        } else {
+            $defaultResume = $user->defaultResume ?? $user->resumes()->where('is_delete', 0)->latest()->first();
+            if ($defaultResume && $defaultResume->file_path) {
+                $fp = $defaultResume->file_path;
+                $resumeUrl = str_starts_with($fp, 'http') ? $fp : asset(str_starts_with($fp, 'storage/') ? $fp : 'storage/' . $fp);
+            }
         }
 
         if (empty($resumeUrl)) {
@@ -842,7 +938,7 @@ class JobController extends Controller
             ], 400);
         }
 
-        // Duplicate Application Check
+        // 2. Duplicate Application Check
         $alreadyApplied = JobApplication::where('candidate_id', $user->id)
             ->where('job_id', $job->id)
             ->exists();
@@ -854,27 +950,113 @@ class JobController extends Controller
             ], 400);
         }
 
+        // 3. Parse Skills
+        $skillsInput = $request->input('skills');
+        $candidateSkills = is_array($skillsInput)
+            ? $skillsInput
+            : (is_string($skillsInput) && !empty($skillsInput)
+                ? array_filter(array_map('trim', explode(',', $skillsInput)))
+                : ($user->skills ?? []));
+
+        // 4. Construct Answers Snapshot
+        $answers = $request->input('answers') ?: [
+            'currentTitle'       => $request->input('current_title') ?: ($user->job_title ?? ''),
+            'city'               => $request->input('city') ?: ($user->city ?? ''),
+            'experience'         => $request->input('experience') ?: ($user->total_experience_years ?? ''),
+            'qualification'      => $request->input('qualification') ?: '',
+            'educationDegree'    => $request->input('education_degree') ?: ($user->education ?? ''),
+            'educationInstitute' => $request->input('education_institute') ?: '',
+            'skills'             => array_values($candidateSkills),
+            'currentSalary'      => $request->input('current_salary') ?: ($user->current_ctc ?? ''),
+            'expectedSalary'     => $request->input('expected_salary') ?: ($user->expected_ctc ?? ''),
+            'lastCompany'        => $request->input('last_company') ?: '',
+            'notice'             => $request->input('notice_period') ?: ($user->notice_period_days ?? ''),
+            'lastWorkingDay'     => $request->input('last_working_day') ?: '',
+            'portfolio'          => $request->input('portfolio') ?: ($user->portfolio ?? ''),
+            'linkedin'           => $request->input('linkedin') ?: ($user->linkedin ?? ''),
+            'whyApply'           => $request->input('why_apply') ?: '',
+        ];
+
         try {
-            $application = JobApplication::create([
+            $appData = [
                 'candidate_id'         => $user->id,
                 'job_id'               => $job->id,
+                'candidate_uuid'       => $user->uuid,
                 'resume_url'           => $resumeUrl,
-                'cover_letter'         => $request->cover_letter,
-                'candidate_name'       => $user->full_name ?? $user->username,
-                'candidate_email'      => $user->email,
-                'candidate_phone'      => $user->phone,
-                'candidate_skills'     => $user->skills,
-                'candidate_experience' => $user->total_experience_years,
+                'cover_letter'         => $request->input('cover_letter') ?: $request->input('why_apply'),
+                'candidate_name'       => $request->input('full_name') ?: ($request->input('candidate_name') ?: ($user->full_name ?? $user->name)),
+                'candidate_email'      => $request->input('email') ?: ($request->input('candidate_email') ?: $user->email),
+                'candidate_phone'      => $request->input('phone') ?: ($request->input('candidate_phone') ?: $user->phone),
+                'candidate_skills'     => array_values($candidateSkills),
+                'candidate_experience' => $request->input('experience') ?: $user->total_experience_years,
+                'current_salary'       => $request->input('current_salary') ?: $user->current_ctc,
+                'expected_salary'      => $request->input('expected_salary') ?: $user->expected_ctc,
+                'last_company'         => $request->input('last_company'),
+                'notice_period'        => $request->input('notice_period') ?: $user->notice_period_days,
+                'last_working_day'     => $request->input('last_working_day'),
+                'city'                 => $request->input('city') ?: $user->city,
+                'answers'              => is_array($answers) ? json_encode($answers) : $answers,
                 'status'               => 'applied'
-            ]);
+            ];
+
+            // Filter columns to avoid db exceptions if any column is pending
+            try {
+                $existingCols = \Illuminate\Support\Facades\Schema::getColumnListing('job_applications');
+                if (!empty($existingCols)) {
+                    $appData = array_intersect_key($appData, array_flip($existingCols));
+                }
+            } catch (\Throwable $e) {}
+
+            $application = JobApplication::create($appData);
 
             $job->increment('applicants');
 
-            // Trigger push notification to candidate and audit log
+            // 5. Update Candidate Profile with newly submitted details
             try {
-                PushNotificationService::notifyApplicationSubmitted($application);
+                $userUpdateData = array_filter([
+                    'full_name'              => $request->input('full_name') ?: $request->input('candidate_name'),
+                    'city'                   => $request->input('city'),
+                    'job_title'              => $request->input('current_title'),
+                    'total_experience_years' => $request->input('experience'),
+                    'current_ctc'            => $request->input('current_salary'),
+                    'expected_ctc'           => $request->input('expected_salary'),
+                    'notice_period_days'     => $request->input('notice_period'),
+                    'portfolio'              => $request->input('portfolio'),
+                    'linkedin'               => $request->input('linkedin'),
+                    'education'              => $request->input('education_degree') ?: $request->input('qualification'),
+                ]);
+                if (!empty($candidateSkills)) {
+                    $userUpdateData['skills'] = array_values($candidateSkills);
+                }
+                if (!empty($userUpdateData)) {
+                    $user->update($userUpdateData);
+                }
+
+                // Auto-create education entry if missing
+                if ($request->filled('education_degree') || $request->filled('qualification')) {
+                    $deg = $request->input('education_degree') ?: $request->input('qualification');
+                    $inst = $request->input('education_institute') ?: 'University/College';
+                    if (!$user->educations()->where('is_delete', 0)->exists()) {
+                        \App\Models\UserEducation::create([
+                            'user_uuid'   => $user->uuid,
+                            'degree'      => $deg,
+                            'institution' => $inst,
+                            'start_year'  => date('Y') - 3,
+                            'end_year'    => date('Y'),
+                            'is_delete'   => 0,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore profile update error
+            }
+
+            // Trigger MailService: sends confirmation email to candidate, in-app + push,
+            // and notifies Creator Admin, Assigned Team Member, and Super Admin via Email + In-App!
+            try {
+                MailService::sendJobApplied($application);
             } catch (Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed sending application push notification: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('Failed sending application email/notifications: ' . $e->getMessage());
             }
 
             $responseData = $application->toArray();
@@ -1107,7 +1289,12 @@ class JobController extends Controller
                     'category:id,uuid,name'
                 ]);
             }
-        ])->where('candidate_id', $user->id);
+        ])->where(function ($q) use ($user) {
+            $q->where('candidate_id', $user->id);
+            if (!empty($user->uuid)) {
+                $q->orWhere('candidate_uuid', $user->uuid);
+            }
+        });
 
         $allApplications = (clone $baseQuery)->latest()->get();
 

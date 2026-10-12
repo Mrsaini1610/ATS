@@ -496,7 +496,7 @@ export default function Header() {
   ];
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 transition-all shadow-2xs">
+    <header className="w-full bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 transition-all shadow-xs">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
         {/* Left: Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
@@ -669,7 +669,7 @@ export default function Header() {
 
       {/* MOBILE DRAWER NAVIGATION */}
       {menuOpen && (
-        <div className="lg:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top duration-200">
+        <div className="lg:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top duration-200 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl mb-2">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-blue-600" />

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Services\MailService;
 use Inertia\Inertia;
 
 class JobRequestController extends Controller
@@ -580,6 +581,17 @@ class JobRequestController extends Controller
                 'reviewed_at' => now(),
                 'reviewed_by' => $superAdminId,
             ]);
+
+            // Dispatch MailService to notify Candidate (Email + In-app + Push)
+            try {
+                MailService::sendApplicationStatusChanged(
+                    $application,
+                    $validated['status'],
+                    $validated['admin_notes'] ?? null
+                );
+            } catch (\Throwable $e) {
+                Log::warning('SuperAdmin sendApplicationStatusChanged failed: ' . $e->getMessage());
+            }
 
             Log::info('Super admin job application status updated successfully.', [
                 'application_id' => $application->id,

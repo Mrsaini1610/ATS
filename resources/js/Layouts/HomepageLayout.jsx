@@ -14,7 +14,7 @@ export default function HomepageLayout({ children, hideFooter = false }) {
     }, []);
 
     return (
-        <div className="min-h-screen flex flex-col bg-[#f8fafc] text-gray-900 antialiased w-full overflow-x-hidden">
+        <div className="min-h-screen flex flex-col bg-[#f8fafc] text-gray-900 antialiased w-full overflow-x-clip">
             <Header />
             <main className="flex-1 flex flex-col w-full">{children}</main>
             {!hideFooter && <Footer />}

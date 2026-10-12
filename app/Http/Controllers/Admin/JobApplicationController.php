@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
 use App\Models\Admin;
+use App\Services\MailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -234,6 +235,13 @@ class JobApplicationController extends Controller
         $application->reviewed_by = $isValidMember ? $adminId : null;
         $application->save();
 
+        // Dispatch Email, In-App Notification & Push Notification to Candidate + Super Admin Alert
+        try {
+            MailService::sendApplicationStatusChanged($application, $validated['status'], $application->admin_notes);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending application status email/notifications: ' . $e->getMessage());
+        }
+
         return redirect()->back()->with('success', "Application status updated to {$validated['status']}.");
     }
 
@@ -246,6 +254,23 @@ class JobApplicationController extends Controller
         $application->assigned_calling_team_member_id = $validated['team_member_id'];
         $application->assigned_to_calling_team_at = now();
         $application->save();
+
+        // Notify assigned team member and Super Admin
+        try {
+            $assignee = Admin::find($validated['team_member_id']);
+            $jobTitle = $application->jobPost?->title ?: 'the job position';
+            MailService::notifyAdmin(
+                $validated['team_member_id'],
+                "Application Assigned: {$application->candidate_name}",
+                "You have been assigned to handle the application of {$application->candidate_name} for '{$jobTitle}'.",
+                ['application_id' => $application->id]
+            );
+            MailService::notifySuperAdmin(
+                "Application Assigned to Team Member",
+                "Application of {$application->candidate_name} for '{$jobTitle}' assigned to " . ($assignee?->name ?? "Member #{$validated['team_member_id']}"),
+                ['application_id' => $application->id, 'assigned_to' => $validated['team_member_id']]
+            );
+        } catch (\Throwable $e) {}
 
         return redirect()->back()->with('success', 'Application successfully assigned to team member.');
     }
@@ -274,6 +299,16 @@ class JobApplicationController extends Controller
         $application->offer_letter_triggered_at = now();
         $application->status = 'hired';
         $application->save();
+
+        // Dispatch Offer Letter Email & Notifications to Candidate + Super Admin
+        try {
+            MailService::sendOfferLetter($application, [
+                'salary'       => $validated['salary'] ?? null,
+                'joining_date' => $validated['joining_date'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending offer letter email/notifications: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Offer details recorded.');
     }
