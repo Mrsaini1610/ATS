@@ -57,7 +57,7 @@ export default function Companies({ company = {} }) {
                   <div className="-mt-12 sm:-mt-14 relative z-20 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-white p-1 border-4 border-white shadow-lg flex items-center justify-center overflow-hidden shrink-0">
                     {hasLogoImage ? (
                       <img
-                        src={`/storage/${comp.logo}`}
+                        src={comp.logo.startsWith('http://') || comp.logo.startsWith('https://') ? comp.logo : (comp.logo.startsWith('/') ? comp.logo : `/storage/${comp.logo}`)}
                         alt={comp.name}
                         className="w-full h-full object-cover rounded-xl sm:rounded-2xl"
                         onError={(e) => {

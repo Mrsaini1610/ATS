@@ -43,7 +43,7 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
                   <div className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center font-black text-sm text-white overflow-hidden shadow-xs bg-gradient-to-br from-indigo-600 to-purple-700 group-hover:scale-105 transition-transform">
                     {hasImageLogo ? (
                       <img
-                        src={`/storage/${comp.logo}`}
+                        src={comp.logo.startsWith('http://') || comp.logo.startsWith('https://') ? comp.logo : (comp.logo.startsWith('/') ? comp.logo : `/storage/${comp.logo}`)}
                         alt={comp.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {

@@ -276,7 +276,7 @@ class JobController extends Controller
             'experiences' => $experiences,
             'savedJobs'   => $savedJobUuids,
             'appliedJobs' => $appliedJobIds,
-            'filters'     => $request->only(
+            'filters'     => (object) $request->only(
                 'search',
                 'location',
                 'salary',
@@ -284,7 +284,8 @@ class JobController extends Controller
                 'experience',
                 'category',
                 'company',
-                'skill'
+                'skill',
+                'sort'
             ),
             'auth' => [
                 'user' => $user,

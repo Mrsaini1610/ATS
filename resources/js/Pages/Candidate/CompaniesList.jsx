@@ -215,7 +215,7 @@ export default function CompaniesList({ companies = [] }) {
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm text-white overflow-hidden shadow-xs bg-gradient-to-br from-blue-600 to-indigo-700 shrink-0">
                               {hasImageLogo ? (
                                 <img
-                                  src={`/storage/${comp.logo}`}
+                                  src={comp.logo.startsWith('http://') || comp.logo.startsWith('https://') ? comp.logo : (comp.logo.startsWith('/') ? comp.logo : `/storage/${comp.logo}`)}
                                   alt={comp.name}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {

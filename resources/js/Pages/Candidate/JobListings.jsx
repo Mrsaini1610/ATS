@@ -162,9 +162,12 @@ function JobDetailPanel({
           <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shrink-0 shadow-sm shadow-blue-500/10 overflow-hidden">
             {job.company_image ? (
               <img
-                src={job.company_image}
+                src={job.company_image.startsWith('http://') || job.company_image.startsWith('https://') ? job.company_image : (job.company_image.startsWith('/') ? job.company_image : `/storage/${job.company_image}`)}
                 alt={job.company}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                }}
               />
             ) : (
               companyInitials
@@ -729,13 +732,14 @@ export default function JobListings({
   };
 
   // Filter States
-  const [search, setSearch] = useState(filters?.search || filters?.skill || "");
-  const [location, setLocation] = useState(filters?.location || "all");
-  const [selectedCategory, setSelectedCategory] = useState(filters?.category || "all");
-  const [selectedJobType, setSelectedJobType] = useState(filters?.job_type || "all");
-  const [selectedExperience, setSelectedExperience] = useState(filters?.experience || "all");
-  const [salaryRange, setSalaryRange] = useState(filters?.salary || "all");
-  const [sortBy, setSortBy] = useState(filters?.sort || "latest");
+  const safeFilters = Array.isArray(filters) ? {} : (filters || {});
+  const [search, setSearch] = useState(safeFilters?.search || safeFilters?.skill || "");
+  const [location, setLocation] = useState(safeFilters?.location || "all");
+  const [selectedCategory, setSelectedCategory] = useState(safeFilters?.category || "all");
+  const [selectedJobType, setSelectedJobType] = useState(safeFilters?.job_type || "all");
+  const [selectedExperience, setSelectedExperience] = useState(safeFilters?.experience || "all");
+  const [salaryRange, setSalaryRange] = useState(safeFilters?.salary || "all");
+  const [sortBy, setSortBy] = useState(typeof safeFilters?.sort === "string" ? safeFilters.sort : "latest");
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -1244,9 +1248,12 @@ export default function JobListings({
                               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-sm font-black shrink-0 overflow-hidden shadow-2xs">
                                 {job.company_image ? (
                                   <img
-                                    src={job.company_image}
+                                    src={job.company_image.startsWith('http://') || job.company_image.startsWith('https://') ? job.company_image : (job.company_image.startsWith('/') ? job.company_image : `/storage/${job.company_image}`)}
                                     alt={job.company}
                                     className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.style.display = "none";
+                                    }}
                                   />
                                 ) : (
                                   companyInitials
