@@ -12,8 +12,10 @@ class JobApplication extends Model
     protected $fillable = [
         'uuid',
         'job_id',
+        'job_uuid',
         'candidate_id',
         'candidate_uuid',
+        'user_uuid',
         'cover_letter',
         'resume_url',
         'answers',
@@ -37,6 +39,10 @@ class JobApplication extends Model
         'offer_joining_date',
         'offer_letter_path',
         'offer_letter_sent_at',
+        'offer_facilities',
+        'offer_designation',
+        'offer_work_location',
+        'offer_terms',
         'candidate_name',
         'candidate_email',
         'candidate_phone',
@@ -54,6 +60,7 @@ class JobApplication extends Model
         'candidate_skills'    => 'array',
         'answers'             => 'array',
         'screening_answers'   => 'array',
+        'offer_facilities'    => 'array',
         'interview_date_time' => 'datetime',
         'offer_joining_date'  => 'date',
         'reviewed_at'         => 'datetime',
@@ -65,6 +72,48 @@ class JobApplication extends Model
             if (empty($application->uuid)) {
                 $application->uuid = (string) Str::uuid();
             }
+            if (!empty($application->candidate_uuid) && empty($application->user_uuid)) {
+                $application->user_uuid = $application->candidate_uuid;
+            }
+            if (!empty($application->user_uuid) && empty($application->candidate_uuid)) {
+                $application->candidate_uuid = $application->user_uuid;
+            }
+            if (empty($application->candidate_uuid) && !empty($application->candidate_id)) {
+                $application->candidate_uuid = User::where('id', $application->candidate_id)->value('uuid');
+                $application->user_uuid = $application->candidate_uuid;
+            }
+            if (empty($application->candidate_id) && !empty($application->candidate_uuid)) {
+                $application->candidate_id = User::where('uuid', $application->candidate_uuid)->value('id');
+            }
+            if (empty($application->job_uuid) && !empty($application->job_id)) {
+                $application->job_uuid = JobPost::where('id', $application->job_id)->value('uuid');
+            }
+            if (empty($application->job_id) && !empty($application->job_uuid)) {
+                $application->job_id = JobPost::where('uuid', $application->job_uuid)->value('id');
+            }
+            if ((empty($application->candidate_name) || empty($application->candidate_email)) && !empty($application->candidate_uuid)) {
+                $user = User::where('uuid', $application->candidate_uuid)->first();
+                if ($user) {
+                    $application->candidate_name = $application->candidate_name ?: ($user->full_name ?: ($user->name ?: 'Candidate'));
+                    $application->candidate_email = $application->candidate_email ?: ($user->email ?: 'candidate@example.com');
+                }
+            }
+        });
+
+        static::saving(function ($application) {
+            if (empty($application->uuid)) {
+                $application->uuid = (string) Str::uuid();
+            }
+            if (!empty($application->candidate_uuid) && empty($application->user_uuid)) {
+                $application->user_uuid = $application->candidate_uuid;
+            }
+            if (empty($application->candidate_uuid) && !empty($application->candidate_id)) {
+                $application->candidate_uuid = User::where('id', $application->candidate_id)->value('uuid');
+                $application->user_uuid = $application->candidate_uuid;
+            }
+            if (empty($application->job_uuid) && !empty($application->job_id)) {
+                $application->job_uuid = JobPost::where('id', $application->job_id)->value('uuid');
+            }
         });
     }
 
@@ -75,17 +124,17 @@ class JobApplication extends Model
 
     public function candidate()
     {
-        return $this->belongsTo(User::class, 'candidate_id');
+        return $this->belongsTo(User::class, 'candidate_uuid', 'uuid');
     }
 
     public function jobPost()
     {
-        return $this->belongsTo(JobPost::class, 'job_id');
+        return $this->belongsTo(JobPost::class, 'job_uuid', 'uuid');
     }
 
     public function job()
     {
-        return $this->belongsTo(JobPost::class, 'job_id');
+        return $this->belongsTo(JobPost::class, 'job_uuid', 'uuid');
     }
 
     public function assignedCallingMember()

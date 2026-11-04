@@ -96,6 +96,7 @@ class CandidateAuthController extends Controller
                 'full_name'           => 'Candidate ' . substr($phone, -4),
                 'username'            => 'user_' . $phone,
                 'password'            => Hash::make(uniqid('pass_')),
+                'registered_from'     => 'web',
                 'city'                => $detectedCity,
                 'area'                => $detectedArea,
                 'web_latitude'        => $lat,
@@ -128,6 +129,12 @@ class CandidateAuthController extends Controller
         // Login candidate
         Auth::guard('web')->login($user, remember: true);
         $request->session()->regenerate();
+
+        // Enforce single web session (invalidates any older web session on other devices/browsers)
+        $user->update([
+            'current_web_session_id' => $request->session()->getId(),
+            'last_web_login_at'      => now(),
+        ]);
 
         // Check if profile is complete
         $isProfileComplete = $user->isProfileComplete();

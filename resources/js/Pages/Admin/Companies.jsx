@@ -17,6 +17,10 @@ import {
   Users,
   AlertCircle,
   Compass,
+  ExternalLink,
+  Calendar,
+  Navigation,
+  Check,
 } from "lucide-react";
 
 const COLORS = [
@@ -624,8 +628,14 @@ export default function Companies({ companies = [] }) {
         </div>
 
         {/* Companies Grid */}
-        <div className="flex gap-6 items-start">
-          <div className="flex-1 flex flex-wrap gap-4">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div
+            className={`transition-all ${
+              selectedCompany
+                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3.5 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                : "w-full flex-1 flex flex-wrap gap-4"
+            }`}
+          >
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
               const isSelected = selectedCompany?.uuid === company.uuid;
@@ -640,11 +650,13 @@ export default function Companies({ companies = [] }) {
                 <div
                   key={company.uuid}
                   onClick={() => setSelectedCompany(company)}
-                  className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[calc(50%-8px)] ${
-                    selectedCompany ? "xl:w-[calc(50%-8px)]" : "xl:w-[calc(33.333%-11px)]"
+                  className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
+                    selectedCompany
+                      ? "w-full ring-1 ring-blue-100"
+                      : "w-full sm:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]"
                   } ${
                     isSelected
-                      ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/25"
+                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30"
                       : "border-gray-100 hover:border-blue-200"
                   }`}
                 >
@@ -790,17 +802,18 @@ export default function Companies({ companies = [] }) {
             )}
           </div>
 
-          {/* Right side active jobs panel */}
+          {/* Right side comprehensive Company Details & Jobs inspection panel */}
           {selectedCompany && (
-            <div className="w-full lg:w-80 xl:w-96 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-140px)] sticky top-20 shadow-xs shrink-0 mb-12">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
+            <div className="w-full lg:w-96 xl:w-[420px] bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] lg:sticky lg:top-3 shadow-2xl shadow-blue-950/20 shrink-0 z-20 mb-12">
+              {/* Distinct High-Contrast Inspection Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   {selectedCompany.logo &&
                   (selectedCompany.logo.startsWith("http") ||
                     selectedCompany.logo.includes(".") ||
                     selectedCompany.logo.includes("/") ||
                     selectedCompany.logo.startsWith("company-logos/")) ? (
-                    <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+                    <div className="w-11 h-11 bg-white/10 border border-white/20 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 shadow-md">
                       <img
                         src={
                           selectedCompany.logo.startsWith("http")
@@ -814,66 +827,267 @@ export default function Companies({ companies = [] }) {
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
                             parent.className =
-                              "w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0";
+                              "w-11 h-11 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md";
                             parent.innerText = (selectedCompany.name || "C").slice(0, 2).toUpperCase();
                           }
                         }}
                       />
                     </div>
                   ) : (
-                    <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+                    <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md border border-white/20">
                       {selectedCompany.logo || (selectedCompany.name || "C").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <h3 className="font-bold text-gray-900 truncate">{selectedCompany.name}</h3>
-                    <p className="text-xs text-gray-500">Active Job Postings</p>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-white text-base truncate">{selectedCompany.name}</h3>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                          selectedCompany.status === "active"
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
+                        }`}
+                      >
+                        {selectedCompany.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-cyan-300 font-medium">Company Profile & Active Jobs</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setSelectedCompany(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                    className="text-xs font-semibold text-blue-200 hover:text-white px-2 py-1 bg-white/10 rounded-lg lg:hidden cursor-pointer"
                   >
                     ← Back
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedCompany(null)}
-                    className="p-1.5 text-gray-400 hover:bg-gray-200/60 rounded-lg cursor-pointer shrink-0"
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer transition shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-3">
-                {selectedCompany.jobs && selectedCompany.jobs.length > 0 ? (
-                  selectedCompany.jobs.map((job) => (
-                    <div
-                      key={job.uuid}
-                      className="border border-gray-100 rounded-xl p-3.5 bg-white hover:border-blue-200 transition flex items-center justify-between gap-3 shadow-2xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-900 text-sm truncate">{job.title}</p>
-                        <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium uppercase mt-1 inline-block">
-                          {job.status}
-                        </span>
-                      </div>
-                      <Link
-                        href={route("admin.jobs.index")}
-                        className="text-xs text-blue-600 hover:underline shrink-0 font-semibold"
-                      >
-                        View Details
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-16 text-gray-400">
-                    <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs">No active jobs posted by this company yet.</p>
+              {/* Scrollable Body with Clean Structured Sections */}
+              <div className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
+                {/* SECTION 1: Key Metadata Badges */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
+                      Company Size
+                    </span>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-blue-600" />
+                      {selectedCompany.company_size || "11 - 50 employees"}
+                    </span>
                   </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
+                      Live Job Posts
+                    </span>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
+                      {selectedCompany.jobs_count || 0} Openings
+                    </span>
+                  </div>
+                </div>
+
+                {/* SECTION 2: Web & Online Presence */}
+                {selectedCompany.website && (
+                  <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">
+                        Official Website
+                      </span>
+                      <a
+                        href={
+                          selectedCompany.website.startsWith("http")
+                            ? selectedCompany.website
+                            : `https://${selectedCompany.website}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-blue-600 hover:underline truncate block"
+                      >
+                        {selectedCompany.website}
+                      </a>
+                    </div>
+                    <a
+                      href={
+                        selectedCompany.website.startsWith("http")
+                          ? selectedCompany.website
+                          : `https://${selectedCompany.website}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-blue-600 text-white rounded-xl shadow-sm hover:bg-blue-700 transition shrink-0"
+                      title="Visit Website"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+
+                {/* SECTION 3: Physical Address & Location */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-blue-600" />
+                      Office Address & Coordinates
+                    </span>
+                    {selectedCompany.location && (
+                      <span className="text-[11px] bg-slate-200/80 text-slate-700 font-bold px-2 py-0.5 rounded-md">
+                        {selectedCompany.location}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                    {selectedCompany.address || "Address not provided"}
+                  </p>
+
+                  {/* GPS Coordinates & Google Maps Link */}
+                  <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    {selectedCompany.latitude && selectedCompany.longitude ? (
+                      <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
+                        <Compass className="w-3 h-3 text-emerald-600" />
+                        {Number(selectedCompany.latitude).toFixed(4)}, {Number(selectedCompany.longitude).toFixed(4)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">GPS not verified</span>
+                    )}
+
+                    <a
+                      href={
+                        selectedCompany.latitude && selectedCompany.longitude
+                          ? `https://www.google.com/maps/search/?api=1&query=${selectedCompany.latitude},${selectedCompany.longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedCompany.address || selectedCompany.name)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold transition"
+                    >
+                      <Navigation className="w-3 h-3" /> Open in Maps ↗
+                    </a>
+                  </div>
+                </div>
+
+                {/* SECTION 4: About / Description */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <span className="text-xs font-bold text-slate-800 block">About Company</span>
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                    {selectedCompany.description ||
+                      "No detailed company description added yet. Edit the company to include background, industry domain, and perks."}
+                  </p>
+                </div>
+
+                {/* SECTION 5: Active Job Postings */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4 text-blue-600" />
+                      Job Openings ({selectedCompany.jobs?.length || 0})
+                    </span>
+                    <Link
+                      href={route("admin.jobs.index")}
+                      className="text-[11px] text-blue-600 hover:underline font-bold"
+                    >
+                      All Jobs →
+                    </Link>
+                  </div>
+
+                  {selectedCompany.jobs && selectedCompany.jobs.length > 0 ? (
+                    selectedCompany.jobs.map((job) => (
+                      <div
+                        key={job.uuid}
+                        className="border border-slate-200 rounded-2xl p-3.5 bg-white hover:border-blue-300 transition shadow-xs space-y-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-bold text-gray-900 text-xs leading-tight">{job.title}</p>
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${
+                              job.status === "active"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {job.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                          {job.openings && <span>{job.openings} Openings</span>}
+                          {job.job_type && (
+                            <>
+                              <span>•</span>
+                              <span className="capitalize">{job.job_type.replace("_", " ")}</span>
+                            </>
+                          )}
+                          {job.salary && (
+                            <>
+                              <span>•</span>
+                              <span className="font-bold text-slate-700">{job.salary}</span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400">{job.location || selectedCompany.location}</span>
+                          <Link
+                            href={route("admin.jobs.index")}
+                            className="text-[11px] text-blue-600 hover:underline font-bold"
+                          >
+                            View Applicants →
+                          </Link>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                      <Briefcase className="w-6 h-6 mx-auto mb-1.5 opacity-40 text-slate-500" />
+                      <p className="text-xs font-medium">No active jobs posted under this company.</p>
+                      {can("create_jobs") && (
+                        <Link
+                          href={route("admin.jobs.index")}
+                          className="mt-2 inline-block text-[11px] font-bold text-blue-600 hover:underline"
+                        >
+                          + Post a Job for this Company
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Fixed Footer: Quick Administrative Actions */}
+              <div className="p-4 border-t border-slate-200 bg-slate-50/90 backdrop-blur-xs flex items-center gap-2 shrink-0 z-10">
+                {can("edit_companies") && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(selectedCompany)}
+                    className="flex-1 py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Edit Company
+                  </button>
+                )}
+                {can("status_companies") && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStatus(selectedCompany.uuid)}
+                    className={`flex-1 py-2.5 px-3 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                      selectedCompany.status === "active"
+                        ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                        : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {selectedCompany.status === "active" ? "Pause Hiring" : "Activate"}
+                  </button>
                 )}
               </div>
             </div>

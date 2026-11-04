@@ -54,6 +54,7 @@ class HandleInertiaRequests extends Middleware
                 $error   = $session ? $session->get('error') : null;
                 $warning = $session ? $session->get('warning') : null;
                 $info    = $session ? $session->get('info') : null;
+                $loggedOutOtherDevice = $session ? $session->get('logged_out_other_device') : null;
 
                 // Fallback: check if flasher envelopes exist in session
                 if ($session && $session->has('flasher::envelopes')) {
@@ -88,7 +89,8 @@ class HandleInertiaRequests extends Middleware
                     'error'   => $error,
                     'warning' => $warning,
                     'info'    => $info,
-                    '_key'    => ($success || $error || $warning || $info) ? uniqid('flash_', true) : null,
+                    'logged_out_other_device' => $loggedOutOtherDevice,
+                    '_key'    => ($success || $error || $warning || $info || $loggedOutOtherDevice) ? uniqid('flash_', true) : null,
                 ];
             }),
             'messages' => Inertia::always(function () use ($request) {

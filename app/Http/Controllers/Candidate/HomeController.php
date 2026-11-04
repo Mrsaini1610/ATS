@@ -20,6 +20,8 @@ class HomeController extends Controller
 {
     public function index(Request $request)
     {
+        JobPost::autoDeactivateExpiredPosts();
+
         $user = Auth::guard('web')->user();
 
         // 1. Stats Data (Dynamic)
@@ -181,11 +183,18 @@ class HomeController extends Controller
                     ->activeForCandidate()
                     ->count();
 
+                $logo = $comp->logo;
+                if ($logo && str_contains($logo, 'photo-1509391365360-2e959784a276')) {
+                    $logo = null;
+                } elseif ($logo && str_contains($logo, 'images.unsplash.com') && !str_contains($logo, 'auto=format')) {
+                    $logo .= '&auto=format&q=75';
+                }
+
                 return [
                     'uuid'     => $comp->uuid,
                     'name'     => $comp->name,
                     'slug'     => $comp->slug,
-                    'logo'     => $comp->logo,
+                    'logo'     => $logo,
                     'industry' => $comp->company_size ?: 'Corporate Services',
                     'location' => $comp->location ?: $comp->address ?: 'India',
                     'jobs'     => $jobsCount,
@@ -311,12 +320,19 @@ class HomeController extends Controller
                 $salaryText = "Up to ₹" . number_format((float) $job->max_salary) . " / {$unitLabel}";
             }
 
+            $companyImage = $job->company_image;
+            if ($companyImage && str_contains($companyImage, 'photo-1509391365360-2e959784a276')) {
+                $companyImage = null;
+            } elseif ($companyImage && str_contains($companyImage, 'images.unsplash.com') && !str_contains($companyImage, 'auto=format')) {
+                $companyImage .= '&auto=format&q=75';
+            }
+
             return [
                 'id'                 => $job->id,
                 'uuid'               => $job->uuid,
                 'title'              => $job->title,
                 'company'            => $job->company,
-                'company_image'      => $job->company_image,
+                'company_image'      => $companyImage,
                 'location'           => $job->location ?: 'Remote / India',
                 'salary'             => $salaryText,
                 'salary_type'        => $job->salary_type ?: 'monthly',

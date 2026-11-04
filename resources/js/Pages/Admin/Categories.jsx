@@ -11,6 +11,11 @@ import {
   ChevronRight,
   Tags,
   Search,
+  Layers,
+  FolderTree,
+  Briefcase,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { updateAdminField } from "@/Components/Admin/liveValidation";
 
@@ -28,6 +33,7 @@ export default function Categories({ categories = [] }) {
   const canViewSubcategories = can("view_subcategories");
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | active | inactive
   const [expandedId, setExpandedId] = useState(null);
   const [modal, setModal] = useState(null); // { mode: 'cat' | 'sub', action: 'add' | 'edit', parentUuid?: string, uuid?: string }
   const [deleteModal, setDeleteModal] = useState(null); // { type: 'category' | 'subcategory', uuid: string, catUuid?: string, subUuid?: string, name?: string }
@@ -151,13 +157,24 @@ export default function Categories({ categories = [] }) {
     const subMatch = (cat.subcategories || []).some((sub) =>
       (sub.name || "").toLowerCase().includes(term)
     );
-    return nameMatch || subMatch;
+    const matchesSearch = !term || nameMatch || subMatch;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && cat.status === "active") ||
+      (statusFilter === "inactive" && cat.status !== "active");
+
+    return matchesSearch && matchesStatus;
   });
 
   const totalSubcategories = categories.reduce(
     (acc, cat) => acc + (cat.subcategories?.length || 0),
     0
   );
+  const totalJobs = categories.reduce(
+    (acc, cat) => acc + (cat.job_count || 0),
+    0
+  );
+  const activeCategoriesCount = categories.filter((c) => c.status === "active").length;
 
   return (
     <>
@@ -315,9 +332,12 @@ export default function Categories({ categories = [] }) {
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Job Categories</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {categories.length} categories · {totalSubcategories} subcategories
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
+              <FolderTree className="w-6 h-6 text-blue-600" />
+              Category & Hierarchy Management
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Organize industry job domains, subcategories, and active role mappings.
             </p>
           </div>
 
@@ -325,30 +345,111 @@ export default function Categories({ categories = [] }) {
             <button
               type="button"
               onClick={openAddCategoryModal}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4" /> Add Category
+              <Plus className="w-4 h-4" /> Add New Category
             </button>
           )}
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-5 w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search categories or subcategories..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-          />
+        {/* Top Summary Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Categories</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Tags className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{categories.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Top-level industries</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Subcategories</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{totalSubcategories}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Specialized sub-tracks</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Jobs Linked</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Briefcase className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{totalJobs.toLocaleString()}</p>
+            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Live role mappings</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Active Status</span>
+              <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                <Check className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{activeCategoriesCount}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Enabled for candidates</p>
+          </div>
+        </div>
+
+        {/* Search Bar & Filter Tabs */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 items-stretch sm:items-center justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search category or subcategory name..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 self-start sm:self-auto shrink-0 shadow-2xs">
+            {[
+              { id: "all", label: "All", count: categories.length },
+              { id: "active", label: "Active", count: activeCategoriesCount },
+              { id: "inactive", label: "Inactive", count: categories.length - activeCategoriesCount },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                  statusFilter === tab.id
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Category List */}
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 py-12 text-center text-sm text-gray-400">
-              Koi category nahi mili.
+            <div className="bg-white rounded-3xl border border-slate-200 py-16 text-center text-slate-400 shadow-sm">
+              <FolderTree className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              <p className="font-bold text-slate-700 text-sm">No matching categories found</p>
+              <p className="text-xs text-slate-400 mt-1">Try clearing your search query or add a new category.</p>
             </div>
           ) : (
             filtered.map((cat) => {
@@ -359,157 +460,188 @@ export default function Categories({ categories = [] }) {
               return (
                 <div
                   key={cat.uuid}
-                  className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-xs"
+                  className={`bg-white border rounded-2xl overflow-hidden transition-all duration-200 shadow-xs ${
+                    isExpanded ? "border-blue-300 ring-2 ring-blue-500/10" : "border-slate-200/90 hover:border-slate-300"
+                  }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3.5 sm:py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4">
                     <button
                       type="button"
                       onClick={() => setExpandedId(isExpanded ? null : cat.uuid)}
-                      className="flex items-center gap-3.5 flex-1 min-w-0 text-left cursor-pointer"
+                      className="flex items-center gap-3.5 flex-1 min-w-0 text-left cursor-pointer group"
                     >
-                      <span className="text-2xl select-none">{cat.icon || "📁"}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 truncate">{cat.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {(cat.job_count ?? 0).toLocaleString()} jobs · {subCount} subcategories
-                        </p>
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 flex items-center justify-center text-2xl select-none shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                        {cat.icon || "📁"}
                       </div>
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
-                      )}
-                    </button>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ${
-                          isActive
-                            ? "bg-green-50 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {isActive ? "Active" : "Inactive"}
-                      </span>
-
-                      {(can("create_categories") || can("edit_categories") || can("status_categories") || can("delete_categories") || can("create_subcategories")) && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {can("create_subcategories") && <button
-                            type="button"
-                            onClick={() => openAddSubcategoryModal(cat.uuid)}
-                            className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg cursor-pointer transition"
-                            title="Add subcategory"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>}
-                          {can("edit_categories") && <button
-                            type="button"
-                            onClick={() => openEditCategoryModal(cat)}
-                            className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
-                            title="Edit category"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>}
-                          {can("status_categories") && <button
-                            type="button"
-                            onClick={() => handleToggleStatus(cat.uuid)}
-                            className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer transition ${
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-black text-slate-900 text-base truncate group-hover:text-blue-600 transition-colors">
+                            {cat.name}
+                          </p>
+                          <span
+                            className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                               isActive
-                                ? "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                                : "text-green-700 bg-green-50 hover:bg-green-100"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-600 border border-slate-200"
                             }`}
                           >
-                            {isActive ? "Turn Off" : "Turn On"}
-                          </button>}
-                          {can("delete_categories") && <button
-                            type="button"
-                            onClick={() => handleDeleteCategory(cat)}
-                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
-                            title="Delete category"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>}
+                            {isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                          <span className="font-bold text-slate-700">
+                            {(cat.job_count ?? 0).toLocaleString()} jobs
+                          </span>
+                          <span>•</span>
+                          <span>{subCount} subcategories</span>
+                        </div>
+                      </div>
+                      <div className="p-1 rounded-lg text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition">
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5" />
+                        )}
+                      </div>
+                    </button>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      {(can("create_subcategories") || can("edit_categories") || can("status_categories") || can("delete_categories")) && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {can("create_subcategories") && (
+                            <button
+                              type="button"
+                              onClick={() => openAddSubcategoryModal(cat.uuid)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl cursor-pointer transition shadow-2xs"
+                              title="Add subcategory to this category"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Sub
+                            </button>
+                          )}
+                          {can("edit_categories") && (
+                            <button
+                              type="button"
+                              onClick={() => openEditCategoryModal(cat)}
+                              className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl cursor-pointer transition shadow-2xs"
+                              title="Edit Category Name & Icon"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {can("status_categories") && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus(cat.uuid)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition shadow-2xs border ${
+                                isActive
+                                  ? "text-slate-600 bg-slate-100 border-slate-200 hover:bg-slate-200"
+                                  : "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100"
+                              }`}
+                            >
+                              {isActive ? "Turn Off" : "Turn On"}
+                            </button>
+                          )}
+                          {can("delete_categories") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(cat)}
+                              className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition shadow-2xs"
+                              title="Delete Category"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Subcategories Accordion */}
+                  {/* Subcategories Accordion with Modern Cards / Grid */}
                   {isExpanded && canViewSubcategories && (
-                    <div className="border-t border-gray-100 bg-gray-50/60 px-4 sm:px-5 py-3 space-y-2">
+                    <div className="border-t border-slate-200/80 bg-slate-50/70 p-4 sm:p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                          Subcategories inside {cat.name} ({subCount})
+                        </span>
+                        {can("create_subcategories") && (
+                          <button
+                            type="button"
+                            onClick={() => openAddSubcategoryModal(cat.uuid)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add Subcategory
+                          </button>
+                        )}
+                      </div>
+
                       {subCount > 0 ? (
-                        cat.subcategories.map((sub) => {
-                          const isSubActive = (sub.status ?? "active") === "active";
-                          return (
-                            <div
-                              key={sub.uuid}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 px-3 rounded-xl hover:bg-white/80 transition"
-                            >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0 ml-1 sm:ml-4" />
-                                <p className="text-sm font-medium text-gray-700 truncate">
-                                  {sub.name}
-                                </p>
-                                <p className="text-xs text-gray-400 shrink-0">
-                                  {sub.job_count ?? 0} jobs
-                                </p>
-                              </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {cat.subcategories.map((sub) => {
+                            const isSubActive = (sub.status ?? "active") === "active";
+                            return (
+                              <div
+                                key={sub.uuid}
+                                className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2 shadow-2xs hover:border-blue-200 transition"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`w-2 h-2 rounded-full shrink-0 ${
+                                        isSubActive ? "bg-emerald-500" : "bg-slate-300"
+                                      }`}
+                                    />
+                                    <p className="text-xs font-bold text-slate-900 truncate">
+                                      {sub.name}
+                                    </p>
+                                  </div>
+                                  <p className="text-[11px] text-slate-400 mt-0.5 ml-4">
+                                    {sub.job_count ?? 0} active jobs
+                                  </p>
+                                </div>
 
-                              <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pl-4 sm:pl-0">
-                                <span
-                                  className={`text-[11px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${
-                                    isSubActive
-                                      ? "bg-green-50 text-green-700"
-                                      : "bg-gray-100 text-gray-500"
-                                  }`}
-                                >
-                                  {isSubActive ? "Active" : "Inactive"}
-                                </span>
-
-                              {(can("status_subcategories") || can("edit_subcategories") || can("delete_subcategories")) && (
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                   {can("status_subcategories") && (
                                     <button
                                       type="button"
                                       onClick={() => handleToggleSubcategoryStatus(cat.uuid, sub.uuid)}
-                                      className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer transition ${
+                                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer transition ${
                                         isSubActive
-                                          ? "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                                          : "text-green-700 bg-green-50 hover:bg-green-100"
+                                          ? "text-slate-600 bg-slate-100 hover:bg-slate-200"
+                                          : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                                       }`}
                                     >
-                                      {isSubActive ? "Turn Off" : "Turn On"}
+                                      {isSubActive ? "Active" : "Off"}
                                     </button>
                                   )}
                                   {can("edit_subcategories") && (
                                     <button
                                       type="button"
                                       onClick={() => openEditSubcategoryModal(cat.uuid, sub)}
-                                      className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-md cursor-pointer transition"
-                                      title="Edit subcategory"
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition"
+                                      title="Edit"
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <Edit3 className="w-3 h-3" />
                                     </button>
                                   )}
                                   {can("delete_subcategories") && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteSubcategory(cat.uuid, sub)}
-                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md cursor-pointer transition"
-                                      title="Delete subcategory"
+                                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition"
+                                      title="Delete"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-3 h-3" />
                                     </button>
                                   )}
                                 </div>
-                              )}
                               </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })}
+                        </div>
                       ) : (
-                        <div className="px-6 py-3 text-xs text-gray-400">
-                          Abhi koi subcategory nahi hai. Nayi jodne ke liye upar <b>+</b> par click karein.
+                        <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                          No subcategories under {cat.name} yet. Click "+ Add Subcategory" to create one.
                         </div>
                       )}
                     </div>

@@ -28,6 +28,8 @@ export default function Footer() {
                             <img
                                 src="/images/logo.png"
                                 alt="ATS.com"
+                                width={36}
+                                height={36}
                                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
                             />
                             <div className="flex items-baseline gap-0.5">
@@ -48,30 +50,30 @@ export default function Footer() {
                             <a
                                 href="#"
                                 aria-label="Facebook"
-                                className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-400 hover:text-white transition"
+                                className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-400 hover:text-white transition"
                             >
-                                <Facebook size={13} />
+                                <Facebook size={15} />
                             </a>
                             <a
                                 href="#"
                                 aria-label="LinkedIn"
-                                className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-400 hover:text-white transition"
+                                className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 hover:bg-blue-600 hover:border-blue-600 flex items-center justify-center text-slate-400 hover:text-white transition"
                             >
-                                <Linkedin size={13} />
+                                <Linkedin size={15} />
                             </a>
                             <a
                                 href="#"
                                 aria-label="Instagram"
-                                className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 hover:bg-pink-600 hover:border-pink-600 flex items-center justify-center text-slate-400 hover:text-white transition"
+                                className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 hover:bg-pink-600 hover:border-pink-600 flex items-center justify-center text-slate-400 hover:text-white transition"
                             >
-                                <Instagram size={13} />
+                                <Instagram size={15} />
                             </a>
                             <a
                                 href="#"
                                 aria-label="Twitter"
-                                className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 hover:bg-sky-500 hover:border-sky-500 flex items-center justify-center text-slate-400 hover:text-white transition"
+                                className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 hover:bg-sky-500 hover:border-sky-500 flex items-center justify-center text-slate-400 hover:text-white transition"
                             >
-                                <Twitter size={13} />
+                                <Twitter size={15} />
                             </a>
                         </div>
                     </div>
@@ -81,29 +83,29 @@ export default function Footer() {
                         <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
                             Candidates
                         </h4>
-                        <ul className="space-y-1.5 text-xs text-slate-400">
+                        <ul className="space-y-1 text-xs text-slate-400">
                             <li>
-                                <Link href="/" className="hover:text-white transition">
+                                <Link href="/" className="inline-block py-1 hover:text-white transition">
                                     Home
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/job-search" className="hover:text-white transition">
+                                <Link href="/job-search" className="inline-block py-1 hover:text-white transition">
                                     Search Jobs
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/categories" className="hover:text-white transition">
+                                <Link href="/categories" className="inline-block py-1 hover:text-white transition">
                                     Browse Categories
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/companies" className="hover:text-white transition">
+                                <Link href="/companies" className="inline-block py-1 hover:text-white transition">
                                     Top Companies
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/services" className="hover:text-white transition">
+                                <Link href="/services" className="inline-block py-1 hover:text-white transition">
                                     Career Services
                                 </Link>
                             </li>
@@ -115,19 +117,19 @@ export default function Footer() {
                         <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
                             Company
                         </h4>
-                        <ul className="space-y-1.5 text-xs text-slate-400">
+                        <ul className="space-y-1 text-xs text-slate-400">
                             <li>
-                                <Link href="/about" className="hover:text-white transition">
+                                <Link href="/about" className="inline-block py-1 hover:text-white transition">
                                     About Us
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/contact" className="hover:text-white transition">
+                                <Link href="/contact" className="inline-block py-1 hover:text-white transition">
                                     Contact Support
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/faq" className="hover:text-white transition">
+                                <Link href="/faq" className="inline-block py-1 hover:text-white transition">
                                     FAQs
                                 </Link>
                             </li>

@@ -3,83 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Candidate Application</title>
+    <title>New Applicant Alert - {{ config('app.name', 'ATS') }}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F2937;">
-    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 580px; margin: 30px auto; background-color: #FFFFFF; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #E5E7EB;">
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); border: 1px solid #E2E8F0;">
         <!-- Header -->
         <tr>
-            <td align="center" style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 30px 20px;">
-                <div style="font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;">
-                    📥 New Candidate Application
+            <td style="background: linear-gradient(135deg, #1E293B 0%, #334155 100%); padding: 30px; text-align: left;">
+                <div style="display: inline-block; background: rgba(59,130,246,0.25); border: 1px solid #3B82F6; border-radius: 999px; padding: 3px 12px; font-size: 11px; font-weight: 800; color: #93C5FD; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">
+                    🎯 Candidate Applied
                 </div>
-                <div style="font-size: 13px; color: #EDE9FE; margin-top: 4px; font-weight: 500;">
-                    {{ $roleContext ?? 'Applicant Tracking System Alert' }}
+                <div style="font-size: 23px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px;">
+                    New Applicant: {{ $candidateName }}
+                </div>
+                <div style="font-size: 14px; color: #CBD5E1; margin-top: 4px; font-weight: 500;">
+                    Applied for <strong>{{ $jobTitle }}</strong> at {{ $companyName }}
                 </div>
             </td>
         </tr>
 
-        <!-- Body -->
+        <!-- Content -->
         <tr>
-            <td style="padding: 32px 28px;">
-                <p style="margin: 0 0 16px; font-size: 15px; color: #4B5563;">
-                    Hello <strong>{{ $recipientName ?? 'Admin' }}</strong>,
-                </p>
-                <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #374151;">
-                    A candidate has applied for <strong>{{ $jobTitle }}</strong> at <strong>{{ $companyName }}</strong>.
+            <td style="padding: 30px;">
+                <p style="margin: 0 0 16px; font-size: 14.5px; color: #475569;">
+                    Hello <strong>{{ $recipientName ?? 'Recruitment Team' }}</strong> ({{ $roleContext ?? 'Coordinator' }}),<br>
+                    A new candidate has submitted an application for the job posting in your management queue.
                 </p>
 
-                <!-- Candidate Info Card -->
-                <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #FAF5FF; border-radius: 8px; border: 1px solid #E9D5FF; border-left: 4px solid #7C3AED; margin: 20px 0;">
+                <!-- Candidate Profile Snapshot Card -->
+                <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 12px; margin-bottom: 24px;">
                     <tr>
-                        <td style="padding: 18px 20px;">
-                            <div style="font-size: 16px; font-weight: 700; color: #581C87; margin-bottom: 12px;">
-                                👤 {{ $candidateName }}
+                        <td style="padding: 20px;">
+                            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #2563EB; letter-spacing: 0.5px; margin-bottom: 12px;">
+                                📋 Candidate Profile Snapshot
                             </div>
-                            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 13px;">
+                            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 13.5px; line-height: 1.8;">
                                 <tr>
-                                    <td style="padding: 5px 0; color: #6B7280; width: 35%;">Email:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">{{ $candidateEmail ?? 'N/A' }}</td>
+                                    <td style="color: #64748B; width: 35%;">Candidate Name:</td>
+                                    <td style="color: #0F172A; font-weight: 800;">{{ $candidateName }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 5px 0; color: #6B7280;">Phone:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">{{ $candidatePhone ?? 'N/A' }}</td>
+                                    <td style="color: #64748B;">Contact Phone:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">
+                                        <a href="tel:{{ $candidatePhone }}" style="color: #2563EB; text-decoration: none;">{{ $candidatePhone ?? '—' }}</a>
+                                    </td>
                                 </tr>
-                                @if(!empty($candidateExperience))
                                 <tr>
-                                    <td style="padding: 5px 0; color: #6B7280;">Experience:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">{{ $candidateExperience }}</td>
+                                    <td style="color: #64748B;">Email Address:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">
+                                        <a href="mailto:{{ $candidateEmail }}" style="color: #2563EB; text-decoration: none;">{{ $candidateEmail ?? '—' }}</a>
+                                    </td>
                                 </tr>
-                                @endif
-                                @if(!empty($candidateCity))
                                 <tr>
-                                    <td style="padding: 5px 0; color: #6B7280;">City:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">{{ $candidateCity }}</td>
+                                    <td style="color: #64748B;">Total Experience:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">{{ $candidateExperience ?? 'Fresher' }}</td>
                                 </tr>
-                                @endif
+                                <tr>
+                                    <td style="color: #64748B;">Current Location:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">📍 {{ $candidateCity ?? 'India' }}</td>
+                                </tr>
                                 @if(!empty($candidateSkills))
                                 <tr>
-                                    <td style="padding: 5px 0; color: #6B7280;">Skills:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">
+                                    <td style="color: #64748B; vertical-align: top;">Key Skills:</td>
+                                    <td style="color: #334155; font-weight: 600;">
                                         {{ is_array($candidateSkills) ? implode(', ', $candidateSkills) : $candidateSkills }}
                                     </td>
                                 </tr>
                                 @endif
-                                <tr>
-                                    <td style="padding: 5px 0; color: #6B7280;">Applied At:</td>
-                                    <td style="padding: 5px 0; font-weight: 600; color: #1F2937;">{{ now()->format('d M Y, h:i A') }}</td>
-                                </tr>
                             </table>
                         </td>
                     </tr>
                 </table>
 
-                <!-- Action Button -->
-                <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                <!-- Actions -->
+                <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin: 20px 0 10px;">
                     <tr>
-                        <td align="center" style="padding: 15px 0;">
-                            <a href="{{ $actionUrl ?? url('/admin/applications') }}" style="display: inline-block; background-color: #7C3AED; color: #FFFFFF; font-weight: 600; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px;">
-                                Review Application
+                        <td align="center">
+                            <a href="{{ $actionUrl ?? url('/admin/applications') }}" style="display: inline-block; background-color: #2563EB; color: #FFFFFF; font-size: 14.5px; font-weight: 800; text-decoration: none; padding: 13px 34px; border-radius: 12px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">
+                                Review & Shortlist Application →
                             </a>
                         </td>
                     </tr>
@@ -89,8 +90,8 @@
 
         <!-- Footer -->
         <tr>
-            <td style="background-color: #F9FAFB; padding: 18px 28px; border-top: 1px solid #E5E7EB; text-align: center; font-size: 12px; color: #9CA3AF;">
-                <p style="margin: 0;">Sent by {{ config('app.name', 'ATS') }} Admin Management Center.</p>
+            <td style="background-color: #F8FAFC; padding: 18px 30px; border-top: 1px solid #E2E8F0; text-align: center; font-size: 12px; color: #94A3B8;">
+                <p style="margin: 0;">ATS Recruiter Automated Dispatch Notification</p>
             </td>
         </tr>
     </table>

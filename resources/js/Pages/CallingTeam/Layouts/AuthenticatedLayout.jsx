@@ -8,6 +8,7 @@ import { Toaster } from "react-hot-toast";
 import { FaBell, FaSun } from "react-icons/fa";
 import Sidebar from "./Sidebar";
 import UserDropdown from "./UserDropdown";
+import RealtimeNotificationToast from "@/Components/Common/RealtimeNotificationToast";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -208,6 +209,7 @@ export default function AuthenticatedLayout({ children }) {
 
     return (
         <>
+            <RealtimeNotificationToast />
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
             <div className="min-h-screen dark:bg-[#0a0e25] bg-gray-100">

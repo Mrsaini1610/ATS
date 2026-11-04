@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
 use App\Models\Admin;
+use App\Services\AuditLogService;
 use App\Services\MailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -242,6 +243,15 @@ class JobApplicationController extends Controller
             \Illuminate\Support\Facades\Log::warning('Failed sending application status email/notifications: ' . $e->getMessage());
         }
 
+        // Audit Trail Log
+        AuditLogService::log(
+            'application_status_updated',
+            "Application #{$application->id} ({$application->candidate_name}) status updated to '{$validated['status']}'",
+            ['new_status' => $validated['status'], 'notes' => $application->admin_notes],
+            'applications',
+            $application
+        );
+
         return redirect()->back()->with('success', "Application status updated to {$validated['status']}.");
     }
 
@@ -272,6 +282,14 @@ class JobApplicationController extends Controller
             );
         } catch (\Throwable $e) {}
 
+        AuditLogService::log(
+            'application_assigned',
+            "Application #{$application->id} ({$application->candidate_name}) assigned to team member " . ($assignee?->name ?? "#{$validated['team_member_id']}"),
+            ['team_member_id' => $validated['team_member_id']],
+            'applications',
+            $application
+        );
+
         return redirect()->back()->with('success', 'Application successfully assigned to team member.');
     }
 
@@ -290,26 +308,53 @@ class JobApplicationController extends Controller
     public function saveOfferDetails(Request $request, JobApplication $application)
     {
         $validated = $request->validate([
-            'salary'       => 'nullable|string|max:255',
-            'joining_date' => 'nullable|date',
+            'salary'        => 'nullable|string|max:255',
+            'joining_date'  => 'nullable|date',
+            'designation'   => 'nullable|string|max:255',
+            'work_location' => 'nullable|string|max:255',
+            'facilities'    => 'nullable|array',
+            'facilities.*'  => 'nullable|string|max:255',
+            'terms'         => 'nullable|string',
         ]);
 
-        $application->offer_salary_package = $validated['salary'] ?? null;
-        $application->offer_joining_date = $validated['joining_date'] ?? null;
+        $application->offer_salary_package      = $validated['salary'] ?? null;
+        $application->offer_joining_date        = $validated['joining_date'] ?? null;
+        $application->offer_designation         = $validated['designation'] ?? null;
+        $application->offer_work_location       = $validated['work_location'] ?? null;
+        $application->offer_facilities          = $validated['facilities'] ?? [];
+        $application->offer_terms               = $validated['terms'] ?? null;
         $application->offer_letter_triggered_at = now();
-        $application->status = 'hired';
+        $application->offer_letter_sent_at      = now();
+        $application->status                    = 'offer_letter_generated';
         $application->save();
 
-        // Dispatch Offer Letter Email & Notifications to Candidate + Super Admin
+        // Dispatch Offer Letter Email & Notifications to Candidate + Super Admin + Creator Admin
         try {
             MailService::sendOfferLetter($application, [
-                'salary'       => $validated['salary'] ?? null,
-                'joining_date' => $validated['joining_date'] ?? null,
+                'salary'        => $validated['salary'] ?? null,
+                'joining_date'  => $validated['joining_date'] ?? null,
+                'designation'   => $validated['designation'] ?? null,
+                'work_location' => $validated['work_location'] ?? null,
+                'facilities'    => $validated['facilities'] ?? [],
+                'terms'         => $validated['terms'] ?? null,
             ]);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Failed sending offer letter email/notifications: ' . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Offer details recorded.');
+        AuditLogService::log(
+            'offer_letter_generated',
+            "Offer letter issued to {$application->candidate_name} for {$application->offer_designation} ({$application->offer_salary_package})",
+            [
+                'designation'  => $application->offer_designation,
+                'salary'       => $application->offer_salary_package,
+                'joining_date' => $application->offer_joining_date,
+                'facilities'   => $application->offer_facilities,
+            ],
+            'offers',
+            $application
+        );
+
+        return redirect()->back()->with('success', 'Offer Letter successfully generated & sent to candidate.');
     }
 }

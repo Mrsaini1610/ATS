@@ -17,6 +17,7 @@ class UserNotification extends Model
     protected $fillable = [
         'uuid',
         'user_id',
+        'user_uuid',
         'type',
         'title',
         'body',
@@ -35,6 +36,18 @@ class UserNotification extends Model
         return ['uuid'];
     }
 
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (!empty($model->user_id) && empty($model->user_uuid)) {
+                $model->user_uuid = User::where('id', $model->user_id)->value('uuid');
+            }
+            if (!empty($model->user_uuid) && empty($model->user_id)) {
+                $model->user_id = User::where('uuid', $model->user_uuid)->value('id');
+            }
+        });
+    }
+
     public function getRouteKeyName(): string
     {
         return 'uuid';
@@ -42,7 +55,7 @@ class UserNotification extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_uuid', 'uuid');
     }
 
     public function isRead(): bool

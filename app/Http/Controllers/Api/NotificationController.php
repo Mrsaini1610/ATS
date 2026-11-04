@@ -27,7 +27,9 @@ class NotificationController extends Controller
         // Auto-sync dynamic notifications for candidate
         $this->syncCandidateNotifications($user);
 
-        $notifications = UserNotification::where('user_id', $user->id)
+        $notifications = UserNotification::where(function ($q) use ($user) {
+                $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+            })
             ->latest()
             ->take(50)
             ->get()
@@ -83,7 +85,9 @@ class NotificationController extends Controller
             return response()->json(['status' => false, 'message' => 'Notification ID is required'], 422);
         }
 
-        $notification = UserNotification::where('user_id', $user->id)
+        $notification = UserNotification::where(function ($q) use ($user) {
+                $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+            })
             ->where(function ($q) use ($targetId) {
                 $q->where('uuid', $targetId)->orWhere('id', $targetId);
             })
@@ -118,7 +122,9 @@ class NotificationController extends Controller
             return response()->json(['status' => false, 'message' => 'Unauthenticated'], 401);
         }
 
-        $affected = UserNotification::where('user_id', $user->id)
+        $affected = UserNotification::where(function ($q) use ($user) {
+                $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+            })
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
@@ -144,7 +150,9 @@ class NotificationController extends Controller
             return response()->json(['status' => false, 'message' => 'Notification ID is required'], 422);
         }
 
-        $notification = UserNotification::where('user_id', $user->id)
+        $notification = UserNotification::where(function ($q) use ($user) {
+                $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+            })
             ->where(function ($q) use ($targetId) {
                 $q->where('uuid', $targetId)->orWhere('id', $targetId);
             })
@@ -170,7 +178,9 @@ class NotificationController extends Controller
             return response()->json(['status' => false, 'message' => 'Unauthenticated'], 401);
         }
 
-        $deleted = UserNotification::where('user_id', $user->id)->delete();
+        $deleted = UserNotification::where(function ($q) use ($user) {
+                $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+            })->delete();
 
         return response()->json([
             'status'  => true,
@@ -187,7 +197,9 @@ class NotificationController extends Controller
         try {
             // 1. Applications updates
             $applications = JobApplication::with(['jobPost'])
-                ->where('candidate_id', $user->id)
+                ->where(function ($q) use ($user) {
+                    $q->where('candidate_uuid', $user->uuid)->orWhere('candidate_id', $user->id);
+                })
                 ->latest()
                 ->take(10)
                 ->get();
@@ -195,9 +207,11 @@ class NotificationController extends Controller
             foreach ($applications as $app) {
                 $jobTitle = $app->jobPost?->title ?: 'your applied position';
                 $companyName = $app->jobPost?->company ?: 'the employer';
-                $refKey = "app_{$app->id}_{$app->status}";
+                $refKey = "app_{$app->uuid}_{$app->status}";
 
-                $exists = UserNotification::where('user_id', $user->id)
+                $exists = UserNotification::where(function ($q) use ($user) {
+                        $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+                    })
                     ->where('data->ref', $refKey)
                     ->exists();
 
@@ -230,20 +244,23 @@ class NotificationController extends Controller
 
                     UserNotification::create([
                         'user_id'    => $user->id,
+                        'user_uuid'  => $user->uuid,
                         'type'       => $type,
                         'title'      => $title,
                         'body'       => $body,
                         'action_url' => '/my-applications',
-                        'data'       => ['ref' => $refKey, 'application_id' => $app->id, 'job_id' => $app->job_id],
+                        'data'       => ['ref' => $refKey, 'application_uuid' => $app->uuid, 'job_uuid' => $app->job_uuid],
                         'created_at' => $app->updated_at ?: now(),
                     ]);
                 }
             }
 
             // 2. Profile completion tip / incomplete notice
-            $profileRef = "profile_tip_" . $user->id;
+            $profileRef = "profile_tip_" . ($user->uuid ?: $user->id);
             if (method_exists($user, 'isProfileComplete') && !$user->isProfileComplete()) {
-                $exists = UserNotification::where('user_id', $user->id)
+                $exists = UserNotification::where(function ($q) use ($user) {
+                        $q->where('user_uuid', $user->uuid)->orWhere('user_id', $user->id);
+                    })
                     ->where('data->ref', $profileRef)
                     ->exists();
 

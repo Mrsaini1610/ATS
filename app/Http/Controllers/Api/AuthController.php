@@ -192,6 +192,7 @@ class AuthController extends Controller
                 $user = User::create([
                     'phone'               => $phone,
                     'username'            => 'user_' . $phone,
+                    'registered_from'     => 'app',
                     'is_profile_complete' => false,
                     'app_is_online'       => true,
                     'app_last_active'     => now(),
@@ -212,6 +213,19 @@ class AuthController extends Controller
             $fcmToken = $request->input('fcm_token') ?? $request->input('fcmToken');
             $deviceId = $request->input('device_id') ?? $request->input('deviceId') ?? 'app_device';
 
+            // Check if user was previously logged in on another mobile device
+            $previousDeviceId = $user->current_app_device_id;
+            if ($previousDeviceId && $previousDeviceId !== $deviceId) {
+                try {
+                    PushNotificationService::sendCandidatePersonal(
+                        $user,
+                        'Device Session Expired',
+                        'Aapka account kisi dusre mobile device par login ho gaya hai. Suraksha ke liye is device par logout kar diya gaya hai.',
+                        ['type' => 'LOGGED_OUT_OTHER_DEVICE']
+                    );
+                } catch (Throwable $e) {}
+            }
+
             if (!empty($fcmToken)) {
                 try {
                     FcmToken::updateOrCreate(
@@ -230,7 +244,15 @@ class AuthController extends Controller
                 }
             }
 
-            // 4. Issue Sanctum Token for the app
+            // 4. Enforce Single App Session: Revoke all prior mobile app tokens
+            $user->tokens()->where('name', 'auth_token')->delete();
+
+            $user->update([
+                'current_app_device_id' => $deviceId,
+                'last_app_login_at'     => now(),
+            ]);
+
+            // Issue new Sanctum Token for this active app device
             $token = $user->createToken('auth_token')->plainTextToken;
 
             // 5. Load candidate relations

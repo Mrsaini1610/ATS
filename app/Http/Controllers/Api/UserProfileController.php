@@ -56,6 +56,10 @@ public function getProfile(Request $request, GeocodingService $geocodingService)
         $user->saveQuietly();
     }
 
+    $isSnoozed = !empty($user->profile_prompt_snoozed_until) && now()->lessThan($user->profile_prompt_snoozed_until);
+    $userData['profile_prompt_snoozed_until'] = $user->profile_prompt_snoozed_until ? $user->profile_prompt_snoozed_until->toIso8601String() : null;
+    $userData['can_prompt_profile_update'] = !$completionData['is_complete'] && !$isSnoozed;
+
     return response()->json([
         'status'  => true,
         'message' => 'Profile fetched successfully',
@@ -270,6 +274,11 @@ private function parseAddressComponents(array $geoResult): array
                 }
             }
 
+            if ($completionData['is_complete'] && !empty($user->profile_prompt_snoozed_until)) {
+                $user->profile_prompt_snoozed_until = null;
+                $user->saveQuietly();
+            }
+
             $freshUser = $user->fresh([
                 'educations',
                 'experiences',
@@ -279,6 +288,9 @@ private function parseAddressComponents(array $geoResult): array
             $freshUser['completion_percentage'] = $completionData['percentage'];
             $freshUser['is_profile_complete']   = $completionData['is_complete'];
             $freshUser['missing_fields']        = $completionData['missing_fields'];
+            $isSnoozedFresh = !empty($user->profile_prompt_snoozed_until) && now()->lessThan($user->profile_prompt_snoozed_until);
+            $freshUser['profile_prompt_snoozed_until'] = $user->profile_prompt_snoozed_until ? $user->profile_prompt_snoozed_until->toIso8601String() : null;
+            $freshUser['can_prompt_profile_update'] = !$completionData['is_complete'] && !$isSnoozedFresh;
 
             return response()->json([
                 'status'  => true,
@@ -293,5 +305,40 @@ private function parseAddressComponents(array $geoResult): array
                 'message' => 'Error: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Snooze profile completion reminder / popup for candidate
+     * (Defaults to 3 days = 72 hours; can specify 'days' or 'hours')
+     */
+    public function snoozeProfilePrompt(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
+        $days = (int) $request->input('days', 3);
+        $hours = $request->input('hours') !== null ? (int) $request->input('hours') : ($days * 24);
+
+        if ($hours <= 0) {
+            $hours = 72; // default 3 days
+        }
+
+        $snoozeUntil = now()->addHours($hours);
+        $user->profile_prompt_snoozed_until = $snoozeUntil;
+        $user->save();
+
+        return response()->json([
+            'status'  => true,
+            'message' => "Profile update reminder snoozed until {$snoozeUntil->toDateTimeString()}",
+            'data'    => [
+                'profile_prompt_snoozed_until' => $snoozeUntil->toIso8601String(),
+                'can_prompt_profile_update'    => false,
+            ]
+        ], 200);
     }
 }

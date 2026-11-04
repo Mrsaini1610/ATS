@@ -21,7 +21,7 @@ class ExpireJobPosts extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically marks job posts whose last_date has passed as expired (is_deleted = 1)';
+    protected $description = 'Automatically deactivates job posts whose last_date has passed (status = deactivated, is_deleted = 1)';
 
     /**
      * Execute the console command.
@@ -33,23 +33,25 @@ class ExpireJobPosts extends Command
         $query = JobPost::whereNotNull('last_date')
             ->whereDate('last_date', '<', $today)
             ->where(function ($q) {
-                $q->where('is_deleted', 0)
+                $q->where('status', '!=', 'deactivated')
+                  ->orWhere('is_deleted', 0)
                   ->orWhereNull('is_deleted');
             });
 
         $count = $query->count();
 
         if ($count === 0) {
-            $this->info("No expired jobs found for {$today}.");
+            $this->info("No expired jobs found to deactivate for {$today}.");
             return Command::SUCCESS;
         }
 
         $query->update([
+            'status'     => 'deactivated',
             'is_deleted' => 1,
             'updated_at' => now(),
         ]);
 
-        $message = "[jobs:expire] Successfully marked {$count} job post(s) as expired (is_deleted = 1) on {$today}.";
+        $message = "[jobs:expire] Successfully deactivated {$count} job post(s) (status = deactivated, is_deleted = 1) whose last date has passed on {$today}.";
         $this->info($message);
         Log::info($message);
 

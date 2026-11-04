@@ -83,6 +83,29 @@ Route::get('/location/areas-by-city', [LocationController::class, 'getAreasByCit
 Route::post('/location/update', [LocationController::class, 'updateLocation']);
 Route::get('/login', [CandidateAuthController::class, 'showLogin'])->name('login');
 Route::get('/register', [CandidateAuthController::class, 'showLogin'])->name('register');
+Route::get('/auth/session-check', function (\Illuminate\Http\Request $request) {
+    if (\Illuminate\Support\Facades\Auth::guard('web')->check()) {
+        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
+        if ($user->current_web_session_id && $user->current_web_session_id !== $request->session()->getId()) {
+            return response()->json([
+                'active'  => false,
+                'guard'   => 'web',
+                'message' => 'Aapka account kisi doosre device ya browser me login kiya gaya hai.',
+            ]);
+        }
+    }
+    if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+        $admin = \Illuminate\Support\Facades\Auth::guard('admin')->user();
+        if ($admin->current_web_session_id && $admin->current_web_session_id !== $request->session()->getId()) {
+            return response()->json([
+                'active'  => false,
+                'guard'   => 'admin',
+                'message' => 'Aapka Admin account kisi doosre device ya browser me login kiya gaya hai.',
+            ]);
+        }
+    }
+    return response()->json(['active' => true]);
+})->name('auth.session-check');
 
 Route::post('/check-phone', [CandidateAuthController::class, 'checkPhoneLogin'])->name('check.phone');
 Route::post('/phone-login', [CandidateAuthController::class, 'phoneLogin'])->name('phone.login');
@@ -190,6 +213,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/jobs', [AdminJobController::class, 'store'])->middleware('permission:create_jobs')->name('jobs.store'); // Agar store method bhi hai
         Route::post('/jobs/{uuid}/update-status', [AdminJobController::class, 'updateStatus'])->middleware('permission:approve_jobs,reject_jobs,hold_jobs,deactivate_jobs')->name('jobs.update-status');
         Route::post('/jobs/{uuid}/assign-team', [AdminJobController::class, 'assignTeam'])->name('jobs.assign-team');
+        Route::get('/jobs/{uuid}/nearby-candidates', [AdminJobController::class, 'nearbyCandidates'])->name('jobs.nearby-candidates');
 
         // 3. Applications
         Route::get('/applications', [JobApplicationController::class, 'index'])->middleware('permission:view_applications,view_all_applications,update_application_status')->name('applications.index');
@@ -213,6 +237,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // 5. Interviews
         Route::get('/interviews', [InterviewController::class, 'index'])->middleware('permission:view_interviews,view_all_interviews,schedule_interviews,status_interviews')->name('interviews.index');
+        Route::get('/interviews/search-candidates', [InterviewController::class, 'searchCandidates'])->name('interviews.search-candidates');
         Route::post('/interviews', [InterviewController::class, 'store'])->middleware('permission:schedule_interviews')->name('interviews.store');
         Route::post('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->middleware('permission:status_interviews')->name('interviews.update-status');
         Route::post('/interviews/{interview}/remark', [InterviewController::class, 'updateRemark'])->middleware('permission:status_interviews')->name('interviews.update-remark');
@@ -257,10 +282,21 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::put('/permissions/{admin}', [PermissionController::class, 'update'])->name('permissions.update');
         });
 
+        // 12. System Audit & Error Logs
+        Route::get('/logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index'])->name('logs.index');
+        Route::get('/logs/export', [\App\Http\Controllers\Admin\AuditLogController::class, 'export'])->name('logs.export');
+        Route::get('/logs/file-download', [\App\Http\Controllers\Admin\AuditLogController::class, 'downloadServerLog'])->name('logs.download-file');
+        Route::post('/logs/clear-errors', [\App\Http\Controllers\Admin\AuditLogController::class, 'clearErrorLogs'])->name('logs.clear-errors');
+        Route::post('/logs/clear-server-log', [\App\Http\Controllers\Admin\AuditLogController::class, 'clearServerLog'])->name('logs.clear-server-log');
+
     }); // Closing Authenticated Admin Group
 });
 
 // ==========================================
-// UTILITY / CACHE ROUTES
+// UTILITY / CACHE & REALTIME ROUTES
 // ==========================================
 Route::get('/clear', [PageController::class, 'clearCache'])->name('clear.cache');
+Route::get('/notifications/live-sync', [\App\Http\Controllers\NotificationLiveSyncController::class, 'sync'])->name('notifications.live-sync');
+Route::post('/notifications/mark-read/{id}', [\App\Http\Controllers\NotificationLiveSyncController::class, 'markAsRead'])->name('notifications.live-mark-read');
+Route::post('/api/client-error', [\App\Http\Controllers\Admin\AuditLogController::class, 'logClientError'])->name('api.client-error');
+

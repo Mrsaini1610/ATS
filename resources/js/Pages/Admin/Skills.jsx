@@ -9,6 +9,10 @@ import {
   X,
   Search,
   Zap,
+  Sparkles,
+  Flame,
+  Check,
+  Layers,
 } from "lucide-react";
 import { updateAdminField } from "@/Components/Admin/liveValidation";
 
@@ -29,9 +33,9 @@ const CATEGORIES = [
 const DEMANDS = ["high", "medium", "low"];
 
 const demandColor = {
-  high: "bg-red-50 text-red-600 border-red-200",
-  medium: "bg-yellow-50 text-yellow-600 border-yellow-200",
-  low: "bg-green-50 text-green-600 border-green-200",
+  high: "bg-rose-50 text-rose-700 border-rose-200",
+  medium: "bg-amber-50 text-amber-700 border-amber-200",
+  low: "bg-blue-50 text-blue-700 border-blue-200",
 };
 
 export default function Skills({ skills = [] }) {
@@ -213,11 +217,14 @@ export default function Skills({ skills = [] }) {
         )}
 
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">Skills</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              {skills.length} skills · {skills.filter((s) => s.active).length} active tags
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
+              <Zap className="w-6 h-6 text-blue-600" />
+              Skill & Competency Repository
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Curate trending keywords, market demand weights, and candidate skill tags.
             </p>
           </div>
 
@@ -225,100 +232,186 @@ export default function Skills({ skills = [] }) {
             <button
               type="button"
               onClick={openAddModal}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer self-start sm:self-auto"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 transition cursor-pointer self-start sm:self-auto shrink-0"
             >
-              <Plus className="w-4 h-4" /> Add Skill
+              <Plus className="w-4 h-4" /> Add New Skill
             </button>
           )}
         </div>
 
-        {/* Search & Categories Tabs */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
-          <div className="relative w-full sm:w-72 md:w-80 shrink-0">
+        {/* Top Summary Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Total Skills</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Zap className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{skills.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Keywords in database</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Active Tags</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Check className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">
+              {skills.filter((s) => s.active).length}
+            </p>
+            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Available for mapping</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">High Demand</span>
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <Flame className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">
+              {skills.filter((s) => s.demand === "high").length}
+            </p>
+            <p className="text-[11px] text-rose-600 font-semibold mt-0.5">High market priority</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500">Categories</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-slate-900">
+              {new Set(skills.map((s) => s.category)).size}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Industry clusters</p>
+          </div>
+        </div>
+
+        {/* Search & Categories Filter Tabs */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 items-stretch sm:items-center">
+          <div className="relative w-full sm:w-80 shrink-0">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search skills or category..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Search skill name or category..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
             />
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none w-full flex-1">
-            {allCats.map((c) => (
+            {search && (
               <button
                 type="button"
-                key={c}
-                onClick={() => setCatFilter(c)}
-                className={`shrink-0 px-3 py-2 rounded-xl text-xs font-semibold capitalize transition-all border cursor-pointer ${
-                  catFilter === c
-                    ? "bg-gray-900 text-white border-gray-900 shadow-xs"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                }`}
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {c}
+                <X className="w-3.5 h-3.5" />
               </button>
-            ))}
+            )}
+          </div>
+
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none w-full flex-1">
+            {allCats.map((c) => {
+              const count = c === "all" ? skills.length : skills.filter((s) => s.category === c).length;
+              return (
+                <button
+                  type="button"
+                  key={c}
+                  onClick={() => setCatFilter(c)}
+                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold capitalize transition-all border cursor-pointer ${
+                    catFilter === c
+                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {c} <span className="opacity-75 font-normal ml-0.5">({count})</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Skills Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
           {filtered.map((skill) => (
             <div
               key={skill.id}
-              className={`bg-white border rounded-2xl p-4 hover:shadow-md transition-shadow flex flex-col justify-between ${
-                !skill.active ? "opacity-60 bg-gray-50/50" : "border-gray-100"
+              className={`bg-white border rounded-2xl p-4 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-blue-300 min-h-[170px] ${
+                !skill.active ? "opacity-60 bg-slate-50/60" : "border-slate-200/90"
               }`}
             >
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-blue-600" />
+                {/* Card Header: Icon & Demand Badge */}
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
+                    <Zap className="w-4 h-4" />
                   </div>
                   <span
-                    className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border capitalize ${
-                      demandColor[skill.demand] || "bg-gray-100 text-gray-600"
+                    className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider shrink-0 ${
+                      demandColor[skill.demand] || "bg-slate-100 text-slate-600 border-slate-200"
                     }`}
                   >
                     {skill.demand} Demand
                   </span>
                 </div>
-                <p className="font-bold text-gray-900 mb-0.5">{skill.name}</p>
-                <p className="text-xs text-gray-500 mb-3">{skill.category}</p>
+
+                {/* Skill Title: Clean leading with fixed minimum height to prevent overlapping */}
+                <div className="min-h-[44px] flex items-center">
+                  <h3
+                    className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-2"
+                    title={skill.name}
+                  >
+                    {skill.name}
+                  </h3>
+                </div>
+
+                {/* Category subtitle */}
+                <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-1.5 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="truncate">{skill.category}</span>
+                </p>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              {/* Bottom Actions: Active Toggle & Edit/Delete */}
+              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 mt-auto">
                 <button
                   type="button"
                   onClick={() => toggleActive(skill.id)}
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg cursor-pointer transition ${
+                  className={`text-xs font-bold px-2.5 py-1 rounded-xl cursor-pointer transition ${
                     skill.active
-                      ? "bg-green-50 text-green-700 hover:bg-green-100"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                      : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
                   }`}
                 >
                   {skill.active ? "Active" : "Inactive"}
                 </button>
 
                 {(can("edit_skills") || can("delete_skills")) && (
-                  <div className="flex gap-1">
-                    {can("edit_skills") && <button
-                      type="button"
-                      onClick={() => openEditModal(skill)}
-                      className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
-                      title="Edit Skill"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>}
-                    {can("delete_skills") && <button
-                      type="button"
-                      onClick={() => deleteSkill(skill.id, skill.name)}
-                      className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
-                      title="Delete Skill"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>}
+                  <div className="flex items-center gap-1.5">
+                    {can("edit_skills") && (
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(skill)}
+                        className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl cursor-pointer transition shadow-2xs"
+                        title="Edit Skill"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {can("delete_skills") && (
+                      <button
+                        type="button"
+                        onClick={() => deleteSkill(skill.id, skill.name)}
+                        className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition shadow-2xs"
+                        title="Delete Skill"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -326,8 +419,10 @@ export default function Skills({ skills = [] }) {
           ))}
 
           {filtered.length === 0 && (
-            <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-gray-100 text-gray-400">
-              No skills found matching your search
+            <div className="col-span-full text-center py-16 bg-white rounded-3xl border border-slate-200 text-slate-400 shadow-sm">
+              <Zap className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              <p className="font-bold text-slate-700 text-sm">No skills found matching your search</p>
+              <p className="text-xs text-slate-400 mt-1">Try another category or add a new skill.</p>
             </div>
           )}
         </div>

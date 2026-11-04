@@ -243,6 +243,27 @@ class MailService
             ],
             url('/admin/users')
         );
+
+        // 4. Active Admins Notified
+        try {
+            $admins = Admin::where('role', 'admin')->where('status', 1)->get();
+            foreach ($admins as $admin) {
+                self::notifyAdmin(
+                    $admin,
+                    "New Candidate Registered: {$candidateName}",
+                    "Candidate {$candidateName} registered ({$user->city}).",
+                    [
+                        'type'           => 'candidate_registered',
+                        'candidate_id'   => $user->id,
+                        'candidate_name' => $candidateName,
+                    ],
+                    true,
+                    url('/admin/users')
+                );
+            }
+        } catch (Throwable $e) {
+            Log::warning("MailService: Failed notifying admins of candidate registration: " . $e->getMessage());
+        }
     }
 
     /**
@@ -355,7 +376,7 @@ class MailService
     {
         $application->loadMissing(['candidate', 'jobPost.creator', 'jobPost.assignedMember']);
 
-        $candidate = $application->candidate ?? User::find($application->candidate_id);
+        $candidate = $application->candidate ?? ($application->candidate_uuid ? User::where('uuid', $application->candidate_uuid)->first() : User::find($application->candidate_id));
         $job       = $application->jobPost ?? JobPost::find($application->job_id);
 
         $candidateName  = $application->candidate_name ?: ($candidate?->full_name ?: ($candidate?->name ?: 'Candidate'));
@@ -480,16 +501,17 @@ class MailService
 
     /**
      * TRIGGER 4: Application Status Changed (Shortlisted, Under Review, Hired, Rejected, etc.).
-     * Notifies: Candidate (Email + In-app + Push), and Super Admin (Email + In-app).
+     * Notifies: Candidate (ALWAYS) + Super Admin, Admin, and Assigned Member (EXCLUDING the one performing the update).
      */
     public static function sendApplicationStatusChanged(
         JobApplication $application,
         string $newStatus,
-        ?string $comments = null
+        ?string $comments = null,
+        $actorAdminOrId = null
     ): void {
-        $application->loadMissing(['candidate', 'jobPost.creator', 'jobPost.assignedMember']);
+        $application->loadMissing(['candidate', 'jobPost.creator', 'jobPost.assignedMember', 'assignedCallingMember']);
 
-        $candidate = $application->candidate ?? User::find($application->candidate_id);
+        $candidate = $application->candidate ?? ($application->candidate_uuid ? User::where('uuid', $application->candidate_uuid)->first() : User::find($application->candidate_id));
         $job       = $application->jobPost ?? JobPost::find($application->job_id);
 
         $candidateName  = $application->candidate_name ?: ($candidate?->full_name ?: ($candidate?->name ?: 'Candidate'));
@@ -497,14 +519,19 @@ class MailService
         $jobTitle       = $job?->title ?: 'Position';
         $companyName    = $job?->company ?: ($job?->companyRelation?->name ?? 'ATS Partner');
 
-        // 1. Candidate Push Notification & In-App Notification
+        // Determine who performed the update so they are excluded
+        $actorId = $actorAdminOrId instanceof Admin ? $actorAdminOrId->id : ($actorAdminOrId ?? auth('admin')->id());
+        $actor = $actorId ? Admin::find($actorId) : null;
+        $actorIsSuperAdmin = $actor ? $actor->isSuperAdmin() : false;
+
+        // 1. Candidate Push Notification & In-App Notification (ALWAYS)
         try {
             PushNotificationService::notifyApplicationStatusChange($application, $newStatus);
         } catch (Throwable $e) {
             Log::warning("MailService: Push failed on status update: " . $e->getMessage());
         }
 
-        // 2. Candidate Status Email
+        // 2. Candidate Status Email (ALWAYS)
         if (!empty($candidateEmail)) {
             self::sendViewEmail(
                 $candidateEmail,
@@ -522,34 +549,58 @@ class MailService
             );
         }
 
-        // 3. Super Admin ALWAYS Notified
-        self::notifySuperAdmin(
-            "Status Update: {$candidateName} -> " . ucwords(str_replace('_', ' ', $newStatus)),
-            "Application of {$candidateName} for {$jobTitle} at {$companyName} updated to '{$newStatus}'." . ($comments ? " Notes: {$comments}" : ""),
-            [
-                'type'           => 'application_status_update',
-                'application_id' => $application->id,
-                'job_id'         => $application->job_id,
-                'candidate_name' => $candidateName,
-                'job_title'      => $jobTitle,
-                'new_status'     => $newStatus,
-                'reviewer_id'    => auth('admin')->id() ?? auth('superadmin')->id() ?? 'System',
-            ],
-            url('/admin/applications')
-        );
+        // 3. Super Admin Notified (ONLY if Super Admin did NOT perform this update)
+        if (!$actorIsSuperAdmin) {
+            self::notifySuperAdmin(
+                "Status Update: {$candidateName} -> " . ucwords(str_replace('_', ' ', $newStatus)),
+                "Application of {$candidateName} for {$jobTitle} at {$companyName} updated to '{$newStatus}'." . ($comments ? " Notes: {$comments}" : ""),
+                [
+                    'type'           => 'application_status_update',
+                    'application_id' => $application->id,
+                    'job_id'         => $application->job_id,
+                    'candidate_name' => $candidateName,
+                    'job_title'      => $jobTitle,
+                    'new_status'     => $newStatus,
+                    'reviewer_id'    => $actorId ?? 'System',
+                ],
+                url('/admin/applications')
+            );
+        }
 
-        // 4. Creator / Assigned Member In-App Notification
+        // 4. Creator Admin Notified (ONLY if Creator Admin did NOT perform this update and is not Super Admin)
         $creator = $job?->creator;
-        if ($creator && !$creator->isSuperAdmin()) {
-            try {
-                AdminNotification::create([
-                    'admin_id' => $creator->id,
-                    'type'     => 'applicant_status_changed',
-                    'title'    => "Applicant Status: {$candidateName}",
-                    'body'     => "{$candidateName}'s application for {$jobTitle} is now " . ucwords(str_replace('_', ' ', $newStatus)),
-                    'data'     => ['application_id' => $application->id, 'status' => $newStatus],
-                ]);
-            } catch (Throwable $e) {}
+        if ($creator && !$creator->isSuperAdmin() && (!$actorId || $creator->id != $actorId)) {
+            self::notifyAdmin(
+                $creator,
+                "Application Status: {$candidateName} -> " . ucwords(str_replace('_', ' ', $newStatus)),
+                "{$candidateName}'s application for {$jobTitle} is now " . ucwords(str_replace('_', ' ', $newStatus)) . ($comments ? " Notes: {$comments}" : ""),
+                [
+                    'type'           => 'application_status_update',
+                    'application_id' => $application->id,
+                    'job_id'         => $application->job_id,
+                    'status'         => $newStatus,
+                ],
+                true,
+                url('/admin/applications')
+            );
+        }
+
+        // 5. Assigned Team Member Notified (ONLY if Assigned Member did NOT perform this update and is distinct)
+        $assignee = $application->assignedCallingMember ?? $job?->assignedMember;
+        if ($assignee && !$assignee->isSuperAdmin() && (!$actorId || $assignee->id != $actorId) && (!$creator || $assignee->id != $creator->id)) {
+            self::notifyAdmin(
+                $assignee,
+                "Assigned Applicant Status: {$candidateName} -> " . ucwords(str_replace('_', ' ', $newStatus)),
+                "Assigned candidate {$candidateName}'s application for {$jobTitle} was updated to " . ucwords(str_replace('_', ' ', $newStatus)) . ($comments ? " Notes: {$comments}" : ""),
+                [
+                    'type'           => 'application_status_update',
+                    'application_id' => $application->id,
+                    'job_id'         => $application->job_id,
+                    'status'         => $newStatus,
+                ],
+                true,
+                url('/admin/applications')
+            );
         }
     }
 
@@ -678,6 +729,66 @@ class MailService
             ],
             url('/admin/interviews')
         );
+
+        // 4. Creator Admin Notification (if not Super Admin)
+        $job = ($interviewOrApplication instanceof JobApplication)
+            ? $interviewOrApplication->jobPost
+            : ($applicationId ? JobApplication::find($applicationId)?->jobPost : null);
+
+        if ($job && $job->creator && !$job->creator->isSuperAdmin()) {
+            self::notifyAdmin(
+                $job->creator,
+                "Interview Scheduled: {$candidateName} for {$jobTitle}",
+                "Interview scheduled with candidate {$candidateName} on {$interviewDateTime}.",
+                ['interview_datetime' => $interviewDateTime, 'job_id' => $job->id],
+                true,
+                url('/admin/interviews')
+            );
+        }
+
+        // 5. Assigned Interviewer Notification (The person conducting the interview)
+        $interviewerAdmin = null;
+        if (!empty($details['interviewer_id'])) {
+            $interviewerAdmin = Admin::find($details['interviewer_id']);
+        } elseif (!empty($interviewer) && $interviewer !== 'ATS Recruiter' && $interviewer !== 'Recruiter') {
+            $interviewerAdmin = Admin::where('name', 'LIKE', '%' . $interviewer . '%')->first();
+        }
+
+        if ($interviewerAdmin && (!$job || !$job->creator || $interviewerAdmin->id !== $job->creator->id) && !$interviewerAdmin->isSuperAdmin()) {
+            if (!empty($interviewerAdmin->email)) {
+                self::sendViewEmail(
+                    $interviewerAdmin->email,
+                    "Interview Assignment: {$candidateName} for {$jobTitle} on {$interviewDateTime}",
+                    'emails.interview_scheduled_interviewer',
+                    [
+                        'interviewerName'   => $interviewerAdmin->name,
+                        'candidateName'     => $candidateName,
+                        'candidatePhone'    => $candidatePhone,
+                        'candidateEmail'    => $candidateEmail,
+                        'jobTitle'          => $jobTitle,
+                        'companyName'       => $companyName,
+                        'interviewDateTime' => $interviewDateTime,
+                        'interviewMode'     => $interviewMode,
+                        'meetingLink'       => $meetingLink,
+                        'interviewAddress'  => $interviewAddress,
+                        'round'             => $round,
+                        'instructions'      => $instructions,
+                        'actionUrl'         => url('/admin/interviews'),
+                    ],
+                    $interviewerAdmin->name
+                );
+            }
+
+            try {
+                AdminNotification::create([
+                    'admin_id' => $interviewerAdmin->id,
+                    'type'     => 'interview_assigned',
+                    'title'    => "Interview Assigned: {$candidateName}",
+                    'body'     => "You are assigned to conduct {$candidateName}'s interview for {$jobTitle} on {$interviewDateTime}.",
+                    'data'     => ['application_id' => $applicationId, 'candidate_name' => $candidateName],
+                ]);
+            } catch (Throwable $e) {}
+        }
     }
 
     /**
@@ -756,54 +867,66 @@ class MailService
     }
 
     /**
-     * TRIGGER 8: Job Offer Letter / Hired Event.
+     * TRIGGER 8: Job Offer Letter / Selection Event.
      */
     public static function sendOfferLetter(JobApplication $application, array $offerDetails = []): void
     {
-        $application->loadMissing(['candidate', 'jobPost']);
+        $application->loadMissing(['candidate', 'jobPost.creator', 'jobPost.companyRelation']);
 
-        $candidate = $application->candidate ?? User::find($application->candidate_id);
+        $candidate = $application->candidate ?? ($application->candidate_uuid ? User::where('uuid', $application->candidate_uuid)->first() : User::find($application->candidate_id));
         $job       = $application->jobPost ?? JobPost::find($application->job_id);
 
-        $candidateName  = $application->candidate_name ?: ($candidate?->full_name ?: 'Candidate');
+        $candidateName  = $application->candidate_name ?: ($candidate?->full_name ?: ($candidate?->name ?: 'Candidate'));
         $candidateEmail = $application->candidate_email ?: $candidate?->email;
-        $jobTitle       = $job?->title ?: 'Position';
-        $companyName    = $job?->company ?: 'ATS Partner';
+        $designation    = $offerDetails['designation'] ?? ($application->offer_designation ?: ($job?->title ?: 'Position'));
+        $jobTitle       = $job?->title ?: $designation;
+        $companyName    = $job?->company ?: ($job?->companyRelation?->name ?? 'ATS Partner');
         $package        = $offerDetails['salary'] ?? ($application->offer_salary_package ?: 'As discussed');
         $joiningDate    = !empty($offerDetails['joining_date'])
             ? date('d M Y', strtotime($offerDetails['joining_date']))
             : ($application->offer_joining_date ? date('d M Y', strtotime($application->offer_joining_date)) : 'To be confirmed');
+        $workLocation   = $offerDetails['work_location'] ?? ($application->offer_work_location ?: ($job?->location ?: ($application->city ?: 'Office / On-site')));
+        $facilities     = $offerDetails['facilities'] ?? ($application->offer_facilities ?: []);
+        $terms          = $offerDetails['terms'] ?? ($application->offer_terms ?: null);
 
         // 1. Candidate Push & In-app
         if ($candidate) {
             try {
                 PushNotificationService::sendToUser(
                     $candidate,
-                    "Congratulations! Job Offer Extended 🏆",
-                    "You have been selected for {$jobTitle} at {$companyName}. Check your offer details now!",
+                    "Congratulations! Official Job Offer Letter 🏆",
+                    "You have been offered the position of {$designation} at {$companyName} ({$package}). View your official offer letter!",
                     [
                         'type'           => 'offer_extended',
                         'application_id' => $application->id,
+                        'designation'    => $designation,
                         'package'        => $package,
+                        'joining_date'   => $joiningDate,
                     ],
                     'shortlisted',
                     '/my-applications'
                 );
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+                Log::warning("MailService: Push failed on offer letter: " . $e->getMessage());
+            }
         }
 
-        // 2. Candidate Offer Email
+        // 2. Candidate Formal Offer Letter Email
         if (!empty($candidateEmail)) {
             self::sendViewEmail(
                 $candidateEmail,
-                "Congratulations! Job Offer: {$jobTitle} at {$companyName} 🏆",
+                "Official Job Offer: {$designation} at {$companyName} 🏆",
                 'emails.offer_letter_candidate',
                 [
                     'candidateName' => $candidateName,
                     'jobTitle'      => $jobTitle,
+                    'designation'   => $designation,
                     'companyName'   => $companyName,
                     'salaryPackage' => $package,
                     'joiningDate'   => $joiningDate,
+                    'workLocation'  => $workLocation,
+                    'facilities'    => is_array($facilities) ? $facilities : (json_decode($facilities, true) ?: []),
+                    'terms'         => $terms,
                     'actionUrl'     => url('/my-applications'),
                 ],
                 $candidateName
@@ -812,18 +935,39 @@ class MailService
 
         // 3. Super Admin ALWAYS Notified
         self::notifySuperAdmin(
-            "Candidate Hired / Offered: {$candidateName} for {$jobTitle}",
-            "{$candidateName} has been offered the position of {$jobTitle} at {$companyName} with package {$package} and joining date {$joiningDate}.",
+            "Candidate Offer Issued: {$candidateName} for {$designation}",
+            "Formal offer letter sent to {$candidateName} ({$candidateEmail}) for {$designation} at {$companyName}. Package: {$package}, Joining: {$joiningDate}.",
             [
                 'type'           => 'offer_extended',
                 'application_id' => $application->id,
                 'candidate_name' => $candidateName,
-                'job_title'      => $jobTitle,
+                'designation'    => $designation,
                 'company'        => $companyName,
                 'package'        => $package,
                 'joining_date'   => $joiningDate,
+                'work_location'  => $workLocation,
             ],
             url('/admin/applications')
         );
+
+        // 4. Job Creator Admin Notified (if not Super Admin)
+        $creator = $job?->creator;
+        if ($creator && !$creator->isSuperAdmin()) {
+            self::notifyAdmin(
+                $creator,
+                "Offer Letter Sent: {$candidateName} for {$designation}",
+                "Formal offer letter has been released to {$candidateName} for {$designation} at {$companyName}.",
+                [
+                    'type'           => 'offer_extended',
+                    'application_id' => $application->id,
+                    'candidate_name' => $candidateName,
+                    'designation'    => $designation,
+                    'package'        => $package,
+                    'joining_date'   => $joiningDate,
+                ],
+                true,
+                url('/admin/applications')
+            );
+        }
     }
 }

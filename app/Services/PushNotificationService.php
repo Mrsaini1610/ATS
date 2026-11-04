@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Exception\Messaging\NotFound;
 use Kreait\Firebase\Exception\Messaging\RegistrationTokenNotRegistered;
+use Kreait\Firebase\Messaging\AndroidConfig;
+use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Throwable;
@@ -135,9 +137,35 @@ class PushNotificationService
             }
 
             try {
+                $androidConfig = AndroidConfig::fromArray([
+                    'priority' => 'high',
+                    'notification' => [
+                        'channel_id'              => 'ats_high_importance_channel',
+                        'sound'                   => 'default',
+                        'default_sound'           => true,
+                        'default_vibrate_timings' => true,
+                        'notification_priority'   => 'PRIORITY_MAX',
+                        'click_action'            => 'FLUTTER_NOTIFICATION_CLICK',
+                    ],
+                ]);
+
+                $apnsConfig = ApnsConfig::fromArray([
+                    'headers' => [
+                        'apns-priority' => '10',
+                    ],
+                    'payload' => [
+                        'aps' => [
+                            'sound' => 'default',
+                            'badge' => 1,
+                        ],
+                    ],
+                ]);
+
                 $cloudMessage = CloudMessage::withTarget('token', $deviceToken)
                     ->withNotification(Notification::create($title, $body))
-                    ->withData($fcmData);
+                    ->withData($fcmData)
+                    ->withAndroidConfig($androidConfig)
+                    ->withApnsConfig($apnsConfig);
 
                 $response = $messaging->send($cloudMessage);
 
@@ -245,7 +273,7 @@ class PushNotificationService
      */
     public static function notifyApplicationSubmitted(JobApplication $application): array
     {
-        $candidate = $application->candidate ?? User::find($application->candidate_id);
+        $candidate = $application->candidate ?? ($application->candidate_uuid ? User::where('uuid', $application->candidate_uuid)->first() : User::find($application->candidate_id));
         if (!$candidate) return ['success' => false];
 
         $job = $application->jobPost ?? JobPost::find($application->job_id);
@@ -272,7 +300,7 @@ class PushNotificationService
      */
     public static function notifyApplicationStatusChange(JobApplication $application, string $newStatus): array
     {
-        $candidate = $application->candidate ?? User::find($application->candidate_id);
+        $candidate = $application->candidate ?? ($application->candidate_uuid ? User::where('uuid', $application->candidate_uuid)->first() : User::find($application->candidate_id));
         if (!$candidate) return ['success' => false];
 
         $job = $application->jobPost ?? JobPost::find($application->job_id);

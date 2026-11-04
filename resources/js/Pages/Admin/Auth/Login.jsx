@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useForm, Head, Link } from "@inertiajs/react";
 import { Briefcase, Mail, Lock, Eye, EyeOff, AlertCircle, Shield } from "lucide-react";
 import { updateAdminField } from "@/Components/Admin/liveValidation";
+import SingleSessionModal from "@/Components/Common/SingleSessionModal";
 
 export default function AdminLogin() {
   const [showPass, setShowPass] = useState(false);
@@ -29,6 +30,7 @@ export default function AdminLogin() {
   return (
     <>
       <Head title="Sign In - ATS Admin" />
+      <SingleSessionModal />
 
       <div className="min-h-screen bg-gray-950 flex">
         {/* Left branding panel */}

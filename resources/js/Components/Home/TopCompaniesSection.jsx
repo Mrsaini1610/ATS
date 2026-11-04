@@ -45,6 +45,10 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
                       <img
                         src={comp.logo.startsWith('http://') || comp.logo.startsWith('https://') ? comp.logo : (comp.logo.startsWith('/') ? comp.logo : `/storage/${comp.logo}`)}
                         alt={comp.name}
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.style.display = "none";
@@ -58,7 +62,7 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
                   <h3 className="font-bold text-sm sm:text-base text-gray-900 truncate group-hover:text-purple-600 transition-colors">
                     {comp.name}
                   </h3>
-                  <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
                     {comp.industry}
                   </p>
                 </div>

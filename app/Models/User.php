@@ -14,12 +14,15 @@ class User extends Authenticatable
 
     protected $fillable = [
         'uuid', 'category_id', 'username', 'full_name', 'email', 'phone', 'password', 'created_by',
+        'registered_from',
         'gender', 'dob', 'total_experience_years', 'current_ctc', 'expected_ctc',
         'notice_period_days', 'bio', 'profile_picture', 'skills', 'languages',
         'address', 'city', 'area', 'state', 'pincode', 'job_title', 'education', 'is_profile_complete',
+        'profile_prompt_snoozed_until',
         'latitude', 'longitude', 'is_online', 'last_active',
         'web_latitude', 'web_longitude', 'web_is_online', 'web_last_active',
         'app_latitude', 'app_longitude', 'app_is_online', 'app_last_active',
+        'current_web_session_id', 'current_app_device_id', 'last_web_login_at', 'last_app_login_at',
         'linkedin', 'github', 'portfolio', 'job_type', 'work_mode', 'is_open_to_work',
     ];
 
@@ -44,11 +47,32 @@ class User extends Authenticatable
         'app_last_active'     => 'datetime',
         'app_latitude'        => 'decimal:8',
         'app_longitude'       => 'decimal:8',
-        'is_profile_complete' => 'boolean',
-        'is_open_to_work'     => 'boolean',
+        'is_profile_complete'          => 'boolean',
+        'profile_prompt_snoozed_until' => 'datetime',
+        'is_open_to_work'              => 'boolean',
     ];
 
-    protected $appends = ['profile_picture_url', 'name'];
+    protected $appends = ['profile_picture_url', 'name', 'platform'];
+
+    public function getPlatformAttribute(): string
+    {
+        $hasWeb = !empty($this->web_last_active) || ($this->registered_from ?? 'web') === 'web';
+        $hasApp = !empty($this->app_last_active) || ($this->registered_from ?? null) === 'app';
+
+        if (!empty($this->web_last_active) && !empty($this->app_last_active)) {
+            return 'both';
+        }
+
+        if (!empty($this->app_last_active)) {
+            return !empty($this->web_last_active) ? 'both' : 'app';
+        }
+
+        if (($this->registered_from ?? null) === 'app') {
+            return !empty($this->web_last_active) ? 'both' : 'app';
+        }
+
+        return 'web';
+    }
 
     public function getNameAttribute()
     {
@@ -139,12 +163,12 @@ class User extends Authenticatable
     }
     public function jobApplications()
     {
-        return $this->hasMany(JobApplication::class, 'candidate_id', 'id');
+        return $this->hasMany(JobApplication::class, 'candidate_uuid', 'uuid');
     }
 
     public function candidateNotifications()
     {
-        return $this->hasMany(UserNotification::class, 'user_id', 'id');
+        return $this->hasMany(UserNotification::class, 'user_uuid', 'uuid');
     }
 
     public function unreadNotificationsCount(): int
@@ -154,11 +178,11 @@ class User extends Authenticatable
 
     public function fcmTokens()
     {
-        return $this->hasMany(FcmToken::class, 'user_id')->where('guard', 'api');
+        return $this->hasMany(FcmToken::class, 'user_uuid', 'uuid')->where('guard', 'api');
     }
 
     public function latestFcmToken()
     {
-        return $this->hasOne(FcmToken::class, 'user_id')->where('guard', 'api')->latestOfMany();
+        return $this->hasOne(FcmToken::class, 'user_uuid', 'uuid')->where('guard', 'api')->latestOfMany();
     }
 }

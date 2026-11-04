@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Web Middleware Stack
         $middleware->web(append: [
             HandleInertiaRequests::class,
+            \App\Http\Middleware\CheckSingleWebSession::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
@@ -56,6 +57,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->report(function (\Throwable $e) {
+            \App\Services\AuditLogService::logException($e);
+        });
     })
     ->create();

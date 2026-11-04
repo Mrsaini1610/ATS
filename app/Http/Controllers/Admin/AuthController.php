@@ -49,6 +49,12 @@ class AuthController extends Controller
         $request->session()->save();
         $request->session()->regenerate();
 
+        // Enforce single admin web session
+        $admin->update([
+            'current_web_session_id' => $request->session()->getId(),
+            'last_web_login_at'      => now(),
+        ]);
+
         // Database role ke mutabiq redirection URL set karein
         $redirectUrl = route('admin.dashboard');
         if ($admin->role === 'super_admin') {

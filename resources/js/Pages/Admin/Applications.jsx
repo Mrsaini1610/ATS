@@ -52,106 +52,169 @@ const mailUrl = (email, subject, body) =>
 
 /* ── Offer Letter Modal ── */
 function OfferLetterModal({ app, onClose }) {
-  const [salary, setSalary] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
+  const [designation, setDesignation] = useState(app.jobTitle || "");
+  const [salary, setSalary] = useState(app.offerSalaryPackage || "");
+  const [joiningDate, setJoiningDate] = useState(app.offerJoiningDate ? app.offerJoiningDate.slice(0, 10) : "");
+  const [workLocation, setWorkLocation] = useState(app.jobLocation || app.userCity || "Head Office / On-site");
+  const [selectedFacilities, setSelectedFacilities] = useState([
+    "Health Insurance (Mediclaim)",
+    "Provident Fund (PF) & ESI",
+    "Paid Leaves (CL/SL/PL)",
+  ]);
+  const [customFacility, setCustomFacility] = useState("");
+  const [terms, setTerms] = useState("Offer valid for 48 hours. Subject to document verification. Standard 3 months probation period.");
   const [sent, setSent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
 
+  const COMMON_PERKS = [
+    "Health Insurance (Mediclaim)",
+    "Provident Fund (PF) & ESI",
+    "Annual Performance Bonus",
+    "Paid Leaves (CL/SL/PL)",
+    "Laptop / Workstation",
+    "Travel / Cab Allowance",
+    "Free Meals / Snacks",
+    "Flexible Work Timings",
+  ];
+
+  const togglePerk = (perk) => {
+    setSelectedFacilities((prev) =>
+      prev.includes(perk) ? prev.filter((p) => p !== perk) : [...prev, perk]
+    );
+  };
+
+  const addCustomPerk = (e) => {
+    e.preventDefault();
+    if (customFacility.trim() && !selectedFacilities.includes(customFacility.trim())) {
+      setSelectedFacilities((prev) => [...prev, customFacility.trim()]);
+      setCustomFacility("");
+    }
+  };
+
   const canSend = () => {
-    if (!salary || Number(salary) <= 0) {
-      setValidationError("Enter a positive offered CTC.");
+    if (!salary || salary.toString().trim() === "") {
+      setValidationError("Please enter offered salary / CTC.");
       return false;
     }
-    if (!joiningDate || joiningDate < new Date().toISOString().slice(0, 10)) {
-      setValidationError("Select today or a future joining date.");
+    if (!joiningDate) {
+      setValidationError("Please select joining date.");
       return false;
     }
     setValidationError("");
     return true;
   };
 
-  const letter = `Dear ${app.userName},
+  const letterText = `Dear ${app.userName},
 
-We are delighted to offer you the position of ${app.jobTitle} at ${app.company}.
+We are pleased to extend this offer of employment for the position of ${designation || app.jobTitle} at ${app.company}.
 
-Position Details:
-• Role: ${app.jobTitle}
+Offer Details:
+• Role: ${designation || app.jobTitle}
 • Company: ${app.company}
-• Location: ${app.userCity || "India"}${salary ? `\n• CTC: ₹${salary} LPA` : ""}${
-    joiningDate ? `\n• Joining Date: ${joiningDate}` : ""
-  }
+• Work Location: ${workLocation}
+• Compensation: ₹${salary}${salary.toString().toLowerCase().includes("lpa") ? "" : " LPA"}
+• Date of Joining: ${joiningDate}
 
-Please confirm your acceptance within 48 hours.
+Perks & Facilities:
+${selectedFacilities.length > 0 ? selectedFacilities.map((f) => `• ${f}`).join("\n") : "• Standard Company Benefits"}
 
-Congratulations and welcome to the team!
+Notes / Terms:
+${terms || "Standard employment terms apply."}
 
-Best regards,
-ATS Recruitment Team`;
+Please confirm your acceptance. Congratulations!
 
-  const recordAndSendWA = () => {
+Warm regards,
+${app.company} Hiring Team / ATS Recruitment`;
+
+  const handleGenerateAndSend = () => {
     if (!canSend()) return;
+    setIsSubmitting(true);
+
     router.post(
       route("admin.applications.save-offer", app.uuid),
-      { salary, joining_date: joiningDate },
-      { preserveScroll: true }
+      {
+        salary: salary.toString().includes("LPA") || salary.toString().includes("₹") ? salary : `₹${salary} LPA`,
+        joining_date: joiningDate,
+        designation,
+        work_location: workLocation,
+        facilities: selectedFacilities,
+        terms,
+      },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          setIsSubmitting(false);
+          setSent("system");
+        },
+        onError: () => {
+          setIsSubmitting(false);
+        },
+      }
     );
+  };
+
+  const handleSendWA = () => {
+    if (!canSend()) return;
+    handleGenerateAndSend();
     window.open(
-      waUrl(app.userPhone, `🎉 *Offer Letter – ${app.company}*\n\n${letter}`),
+      waUrl(app.userPhone, `🎉 *Official Job Offer – ${app.company}*\n\n${letterText}`),
       "_blank"
     );
     setSent("wa");
   };
 
-  const recordAndSendEmail = () => {
-    if (!app.userEmail || !canSend()) return;
-    router.post(
-      route("admin.applications.save-offer", app.uuid),
-      { salary, joining_date: joiningDate },
-      { preserveScroll: true }
-    );
-    window.open(
-      mailUrl(
-        app.userEmail,
-        `Offer Letter – ${app.jobTitle} at ${app.company}`,
-        letter
-      ),
-      "_blank"
-    );
-    setSent("email");
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-green-600" />
-            <h3 className="font-bold text-gray-900">Send Offer Letter</h3>
+      <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl max-h-[92vh] overflow-y-auto border border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-linear-to-r from-emerald-50 to-teal-50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-base">Generate & Send Offer Letter</h3>
+              <p className="text-xs text-gray-500">{app.userName} • {app.company}</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+            className="p-1.5 text-gray-400 hover:bg-gray-200/60 rounded-lg cursor-pointer transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
+
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Offered CTC (LPA)
+                Designation / Position
+              </label>
+              <input
+                value={designation}
+                onChange={(e) => setDesignation(e.target.value)}
+                placeholder="e.g. Senior Backend Engineer"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Offered CTC / Salary
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">₹</span>
                 <input
                   value={salary}
                   onChange={(e) => setSalary(e.target.value)}
-                  placeholder="e.g. 6.5"
-                  className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. 6.5 LPA or 45,000 / month"
+                  className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Joining Date
@@ -160,40 +223,119 @@ ATS Recruitment Team`;
                 type="date"
                 value={joiningDate}
                 onChange={(e) => setJoiningDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Work Location / Mode
+              </label>
+              <input
+                value={workLocation}
+                onChange={(e) => setWorkLocation(e.target.value)}
+                placeholder="e.g. Noida / Hybrid / On-site"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
           </div>
+
+          {/* Facilities / Perks */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Employee Facilities & Perks (Choose or Add)
+            </label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {COMMON_PERKS.map((perk) => {
+                const isSelected = selectedFacilities.includes(perk);
+                return (
+                  <button
+                    key={perk}
+                    type="button"
+                    onClick={() => togglePerk(perk)}
+                    className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium transition cursor-pointer ${
+                      isSelected
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isSelected ? "✓ " : "+ "}
+                    {perk}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={customFacility}
+                onChange={(e) => setCustomFacility(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addCustomPerk(e); }}
+                placeholder="Add other perk (e.g. Relocation bonus)..."
+                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={addCustomPerk}
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition cursor-pointer"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Terms / Notes */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Letter Preview
+              Offer Terms / Notes
             </label>
-            <pre className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-52 overflow-y-auto">
-              {letter}
+            <textarea
+              rows={2}
+              value={terms}
+              onChange={(e) => setTerms(e.target.value)}
+              placeholder="Terms, probation details, validity..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+            />
+          </div>
+
+          {/* Live Preview Snippet */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Letter Preview Preview
+            </label>
+            <pre className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-40 overflow-y-auto">
+              {letterText}
             </pre>
           </div>
+
           {sent && (
-            <div className="flex items-center gap-2 text-xs bg-green-50 text-green-700 px-3 py-2 rounded-xl font-medium border border-green-200">
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-              Offer details logged. Verify and send via selected channel.
+            <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 px-3.5 py-2.5 rounded-xl font-medium border border-emerald-200">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                Offer Letter successfully generated & sent! Formal HTML email dispatched to {app.userEmail || "candidate"} and alerts sent to Admin.
+              </span>
             </div>
           )}
-          {validationError && <p className="text-xs text-red-500">{validationError}</p>}
-          <div className="flex gap-3 pt-2">
+
+          {validationError && <p className="text-xs text-red-500 font-medium">{validationError}</p>}
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
             <button
               type="button"
-              onClick={recordAndSendWA}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold cursor-pointer transition shadow-md shadow-green-500/20"
+              onClick={handleGenerateAndSend}
+              disabled={isSubmitting}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold cursor-pointer transition shadow-md shadow-emerald-600/20 disabled:opacity-60"
+            >
+              <Mail className="w-4 h-4" />
+              {isSubmitting ? "Generating & Sending..." : "Send Official Offer Email"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSendWA}
+              disabled={isSubmitting}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold cursor-pointer transition shadow-md shadow-green-500/20"
             >
               <MessageCircle className="w-4 h-4" /> WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={recordAndSendEmail}
-              disabled={!app.userEmail || !salary || !joiningDate}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer transition shadow-md shadow-blue-600/20"
-            >
-              <Mail className="w-4 h-4" /> Email
             </button>
           </div>
         </div>
@@ -568,8 +710,14 @@ export default function Applications({
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Applications Table */}
-          <div className={`w-full min-w-0 ${selectedApp ? "hidden lg:block lg:w-1/2 xl:w-7/12" : "w-full"}`}>
+          {/* Applications Table (Independent Scroll in View Mode) */}
+          <div
+            className={`w-full min-w-0 ${
+              selectedApp
+                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                : "w-full"
+            }`}
+          >
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -733,50 +881,52 @@ export default function Applications({
             </div>
           </div>
 
-          {/* Application Detail Side View (Natural Full Height, No Inner Scroller) */}
+          {/* Application Detail Side View (Independent Smooth Scroll & Distinct Contrast Header) */}
           {selectedApp && (
             <div
               id="admin-application-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border border-gray-200 rounded-3xl shadow-lg flex flex-col h-fit sticky top-6 z-10 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white shrink-0">
-                <div className="flex items-center gap-2 min-w-0 pr-2">
+              {/* Header with High-Contrast Navy/Blue Gradient */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
                   <button
                     type="button"
                     onClick={() => setSelectedApp(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg lg:hidden cursor-pointer shrink-0"
+                    className="text-xs font-semibold text-blue-200 hover:text-white px-2.5 py-1 bg-white/10 border border-white/20 rounded-lg lg:hidden cursor-pointer shrink-0"
                   >
                     ← Back
                   </button>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
-                        Application #{selectedApp.id}
+                      <h3 className="font-extrabold text-white text-base truncate">
+                        {selectedApp.candidateName || `Application #${selectedApp.id}`}
                       </h3>
                       <span
-                        className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold shrink-0 ${
-                          STATUS_CFG[selectedApp.status]?.color || "bg-gray-100 text-gray-600"
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                          STATUS_CFG[selectedApp.status]?.color || "bg-white/20 text-white"
                         }`}
                       >
                         {STATUS_CFG[selectedApp.status]?.label || selectedApp.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Applied: {selectedApp.appliedAt}</p>
+                    <p className="text-[11px] text-cyan-300 font-medium mt-0.5">
+                      Applied: {selectedApp.appliedAt} • #{selectedApp.id}
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedApp(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer shrink-0 transition"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer shrink-0 transition"
                   title="Close (Esc)"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Natural Full Content (No Inner Scroller, Clean & Visible) */}
-              <div className="p-5 sm:p-6 space-y-4">
+              {/* Independent Scrollable Content Area */}
+              <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
                 {/* Hero Candidate Profile Card */}
                 <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-purple-50/50 border border-blue-100">
                   <div className="w-13 h-13 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-blue-500/20 shrink-0">

@@ -59,17 +59,36 @@ class UserController extends Controller
         }
 
         $users = $query->get()->map(function ($user) {
+            // Determine platform: web, app, or both
+            $hasWeb = !empty($user->web_last_active) || ($user->registered_from ?? 'web') === 'web';
+            $hasApp = !empty($user->app_last_active) || ($user->registered_from ?? null) === 'app';
+            
+            if (!empty($user->web_last_active) && !empty($user->app_last_active)) {
+                $platform = 'both';
+            } elseif (!empty($user->app_last_active) || ($user->registered_from ?? null) === 'app') {
+                $platform = 'app';
+            } else {
+                $platform = 'web';
+            }
+
             return [
-                'uuid'         => $user->uuid,
-                'name'         => $user->full_name ?? ($user->username ?? 'Candidate'),
-                'phone'        => $user->phone ?? '—',
-                'email'        => $user->email ?? '—',
-                'city'         => $user->city ?? '—',
-                'jobTitle'     => $user->bio ?? 'General Candidate',
-                'experience'   => $user->total_experience_years ? "{$user->total_experience_years} Years" : 'Fresher',
-                'status'       => $user->is_online ? 'active' : 'inactive',
-                'registeredAt' => $user->created_at ? $user->created_at->format('d M Y') : null,
-                'appliedCount' => $user->job_applications_count ?? 0,
+                'id'             => $user->id,
+                'uuid'           => $user->uuid,
+                'name'           => $user->full_name ?? ($user->username ?? 'Candidate'),
+                'phone'          => $user->phone ?? '—',
+                'email'          => $user->email ?? '—',
+                'city'           => $user->city ?? '—',
+                'area'           => $user->area ?? '—',
+                'jobTitle'       => $user->job_title ?? ($user->bio ?? 'General Candidate'),
+                'experience'     => $user->total_experience_years ? "{$user->total_experience_years} Years" : 'Fresher',
+                'status'         => $user->is_online ? 'active' : 'inactive',
+                'registeredAt'   => $user->created_at ? $user->created_at->format('d M Y') : null,
+                'appliedCount'   => $user->job_applications_count ?? 0,
+                'platform'       => $platform, // 'web' | 'app' | 'both'
+                'registeredFrom' => $user->registered_from ?? 'web',
+                'webLastActive'  => $user->web_last_active ? $user->web_last_active->format('d M Y, h:i A') : null,
+                'appLastActive'  => $user->app_last_active ? $user->app_last_active->format('d M Y, h:i A') : null,
+                'skills'         => is_array($user->skills) ? $user->skills : (json_decode($user->skills, true) ?: []),
             ];
         });
 
@@ -122,6 +141,7 @@ class UserController extends Controller
             'bio'                    => $validated['jobTitle'] ?? null,
             'skills'                 => !empty($validated['category']) ? [$validated['category']] : null,
             'total_experience_years' => preg_replace('/[^0-9]/', '', $validated['experience'] ?? '0') ?: null,
+            'registered_from'        => 'web',
             'is_online'              => true,
             'created_by'             => auth('admin')->id(),
             'password'               => Hash::make('Password@123'),

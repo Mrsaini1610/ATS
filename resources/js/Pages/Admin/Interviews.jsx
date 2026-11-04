@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, useForm, router } from "@inertiajs/react";
 import {
@@ -38,7 +38,7 @@ const STATUS_CFG = {
 
 const MODE_ICON = { phone: Phone, video: Video, in_person: MapPin };
 
-export default function Interviews({ interviews = [], teamMembers = [], jobs = [], canViewAll = false, scope = "your" }) {
+export default function Interviews({ interviews = [], teamMembers = [], jobs = [], canViewAll = false, scope = "your", candidates = [] }) {
   const { auth, flash } = usePage().props;
   const currentUser = auth?.admin;
   const permissions = currentUser?.permissions || [];
@@ -52,16 +52,37 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
   const [remarkText, setRemarkText] = useState("");
   const [copiedPhone, setCopiedPhone] = useState(false);
 
+  // Close inspection drawer or modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (selected) setSelected(null);
+        if (scheduleModal) closeScheduleModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selected, scheduleModal]);
+
+  // Auto-fill searchable combobox states
+  const [jobSearch, setJobSearch] = useState("");
+  const [jobDropdownOpen, setJobDropdownOpen] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [candidateDropdownOpen, setCandidateDropdownOpen] = useState(false);
+
   const defaultInterviewer = currentUser?.name
     ? `${currentUser.name} (${(currentUser.role || "Admin").replace("_", " ")})`
     : "Admin Staff";
 
   const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
+    jobId: "",
+    jobTitle: "",
+    company: "",
+    companyAddress: "",
     applicationId: "",
     candidateName: "",
     candidatePhone: "",
-    jobTitle: "",
-    company: "",
+    candidateEmail: "",
     date: "",
     time: "",
     mode: "phone",
@@ -73,6 +94,10 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
   const openScheduleModal = () => {
     clearErrors();
     reset();
+    setJobSearch("");
+    setCandidateSearch("");
+    setJobDropdownOpen(false);
+    setCandidateDropdownOpen(false);
     setData((prev) => ({
       ...prev,
       interviewer: defaultInterviewer,
@@ -84,8 +109,58 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
 
   const closeScheduleModal = () => {
     setScheduleModal(false);
+    setJobDropdownOpen(false);
+    setCandidateDropdownOpen(false);
     reset();
     clearErrors();
+  };
+
+  const handleJobSelect = (job) => {
+    const address = job.company_address || job.location || "";
+    setData((prev) => {
+      const updated = {
+        ...prev,
+        jobId: job.id,
+        jobTitle: job.title,
+        company: job.company || "ATS Partner",
+        companyAddress: address,
+      };
+      if (prev.mode === "in_person") {
+        updated.meetingLink = address;
+      }
+      return updated;
+    });
+    setJobSearch(`${job.title} (${job.company || "Client"})`);
+    setJobDropdownOpen(false);
+    clearErrors("jobTitle");
+  };
+
+  const handleCandidateSelect = (cand) => {
+    const digits = (cand.phone || "").replace(/\D/g, "").slice(0, 10);
+    setData((prev) => ({
+      ...prev,
+      candidateName: cand.name || "",
+      candidatePhone: digits,
+      candidateEmail: cand.email || "",
+      applicationId: cand.application_id || prev.applicationId || "",
+    }));
+    setCandidateSearch(`${cand.name} (${digits})`);
+    setCandidateDropdownOpen(false);
+    clearErrors("candidateName");
+    clearErrors("candidatePhone");
+  };
+
+  const handleModeChange = (newMode) => {
+    setData((prev) => ({
+      ...prev,
+      mode: newMode,
+      meetingLink:
+        newMode === "in_person"
+          ? prev.companyAddress || prev.meetingLink || ""
+          : newMode === "phone"
+          ? ""
+          : prev.meetingLink,
+    }));
   };
 
   // Strictly allow digits only (0-9) and limit to max 10 digits
@@ -150,17 +225,6 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
       setError("date", "Interview date cannot be in the past.");
     } else {
       clearErrors("date");
-    }
-  };
-
-  const handleJobSelect = (jobId) => {
-    const selectedJob = jobs.find((j) => String(j.id) === String(jobId));
-    if (selectedJob) {
-      setData((prev) => ({
-        ...prev,
-        jobTitle: selectedJob.title,
-        company: selectedJob.company || prev.company || "Company",
-      }));
     }
   };
 
@@ -307,137 +371,335 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
       <Head title="Interview Scheduling - ATS Admin" />
 
       <div className="p-3.5 sm:p-5 lg:p-6 pb-25">
+        {/* Flash Message & Instant WhatsApp Invite Link */}
         {flash?.success && (
-          <div className="mb-5 flex items-center gap-2 bg-emerald-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium border border-emerald-700">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" /> {flash.success}
+          <div className="mb-5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-900 text-white p-4 rounded-2xl shadow-xl text-sm font-medium border border-emerald-700">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{flash.success}</span>
+            </div>
+            {flash?.whatsapp_url && (
+              <a
+                href={flash.whatsapp_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs rounded-xl shadow-lg transition shrink-0 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" /> Open WhatsApp Invite ↗
+              </a>
+            )}
           </div>
         )}
 
-        {/* Schedule Modal */}
+        {/* Schedule Modal (Step-by-step Auto-fill Flow) */}
         {scheduleModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-lg shadow-2xl border border-gray-100 max-h-[92vh] overflow-y-auto">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-xl shadow-2xl border-2 border-blue-100 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold shadow-md shadow-blue-600/30">
                     <Calendar className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-base">Schedule New Interview</h3>
-                    <p className="text-xs text-gray-500">Candidate, phone validation & interviewer panel</p>
+                    <h3 className="font-bold text-gray-900 text-base">Schedule Interview (Step-by-Step)</h3>
+                    <p className="text-xs text-gray-500">1. Job Selection → 2. Candidate Selection → 3. Process & Venue</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={closeScheduleModal}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer transition"
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl cursor-pointer transition"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleSchedule} className="space-y-4">
-                {/* Candidate Name */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Candidate Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={data.candidateName}
-                    onChange={handleNameChange}
-                    placeholder="e.g. Priya Mehta"
-                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
-                      errors.candidateName
-                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
-                        : "border-gray-200 focus:ring-blue-500"
-                    }`}
-                    autoFocus
-                  />
-                  {errors.candidateName && (
-                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {errors.candidateName}
-                    </p>
+                {/* STEP 1: Select Job Post */}
+                <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4 text-blue-600" />
+                      Step 1: Select Job Post (Auto-fills Company & Address) <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] bg-blue-200/60 text-blue-900 font-bold px-2 py-0.5 rounded-full">
+                      Step 1
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Type to search job by title or company..."
+                      value={jobSearch}
+                      onChange={(e) => {
+                        setJobSearch(e.target.value);
+                        setJobDropdownOpen(true);
+                      }}
+                      onFocus={() => setJobDropdownOpen(true)}
+                      className="w-full px-3.5 py-2.5 border border-blue-200 bg-white rounded-xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                    />
+                    {jobDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl z-30 divide-y divide-gray-100">
+                        {jobs
+                          .filter((j) =>
+                            !jobSearch ||
+                            (j.title || "").toLowerCase().includes(jobSearch.toLowerCase()) ||
+                            (j.company || "").toLowerCase().includes(jobSearch.toLowerCase()) ||
+                            (j.location || "").toLowerCase().includes(jobSearch.toLowerCase())
+                          )
+                          .slice(0, 15)
+                          .map((j) => (
+                            <div
+                              key={j.id}
+                              onClick={() => handleJobSelect(j)}
+                              className="p-2.5 hover:bg-blue-50 cursor-pointer transition text-left"
+                            >
+                              <p className="font-bold text-xs text-gray-900">{j.title}</p>
+                              <p className="text-[11px] text-gray-500 flex items-center gap-2 mt-0.5">
+                                <span className="text-blue-600 font-semibold">{j.company || "ATS Partner"}</span>
+                                <span>•</span>
+                                <span>{j.location || "Location N/A"}</span>
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {data.jobTitle && (
+                    <div className="bg-white border border-blue-100 rounded-xl p-2.5 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 font-medium">Auto-filled Job:</span>
+                        <span className="font-bold text-blue-900">{data.jobTitle}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 font-medium">Company:</span>
+                        <span className="font-bold text-gray-800">{data.company || "—"}</span>
+                      </div>
+                      {data.companyAddress && (
+                        <div className="flex items-center justify-between text-[11px] text-gray-500">
+                          <span className="font-medium flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-blue-500" /> Venue / Address:
+                          </span>
+                          <span className="text-right truncate max-w-[240px] text-gray-700 font-medium">{data.companyAddress}</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                {/* Candidate Phone Number (Digits Only, Max 10 digits) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      Candidate Phone (10 Digits Only) <span className="text-red-500">*</span>
+                {/* STEP 2: Select Candidate (Searchable List) */}
+                <div className="bg-indigo-50/50 border border-indigo-200/80 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      Step 2: Select Candidate (Searchable List) <span className="text-red-500">*</span>
                     </label>
-                    <span
-                      className={`text-xs font-bold flex items-center gap-1 ${
-                        data.candidatePhone?.length === 10
-                          ? "text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md"
-                          : "text-gray-400"
-                      }`}
-                    >
-                      {data.candidatePhone?.length === 10 && <Check className="w-3 h-3 text-emerald-600" />}
-                      {data.candidatePhone?.length || 0} / 10 digits
+                    <span className="text-[10px] bg-indigo-200/60 text-indigo-900 font-bold px-2 py-0.5 rounded-full">
+                      Step 2
                     </span>
                   </div>
-                  <div className="relative flex items-center">
-                    <span className="absolute left-3 text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md select-none border border-gray-200">
-                      🇮🇳 +91
-                    </span>
+
+                  <div className="relative">
                     <input
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={10}
-                      value={data.candidatePhone}
-                      onChange={handlePhoneChange}
-                      onPaste={handlePhonePaste}
-                      onKeyDown={(e) => {
-                        // Strictly prevent any non-numeric character
-                        if (
-                          !/[0-9]/.test(e.key) &&
-                          !["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Enter"].includes(e.key) &&
-                          !e.ctrlKey &&
-                          !e.metaKey
-                        ) {
-                          e.preventDefault();
-                        }
+                      type="text"
+                      placeholder="Type candidate name or 10-digit phone to search..."
+                      value={candidateSearch}
+                      onChange={(e) => {
+                        setCandidateSearch(e.target.value);
+                        setCandidateDropdownOpen(true);
                       }}
-                      placeholder="9876543210"
-                      className={`w-full pl-20 pr-4 py-2.5 border rounded-xl text-sm font-semibold tracking-wider outline-none transition focus:ring-2 ${
-                        errors.candidatePhone
-                          ? "border-red-500 focus:ring-red-400 bg-red-50/20 text-red-900"
-                          : data.candidatePhone?.length === 10
-                          ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/10"
-                          : "border-gray-200 focus:ring-blue-500"
+                      onFocus={() => setCandidateDropdownOpen(true)}
+                      className={`w-full px-3.5 py-2.5 border bg-white rounded-xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs ${
+                        errors.candidateName || errors.candidatePhone ? "border-red-400 bg-red-50/20" : "border-indigo-200"
                       }`}
                     />
+                    {candidateDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl z-30 divide-y divide-gray-100">
+                        {candidates
+                          .filter((c) => {
+                            if (!candidateSearch) return true;
+                            const q = candidateSearch.toLowerCase();
+                            return (
+                              (c.name || "").toLowerCase().includes(q) ||
+                              (c.phone || "").includes(q) ||
+                              (c.email || "").toLowerCase().includes(q)
+                            );
+                          })
+                          .sort((a, b) => {
+                            const aApplied = data.jobId && a.applied_job_ids?.includes(Number(data.jobId));
+                            const bApplied = data.jobId && b.applied_job_ids?.includes(Number(data.jobId));
+                            if (aApplied && !bApplied) return -1;
+                            if (!aApplied && bApplied) return 1;
+                            return 0;
+                          })
+                          .slice(0, 20)
+                          .map((c) => {
+                            const isApplicant = data.jobId && c.applied_job_ids?.includes(Number(data.jobId));
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => handleCandidateSelect(c)}
+                                className={`p-2.5 hover:bg-indigo-50 cursor-pointer transition text-left flex items-center justify-between ${
+                                  isApplicant ? "bg-emerald-50/50" : ""
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="font-bold text-xs text-gray-900">{c.name}</p>
+                                    {isApplicant && (
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
+                                        Applied for this Job
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    📞 +91 {c.phone} {c.email ? `• ✉️ ${c.email}` : ""} {c.city ? `• 📍 ${c.city}` : ""}
+                                  </p>
+                                </div>
+                                <span className="text-xs text-indigo-600 font-bold">Select →</span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
                   </div>
-                  {errors.candidatePhone ? (
-                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {errors.candidatePhone}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Only 10 digits allowed (no spaces, letters, or special characters).
-                    </p>
-                  )}
+
+                  {/* Candidate Auto-filled Preview and Manual Edit */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white border border-indigo-100 rounded-xl p-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                        Candidate Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={data.candidateName}
+                        onChange={handleNameChange}
+                        placeholder="e.g. Rahul Sharma"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      {errors.candidateName && (
+                        <p className="text-[11px] text-red-500 mt-0.5">{errors.candidateName}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                        Phone (10 Digits) *
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={data.candidatePhone}
+                        onChange={handlePhoneChange}
+                        onPaste={handlePhonePaste}
+                        placeholder="9876543210"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      {errors.candidatePhone && (
+                        <p className="text-[11px] text-red-500 mt-0.5">{errors.candidatePhone}</p>
+                      )}
+                    </div>
+
+                    <div className="col-span-full">
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                        Candidate Email (Optional - For Email Invitation)
+                      </label>
+                      <input
+                        type="email"
+                        value={data.candidateEmail}
+                        onChange={(e) => setData("candidateEmail", e.target.value)}
+                        placeholder="candidate@example.com"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-800 outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Interviewer Details ("kon kon lega us ki details") */}
-                <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/50 border border-blue-100 rounded-2xl p-4 space-y-3">
+                {/* STEP 3: Process Details & Venue */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-blue-600" />
-                      Who will take interview? (Interviewer / Panel) <span className="text-red-500">*</span>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-slate-600" />
+                      Step 3: Interview Process, Round & Venue
                     </label>
-                    <span className="text-[10px] text-blue-800 bg-blue-100 font-bold px-2 py-0.5 rounded-full">
-                      Panel Details
+                    <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded-full">
+                      Step 3
                     </span>
                   </div>
 
+                  {/* Mode, Date, Time */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Interview Mode *
+                      </label>
+                      <select
+                        value={data.mode}
+                        onChange={(e) => handleModeChange(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-gray-800"
+                      >
+                        <option value="phone">📞 Phone Call</option>
+                        <option value="video">🎥 Video Call</option>
+                        <option value="in_person">🏢 In Person</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Date *
+                      </label>
+                      <input
+                        type="date"
+                        min={todayStr}
+                        value={data.date}
+                        onChange={handleDateChange}
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-gray-800"
+                      />
+                      {errors.date && <p className="text-[10px] text-red-500 mt-0.5">{errors.date}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Time *
+                      </label>
+                      <input
+                        type="time"
+                        value={data.time}
+                        onChange={(e) => {
+                          setData("time", e.target.value);
+                          if (e.target.value) clearErrors("time");
+                        }}
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-gray-800"
+                      />
+                      {errors.time && <p className="text-[10px] text-red-500 mt-0.5">{errors.time}</p>}
+                    </div>
+                  </div>
+
+                  {/* Round & Interviewer Panel */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        Select Staff / Interviewer
+                        Round / Stage
+                      </label>
+                      <select
+                        value={data.round}
+                        onChange={(e) => setData("round", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-gray-800"
+                      >
+                        <option value="HR Screening">1. HR Screening</option>
+                        <option value="Technical Round 1">2. Technical Round 1</option>
+                        <option value="Technical Round 2">3. Technical Round 2</option>
+                        <option value="Managerial Round">4. Managerial / HOD</option>
+                        <option value="Final / Culture Fit">5. Final / Culture Fit</option>
+                        <option value="Client Interview">6. Client Interview</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Interviewer / Panel *
                       </label>
                       <select
                         onChange={(e) => {
@@ -446,9 +708,9 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                             clearErrors("interviewer");
                           }
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none text-gray-800"
                       >
-                        <option value="">-- Select Member --</option>
+                        <option value="">-- Choose Member --</option>
                         {teamMembers.map((m) => (
                           <option key={m.id} value={`${m.name} (${(m.role || "Staff").replace("_", " ")})`}>
                             {m.name} — {(m.role || "Staff").replace("_", " ")}
@@ -456,51 +718,9 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                         ))}
                       </select>
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        Interview Round / Stage
-                      </label>
-                      <select
-                        value={data.round}
-                        onChange={(e) => setData("round", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                      >
-                        <option value="HR Screening">1. HR Screening (Phone)</option>
-                        <option value="Technical Round 1">2. Technical Round 1</option>
-                        <option value="Technical Round 2">3. Technical Round 2</option>
-                        <option value="Managerial Round">4. Managerial / HOD</option>
-                        <option value="Final / Culture Fit">5. Final / Culture Fit</option>
-                        <option value="Client Interview">6. Client Interview</option>
-                      </select>
-                    </div>
                   </div>
 
-                  {/* Multi-member panel quick append */}
-                  {teamMembers.length > 0 && (
-                    <div>
-                      <label className="block text-[10px] font-medium text-gray-500 mb-1">
-                        Quick Add Co-interviewer to Panel:
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {teamMembers.slice(0, 5).map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => appendInterviewer(`${m.name} (${(m.role || "Staff").replace("_", " ")})`)}
-                            className="text-[11px] px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg cursor-pointer transition flex items-center gap-1 font-medium"
-                          >
-                            + {m.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                      Interviewer Details / Panel Description <span className="text-red-500">*</span>
-                    </label>
                     <input
                       type="text"
                       value={data.interviewer}
@@ -508,172 +728,87 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                         setData("interviewer", e.target.value);
                         if (e.target.value.trim()) clearErrors("interviewer");
                       }}
-                      placeholder="e.g. Rahul Sharma (HR) & Amit Verma (Tech Lead)"
-                      className={`w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 outline-none transition ${
-                        errors.interviewer
-                          ? "border-red-500 focus:ring-red-400 bg-red-50/20"
-                          : "border-gray-200 focus:ring-blue-500"
-                      }`}
+                      placeholder="Interviewer name or panel details"
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
                     />
-                    {errors.interviewer && (
-                      <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" /> {errors.interviewer}
+                    {errors.interviewer && <p className="text-[10px] text-red-500 mt-0.5">{errors.interviewer}</p>}
+                  </div>
+
+                  {/* IN-PERSON MODE: Company Address Auto-filled */}
+                  {data.mode === "in_person" && (
+                    <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-amber-700" />
+                          Company Address (Auto-filled for In-Person) *
+                        </label>
+                        <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                          Venue Address
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={data.meetingLink}
+                        onChange={(e) => setData("meetingLink", e.target.value)}
+                        placeholder="Company address / Interview cabin location..."
+                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                      />
+                      <p className="text-[10px] text-amber-800 font-medium">
+                        {data.companyAddress
+                          ? "✓ Automatically loaded from company profile. You can customize room or floor number."
+                          : "Please enter company office address for the candidate."}
                       </p>
-                    )}
+                    </div>
+                  )}
+
+                  {/* VIDEO MODE: Meeting Link */}
+                  {data.mode === "video" && (
+                    <div className="bg-purple-50/80 border border-purple-200 rounded-xl p-3 space-y-1">
+                      <label className="block text-[11px] font-bold text-purple-900 flex items-center gap-1">
+                        <Video className="w-3.5 h-3.5 text-purple-700" />
+                        Meeting Link (Google Meet / Zoom / MS Teams)
+                      </label>
+                      <input
+                        type="url"
+                        value={data.meetingLink}
+                        onChange={(e) => setData("meetingLink", e.target.value)}
+                        placeholder="https://meet.google.com/xyz-abcd-efg"
+                        className="w-full px-3 py-2 border border-purple-300 rounded-lg text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm Dispatch Notice */}
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-bold">Interview will be confirmed via Email & WhatsApp</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-800">
+                    <span>✉️ Email</span> • <span>💬 WhatsApp</span>
                   </div>
                 </div>
 
-                {/* Mode, Date, and Time */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Mode <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={data.mode}
-                      onChange={(e) => setData("mode", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="phone">📞 Phone Call</option>
-                      <option value="video">🎥 Video Call</option>
-                      <option value="in_person">🏢 In Person</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      min={todayStr}
-                      value={data.date}
-                      onChange={handleDateChange}
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 transition ${
-                        errors.date ? "border-red-500 focus:ring-red-400 bg-red-50/20" : "border-gray-200 focus:ring-blue-500"
-                      }`}
-                    />
-                    {errors.date && (
-                      <p className="text-xs text-red-500 mt-1 font-medium">{errors.date}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Time <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={data.time}
-                      onChange={(e) => {
-                        setData("time", e.target.value);
-                        if (e.target.value) clearErrors("time");
-                      }}
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 transition ${
-                        errors.time ? "border-red-500 focus:ring-red-400 bg-red-50/20" : "border-gray-200 focus:ring-blue-500"
-                      }`}
-                    />
-                    {errors.time && (
-                      <p className="text-xs text-red-500 mt-1 font-medium">{errors.time}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Meeting Link or Office Address */}
-                {data.mode === "video" && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Video Meeting Link (Google Meet / Zoom / MS Teams)
-                    </label>
-                    <input
-                      type="url"
-                      value={data.meetingLink}
-                      onChange={(e) => setData("meetingLink", e.target.value)}
-                      placeholder="https://meet.google.com/abc-defg-hij"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                )}
-
-                {data.mode === "in_person" && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Interview Location / Office Address / Cabin
-                    </label>
-                    <input
-                      type="text"
-                      value={data.meetingLink}
-                      onChange={(e) => setData("meetingLink", e.target.value)}
-                      placeholder="e.g. ATS Head Office, 3rd Floor, Malviya Nagar, Jaipur"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                )}
-
-                {/* Job Link & Company */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Select Job Post (Auto-fill)
-                    </label>
-                    <select
-                      onChange={(e) => handleJobSelect(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="">-- Choose Job --</option>
-                      {jobs.map((j) => (
-                        <option key={j.id} value={j.id}>
-                          {j.title} {j.company ? `(${j.company})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Job Title
-                    </label>
-                    <input
-                      type="text"
-                      value={data.jobTitle}
-                      onChange={(e) => setData("jobTitle", e.target.value)}
-                      placeholder="e.g. Telecalling Executive"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Company Name
-                  </label>
-                  <input
-                    type="text"
-                    value={data.company}
-                    onChange={(e) => setData("company", e.target.value)}
-                    placeholder="e.g. Tech Solutions Pvt Ltd"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-3 border-t border-gray-100">
+                {/* Submit and Cancel Buttons */}
+                <div className="flex gap-3 pt-2 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={closeScheduleModal}
-                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-semibold transition"
+                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs text-gray-600 hover:bg-gray-50 cursor-pointer font-semibold transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={processing}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/30 transition flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/30 transition flex items-center justify-center gap-2"
                   >
                     {processing ? (
                       "Scheduling..."
                     ) : (
                       <>
-                        <Check className="w-4 h-4" /> Confirm Schedule
+                        <Check className="w-4 h-4" /> Confirm & Schedule Interview
                       </>
                     )}
                   </button>
@@ -861,8 +996,14 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
 
         {/* Main List and Details Drawer */}
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* Interview List Cards */}
-          <div className={`flex-1 w-full ${selected ? "hidden lg:block" : ""} space-y-3`}>
+          {/* Interview List Cards (Independent Scroll in View Mode) */}
+          <div
+            className={`w-full min-w-0 ${
+              selected
+                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin] space-y-3"
+                : "space-y-3.5"
+            }`}
+          >
             {filtered.map((iv) => {
               const ModeIcon = MODE_ICON[iv.mode] || Phone;
               const isToday = iv.date === todayStr;
@@ -874,13 +1015,13 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                     setSelected(iv);
                     setRemarkText(iv.remark || "");
                   }}
-                  className={`bg-white border rounded-2xl p-4.5 cursor-pointer hover:shadow-md transition-all relative ${
+                  className={`bg-white border rounded-2xl p-4 sm:p-4.5 cursor-pointer hover:shadow-md transition-all relative overflow-hidden ${
                     selected?.uuid === iv.uuid
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/15"
-                      : "border-gray-100 hover:border-blue-200"
+                      : "border-gray-200/80 hover:border-blue-300"
                   }`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3.5 sm:gap-4 min-w-0">
                     {/* Mode Icon */}
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
@@ -898,17 +1039,19 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
 
                     <div className="flex-1 min-w-0">
                       {/* Candidate Name & Status */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-gray-900 text-base">{iv.candidateName}</h4>
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h4 className="font-bold text-gray-900 text-base truncate" title={iv.candidateName}>
+                            {iv.candidateName}
+                          </h4>
                           {isToday && (
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-500 text-white animate-pulse">
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-500 text-white animate-pulse shrink-0">
                               Today
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <span
                             className={`text-xs px-2.5 py-1 rounded-full font-bold border capitalize shrink-0 ${
                               STATUS_CFG[iv.status]?.color || "bg-gray-100 border-gray-200"
@@ -920,61 +1063,65 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                       </div>
 
                       {/* Job & Company */}
-                      <p className="text-xs text-gray-600 flex items-center gap-1.5 font-medium mb-2">
-                        <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span>{iv.jobTitle}</span>
-                        <span className="text-gray-300">•</span>
-                        <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="text-gray-700 font-semibold">{iv.company}</span>
-                      </p>
+                      <div className="text-xs text-gray-600 flex flex-wrap items-center gap-x-2 gap-y-1 font-medium mb-2.5 min-w-0">
+                        <span className="inline-flex items-center gap-1.5 min-w-0">
+                          <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate max-w-[200px] sm:max-w-none">{iv.jobTitle}</span>
+                        </span>
+                        <span className="text-gray-300 hidden sm:inline">•</span>
+                        <span className="inline-flex items-center gap-1.5 min-w-0">
+                          <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-800 font-semibold truncate max-w-[200px] sm:max-w-none">{iv.company}</span>
+                        </span>
+                      </div>
 
                       {/* Round & Interviewer Panel ("kon kon lega") */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-2.5 bg-gray-50/80 border border-gray-100 rounded-xl p-2.5">
-                        <div className="flex items-center gap-2 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2.5 bg-gray-50/80 border border-gray-100 rounded-xl p-2.5 text-xs min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="text-gray-400 font-medium shrink-0">Round:</span>
-                          <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                          <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 truncate">
                             {iv.round || "HR Screening"}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-xs truncate">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span className="text-gray-500 text-[11px]">Interviewer:</span>
-                          <span className="font-bold text-gray-800 truncate" title={iv.interviewer}>
+                          <span className="text-gray-500 text-[11px] shrink-0">Interviewer:</span>
+                          <span className="font-bold text-gray-800 truncate" title={iv.interviewer || iv.scheduledBy || "Admin"}>
                             {iv.interviewer || iv.scheduledBy || "Admin"}
                           </span>
                         </div>
                       </div>
 
                       {/* Date, Time, Phone Info */}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">
-                        <span className="flex items-center gap-1 font-semibold text-gray-700">
-                          <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs text-gray-500 mb-3 min-w-0">
+                        <span className="flex items-center gap-1 font-semibold text-gray-700 shrink-0">
+                          <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                           {iv.date}
                         </span>
-                        <span className="flex items-center gap-1 font-semibold text-gray-700">
-                          <Clock className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="flex items-center gap-1 font-semibold text-gray-700 shrink-0">
+                          <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                           {iv.time}
                         </span>
-                        <span className="flex items-center gap-1 font-mono font-semibold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">
-                          <Phone className="w-3 h-3 text-gray-500" />
+                        <span className="flex items-center gap-1 font-mono font-semibold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md shrink-0">
+                          <Phone className="w-3 h-3 text-gray-500 shrink-0" />
                           +91 {iv.candidatePhone}
                         </span>
                         {iv.mode === "video" && iv.meetingLink && (
-                          <span className="text-blue-600 font-medium flex items-center gap-1">
-                            <Video className="w-3.5 h-3.5" /> Video Call Link Attached
+                          <span className="text-blue-600 font-medium flex items-center gap-1 shrink-0">
+                            <Video className="w-3.5 h-3.5 shrink-0" /> Video Call Link Attached
                           </span>
                         )}
                       </div>
 
                       {/* Action Bar (Direct Call, WhatsApp, Open Meeting) */}
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 flex-wrap">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-gray-100 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
                           {/* Direct Call */}
                           <a
                             href={`tel:+91${(iv.candidatePhone || "").replace(/\D/g, "")}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition cursor-pointer shrink-0"
                             title="Call Candidate"
                           >
                             <Phone className="w-3.5 h-3.5" /> Call
@@ -986,7 +1133,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition cursor-pointer shrink-0"
                             title="Send Interview Details on WhatsApp"
                           >
                             <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Invite
@@ -999,7 +1146,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition cursor-pointer"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition cursor-pointer shrink-0"
                             >
                               <ExternalLink className="w-3.5 h-3.5" /> Join Meeting
                             </a>
@@ -1009,7 +1156,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                         {/* Candidate Interest Badge */}
                         {iv.interested !== null && iv.interested !== undefined && (
                           <span
-                            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+                            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
                               iv.interested
                                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                 : "bg-red-50 text-red-600 border border-red-200"
@@ -1044,31 +1191,40 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
             )}
           </div>
 
-          {/* Details Drawer */}
+          {/* Details Drawer (Independent Smooth Scroll & Distinct Contrast Header) */}
           {selected && (
-            <div className="w-full lg:w-96 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col max-h-[calc(100vh-100px)] sticky top-20 shadow-md">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/70">
-                <div className="flex items-center gap-2">
+            <div
+              id="admin-interview-detail-panel"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
                   <button
                     type="button"
                     onClick={() => setSelected(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                    className="text-xs font-semibold text-blue-200 hover:text-white px-2.5 py-1 bg-white/10 border border-white/20 rounded-lg lg:hidden cursor-pointer shrink-0"
                   >
                     ← Back
                   </button>
-                  <UserCheck className="w-4 h-4 text-blue-600" />
-                  <h3 className="font-bold text-gray-900 text-sm">Interview Details</h3>
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-cyan-400 flex items-center justify-center font-bold shrink-0">
+                    <UserCheck className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-white text-sm truncate">Interview Inspection</h3>
+                    <span className="text-[10px] text-cyan-300 font-medium truncate block">Candidate & Process Details</span>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-200 rounded-lg cursor-pointer transition shrink-0"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer transition shrink-0"
+                  title="Close (Esc)"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-4 pb-8">
+              <div className="overflow-y-auto flex-1 p-5 space-y-4 pb-8 overscroll-contain [scrollbar-width:thin]">
                 {/* Candidate Profile Header */}
                 <div className="flex items-center gap-3.5 bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100">
                   <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-base shadow-md shadow-blue-600/30 shrink-0">

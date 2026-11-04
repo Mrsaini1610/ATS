@@ -15,6 +15,9 @@ class Interview extends Model
     protected $fillable = [
         'uuid',
         'application_id',
+        'application_uuid',
+        'candidate_uuid',
+        'job_uuid',
         'candidate_name',
         'candidate_phone',
         'job_title',
@@ -47,6 +50,22 @@ class Interview extends Model
             if (empty($interview->scheduled_at)) {
                 $interview->scheduled_at = now()->toDateString();
             }
+            if (!empty($interview->application_id) && empty($interview->application_uuid)) {
+                $app = JobApplication::find($interview->application_id);
+                if ($app) {
+                    $interview->application_uuid = $app->uuid;
+                    $interview->candidate_uuid   = $interview->candidate_uuid ?: $app->candidate_uuid;
+                    $interview->job_uuid         = $interview->job_uuid ?: $app->job_uuid;
+                }
+            }
+            if (!empty($interview->application_uuid) && empty($interview->application_id)) {
+                $app = JobApplication::where('uuid', $interview->application_uuid)->first();
+                if ($app) {
+                    $interview->application_id = $app->id;
+                    $interview->candidate_uuid = $interview->candidate_uuid ?: $app->candidate_uuid;
+                    $interview->job_uuid       = $interview->job_uuid ?: $app->job_uuid;
+                }
+            }
         });
     }
 
@@ -54,8 +73,19 @@ class Interview extends Model
     {
         return 'uuid';
     }
+
     public function application()
     {
-        return $this->belongsTo(JobApplication::class, 'application_id', 'id');
+        return $this->belongsTo(JobApplication::class, 'application_uuid', 'uuid');
+    }
+
+    public function candidate()
+    {
+        return $this->belongsTo(User::class, 'candidate_uuid', 'uuid');
+    }
+
+    public function jobPost()
+    {
+        return $this->belongsTo(JobPost::class, 'job_uuid', 'uuid');
     }
 }

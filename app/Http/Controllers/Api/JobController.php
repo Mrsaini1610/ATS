@@ -826,8 +826,14 @@ class JobController extends Controller
             ], 404);
         }
 
-        $application = JobApplication::where('candidate_id', $user->id)
-            ->where('job_id', $job->id)
+        $application = JobApplication::where(function ($q) use ($user) {
+                $q->where('candidate_uuid', $user->uuid)
+                  ->orWhere('candidate_id', $user->id);
+            })
+            ->where(function ($q) use ($job) {
+                $q->where('job_uuid', $job->uuid)
+                  ->orWhere('job_id', $job->id);
+            })
             ->first();
 
         $isSaved = SavedJob::where('user_uuid', $user->uuid)
@@ -939,8 +945,14 @@ class JobController extends Controller
         }
 
         // 2. Duplicate Application Check
-        $alreadyApplied = JobApplication::where('candidate_id', $user->id)
-            ->where('job_id', $job->id)
+        $alreadyApplied = JobApplication::where(function ($q) use ($user) {
+                $q->where('candidate_uuid', $user->uuid)
+                  ->orWhere('candidate_id', $user->id);
+            })
+            ->where(function ($q) use ($job) {
+                $q->where('job_uuid', $job->uuid)
+                  ->orWhere('job_id', $job->id);
+            })
             ->exists();
 
         if ($alreadyApplied) {
@@ -979,9 +991,11 @@ class JobController extends Controller
 
         try {
             $appData = [
-                'candidate_id'         => $user->id,
-                'job_id'               => $job->id,
                 'candidate_uuid'       => $user->uuid,
+                'user_uuid'            => $user->uuid,
+                'candidate_id'         => $user->id,
+                'job_uuid'             => $job->uuid,
+                'job_id'               => $job->id,
                 'resume_url'           => $resumeUrl,
                 'cover_letter'         => $request->input('cover_letter') ?: $request->input('why_apply'),
                 'candidate_name'       => $request->input('full_name') ?: ($request->input('candidate_name') ?: ($user->full_name ?? $user->name)),

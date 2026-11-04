@@ -48,7 +48,7 @@ export default function RecentJobsSection({ recentJobs = [] }) {
                         <p className="text-xs font-semibold text-gray-500 truncate">
                           {job.company || "Hiring Partner"}
                         </p>
-                        <span className="text-[11px] font-medium text-gray-400">
+                        <span className="text-[11px] font-medium text-gray-500">
                           {job.created_at_human}
                         </span>
                       </div>
@@ -76,7 +76,7 @@ export default function RecentJobsSection({ recentJobs = [] }) {
                         </span>
                       ))}
                       {skillList.length > 3 && (
-                        <span className="text-[11px] font-medium text-gray-400 self-center">
+                        <span className="text-[11px] font-medium text-gray-500 self-center">
                           +{skillList.length - 3}
                         </span>
                       )}

@@ -108,6 +108,27 @@ class JobPost extends Model
             });
     }
 
+    /**
+     * Auto-deactivate posts whose last_date has passed
+     */
+    public static function autoDeactivateExpiredPosts(): int
+    {
+        $today = now()->toDateString();
+        return static::whereNotNull('last_date')
+            ->whereDate('last_date', '<', $today)
+            ->where(function ($q) {
+                $q->where('status', '!=', 'deactivated')
+                  ->orWhere('is_deleted', 0)
+                  ->orWhereNull('is_deleted');
+            })
+            ->whereIn('status', ['active', 'approved', 'pending', 'hold'])
+            ->update([
+                'status'     => 'deactivated',
+                'is_deleted' => 1,
+                'updated_at' => now(),
+            ]);
+    }
+
     public function isExpired(): bool
     {
         if ($this->is_deleted) {

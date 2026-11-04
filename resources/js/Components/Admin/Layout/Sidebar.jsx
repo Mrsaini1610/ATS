@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, usePage, router } from "@inertiajs/react";
 import { useAlerts } from "@/Components/Alerts";
 import { Toaster } from "react-hot-toast";
+import RealtimeNotificationToast from "@/Components/Common/RealtimeNotificationToast";
+import SingleSessionModal from "@/Components/Common/SingleSessionModal";
 import {
   LayoutDashboard,
   Briefcase,
@@ -21,6 +23,7 @@ import {
   ChevronDown,
   Menu,
   X,
+  ScrollText,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -35,6 +38,7 @@ const NAV_ITEMS = [
   { href: "/admin/companies", label: "Companies", icon: Building2, permissions: ["view_companies", "create_companies", "edit_companies", "status_companies", "delete_companies"] },
   { href: "/admin/categories", label: "Categories", icon: Tags, permissions: ["view_categories", "create_categories", "edit_categories", "status_categories", "delete_categories", "view_subcategories", "create_subcategories", "edit_subcategories", "status_subcategories", "delete_subcategories"] },
   { href: "/admin/skills", label: "Skills", icon: Zap, permissions: ["view_skills", "create_skills", "edit_skills", "status_skills", "delete_skills"] },
+  { href: "/admin/logs", label: "Logs & Audit Trail", icon: ScrollText, roles: ["super_admin", "admin"] },
   { href: "/admin/permissions", label: "Permissions", icon: Shield, roles: ["super_admin"] },
 ];
 
@@ -135,6 +139,8 @@ export default function SidebarLayout({ children }) {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
       <Toaster position="top-right" reverseOrder={false} gutter={8} />
+      <RealtimeNotificationToast />
+      <SingleSessionModal />
 
       {/* Mobile Drawer Backdrop Overlay */}
       {mobileOpen && (
@@ -280,6 +286,7 @@ export default function SidebarLayout({ children }) {
                   if (currentPath.startsWith("/admin/companies")) return "Companies";
                   if (currentPath.startsWith("/admin/categories")) return "Categories";
                   if (currentPath.startsWith("/admin/skills")) return "Skills";
+                  if (currentPath.startsWith("/admin/logs")) return "Logs & Audit Trail";
                   if (currentPath.startsWith("/admin/permissions")) return "Permissions";
                   if (currentPath.startsWith("/admin/profile")) return "My Profile";
                   if (currentPath.startsWith("/admin/notifications")) return "Notifications";

@@ -14,7 +14,21 @@ import {
   Plus,
   X,
   Flame,
+  Database,
+  FileSpreadsheet,
+  Download,
+  Phone,
+  Mail,
+  MessageCircle,
+  Globe,
+  Smartphone,
+  RefreshCw,
+  Compass,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
+import * as XLSX from "xlsx";
+import axios from "axios";
 
 const STATUS_CONFIG = {
   pending:     { label: "Pending",     color: "bg-yellow-50 text-yellow-700 border-yellow-200", dotColor: "bg-yellow-400" },
@@ -23,6 +37,7 @@ const STATUS_CONFIG = {
   rejected:    { label: "Rejected",    color: "bg-red-50 text-red-600 border-red-200",          dotColor: "bg-red-500" },
   hold:        { label: "On Hold",     color: "bg-orange-50 text-orange-600 border-orange-200", dotColor: "bg-orange-400" },
   inactive:    { label: "Inactive",    color: "bg-gray-100 text-gray-500 border-gray-200",      dotColor: "bg-gray-400" },
+  deactivated: { label: "Deactivated", color: "bg-gray-100 text-gray-500 border-gray-200",      dotColor: "bg-gray-400" },
 };
 
 function StatusBadge({ status }) {
@@ -141,6 +156,376 @@ function AssignTMModal({ job, teamMembers = [], onAssign, onClose, processing })
   );
 }
 
+/* ── 15 KM Nearby Candidate Database Section (Inline & Modal Table View) ── */
+function NearbyDatabaseSection({ job, onClose, isInline = false }) {
+  const [radius, setRadius] = useState(15);
+  const [platform, setPlatform] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [jobInfo, setJobInfo] = useState(job);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchNearby = async (selectedRadius, selectedPlatform) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(
+        route("admin.jobs.nearby-candidates", job.uuid || job.id),
+        {
+          params: {
+            radius: selectedRadius,
+            platform: selectedPlatform,
+          },
+        }
+      );
+      if (res.data?.success) {
+        setCandidates(res.data.candidates || []);
+        if (res.data.job) {
+          setJobInfo((prev) => ({ ...prev, ...res.data.job }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load nearby candidates:", err);
+      setError("Unable to load nearby candidate database. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNearby(radius, platform);
+  }, [radius, platform]);
+
+  const filtered = candidates.filter((c) => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    const skillsStr = Array.isArray(c.skills) ? c.skills.join(" ").toLowerCase() : "";
+    return (
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.phone || "").includes(q) ||
+      (c.city || "").toLowerCase().includes(q) ||
+      (c.area || "").toLowerCase().includes(q) ||
+      (c.jobTitle || "").toLowerCase().includes(q) ||
+      skillsStr.includes(q)
+    );
+  });
+
+  const handleExportExcel = () => {
+    if (!filtered || filtered.length === 0) {
+      alert("No candidates to export.");
+      return;
+    }
+
+    const rows = filtered.map((c, idx) => ({
+      "S.No": idx + 1,
+      "Candidate Name": c.name || "—",
+      "Mobile Number": c.phone || "—",
+      "Email Address": c.email || "—",
+      "City": c.city || "—",
+      "Area": c.area || "—",
+      "Distance": c.distance !== null ? `${c.distance} km` : "City Match",
+      "Platform": c.platform === "both" ? "Both (Web & App)" : (c.platform === "app" ? "App" : "Web"),
+      "Registered Via": (c.registeredFrom || "web").toUpperCase(),
+      "Target Job Role": c.jobTitle || "—",
+      "Total Experience": c.experience || "—",
+      "Key Skills": Array.isArray(c.skills) ? c.skills.join(", ") : "",
+      "Applied to this Post": c.is_applied ? "YES (Applied)" : "NO",
+      "Registered Date": c.registeredAt || "—",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Nearby_Candidates");
+
+    const safeTitle = (job.title || "Job").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 25);
+    const fileName = `${safeTitle}_Database_${radius}KM_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  const bodyContent = (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-4 sm:px-6 py-3.5 border-b border-purple-100 bg-gradient-to-r from-purple-50 via-white to-blue-50/40 rounded-t-2xl">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 shrink-0">
+            <Database className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-extrabold text-gray-900 text-sm sm:text-base">
+                Candidate Database ({radius} KM Area)
+              </h3>
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                {candidates.length} Available
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Target Location: <strong className="text-gray-800">{job.location || job.company}</strong> · {job.title}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer transition shrink-0"
+          title="Close Database"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Toolbar & Filters */}
+      <div className="p-3.5 sm:p-4 border-b border-gray-100 bg-gray-50/70 space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by candidate name, phone, role, skills..."
+              className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
+          {/* Excel Export Button */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+            title="Download this radius candidate database to Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Export Excel ({filtered.length})</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+          {/* Radius Options */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mr-1">Radius:</span>
+            {[
+              { r: 15, label: "15 KM (Exact)" },
+              { r: 25, label: "25 KM" },
+              { r: 50, label: "50 KM" },
+              { r: 100, label: "100 KM" },
+            ].map((item) => (
+              <button
+                type="button"
+                key={item.r}
+                onClick={() => setRadius(item.r)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  radius === item.r
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-purple-300"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Platform Filter */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mr-1">Platform:</span>
+            {[
+              { id: "all", label: "All" },
+              { id: "web", label: "🌐 Web" },
+              { id: "app", label: "📱 App" },
+              { id: "both", label: "🔄 Both" },
+            ].map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => setPlatform(item.id)}
+                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  platform === item.id
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content - Candidate List / Table (No Cards!) */}
+      <div className={`overflow-y-auto ${isInline ? "max-h-[460px]" : "flex-1"} p-3 sm:p-4`}>
+        {loading ? (
+          <div className="py-12 text-center text-gray-400 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-7 h-7 animate-spin text-purple-600" />
+            <p className="text-xs font-semibold text-gray-600">
+              Scanning candidates within {radius} KM radius of {job.location || "job location"}...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="py-8 text-center text-red-500 text-xs">{error}</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center text-gray-400 bg-white rounded-xl border border-gray-100">
+            <Database className="w-8 h-8 mx-auto text-gray-300 mb-1.5" />
+            <p className="font-semibold text-gray-700 text-xs">No candidates found within {radius} KM.</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Try switching the radius to 25 KM or 50 KM above.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-purple-50/70 border-b border-purple-100 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                  <th className="py-2.5 px-3">#</th>
+                  <th className="py-2.5 px-3">Candidate</th>
+                  <th className="py-2.5 px-3">Distance</th>
+                  <th className="py-2.5 px-3">Location</th>
+                  <th className="py-2.5 px-3">Role & Experience</th>
+                  <th className="py-2.5 px-3">Platform</th>
+                  <th className="py-2.5 px-3">Applied</th>
+                  <th className="py-2.5 px-3 text-right">Direct Contact</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((c, idx) => {
+                  const cleanPhone = (c.phone || "").replace(/\D+/g, "");
+                  const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                  const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
+                    `Hello ${c.name}, we have an opening for '${job.title}' at ${job.company} near your location (${c.distance_text}). Are you interested?`
+                  )}`;
+
+                  return (
+                    <tr key={c.uuid || c.id} className="hover:bg-purple-50/30 transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-gray-400">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-xs">
+                            {(c.name || "C").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">{c.name}</p>
+                            <p className="text-[11px] text-gray-400">{c.jobTitle || "Job Seeker"}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                          📍 {c.distance_text}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">
+                        {c.area && c.area !== "—" ? `${c.area}, ${c.city}` : c.city}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <p className="font-semibold text-gray-800">{c.experience}</p>
+                        {Array.isArray(c.skills) && c.skills.length > 0 && (
+                          <p className="text-[11px] text-gray-400 truncate max-w-[160px]">
+                            {c.skills.slice(0, 3).join(", ")}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {c.platform === "both" ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            🔄 Both
+                          </span>
+                        ) : c.platform === "app" ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                            📱 App
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            🌐 Web
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {c.is_applied ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                            <CheckCircle2 className="w-3 h-3 text-green-600" /> Applied
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-400">Not Applied</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {cleanPhone && (
+                            <>
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 border border-green-200"
+                                title="Chat on WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-green-600" />
+                                <span>WhatsApp</span>
+                              </a>
+                              <a
+                                href={`tel:${c.phone}`}
+                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 border border-blue-200"
+                                title={`Call ${c.phone}`}
+                              >
+                                <Phone className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Call</span>
+                              </a>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 sm:px-6 py-2.5 border-t border-purple-100 bg-purple-50/30 flex items-center justify-between rounded-b-2xl">
+        <p className="text-[11px] text-gray-500">
+          Showing <strong>{filtered.length}</strong> matching candidates within {radius} KM radius
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-1 bg-white border border-gray-200 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700 cursor-pointer transition shadow-2xs"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isInline) {
+    return (
+      <div className="w-full bg-white border-2 border-purple-200 rounded-2xl shadow-sm overflow-hidden">
+        {bodyContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs">
+      <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl border border-gray-100 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        {bodyContent}
+      </div>
+    </div>
+  );
+}
+
+function NearbyDatabaseInline({ job, onClose }) {
+  return <NearbyDatabaseSection job={job} onClose={onClose} isInline={true} />;
+}
+
+function NearbyDatabaseModal({ job, onClose }) {
+  return <NearbyDatabaseSection job={job} onClose={onClose} isInline={false} />;
+}
+
 export default function Jobs({
   jobs = [],
   teamMembers = [],
@@ -156,6 +541,8 @@ export default function Jobs({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedJob, setSelectedJob] = useState(null);
+  const [databaseModalJob, setDatabaseModalJob] = useState(null);
+  const [expandedDbJobUuid, setExpandedDbJobUuid] = useState(null);
   const [remarkModal, setRemarkModal] = useState(null);
   const [remark, setRemark] = useState("");
   const [assigningJob, setAssigningJob] = useState(null);
@@ -193,6 +580,16 @@ export default function Jobs({
       };
     }
   }, [selectedJob]);
+
+  // Auto-scroll detail panel smoothly into view when job is selected
+  useEffect(() => {
+    if (selectedJob) {
+      const el = document.getElementById("admin-job-detail-panel");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [selectedJob?.uuid]);
 
   const updateStatus = (uuid, status, remarkReason = null) => {
     setIsProcessing(true);
@@ -318,6 +715,13 @@ export default function Jobs({
           />
         )}
 
+        {databaseModalJob && (
+          <NearbyDatabaseModal
+            job={databaseModalJob}
+            onClose={() => setDatabaseModalJob(null)}
+          />
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900">Job Posts</h1>
@@ -401,8 +805,14 @@ export default function Jobs({
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* Jobs List (Left Side) */}
-          <div className={`w-full ${selectedJob ? "lg:w-1/2 xl:w-7/12" : "w-full"} space-y-3 transition-all duration-500 ease-out`}>
+          {/* Jobs List (Left Side - Independent Scroll in View Mode) */}
+          <div
+            className={`w-full ${
+              selectedJob
+                ? "lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                : "w-full"
+            } space-y-3 transition-all duration-300 ease-out`}
+          >
           {filtered.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
               <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -521,48 +931,110 @@ export default function Jobs({
                   )
                 )}
 
-                <div className="flex items-center justify-between text-xs text-gray-400 mt-2.5 pt-2 border-t border-gray-100 flex-wrap gap-2">
-                  <p>
-                    Posted {job.posted_at} · {job.type}
-                    {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
-                    · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
-                  </p>
-                  {job.posted_by && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-[11px] shadow-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      Posted by: {job.posted_by}
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-3 pt-2.5 border-t border-gray-100 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap text-gray-400">
+                    <p>
+                      Posted {job.posted_at} · {job.type}
+                      {job.work_mode && job.work_mode !== job.type && ` · ${job.work_mode}`}
+                      · {job.exp} · {job.openings} opening{job.openings > 1 ? "s" : ""}
+                    </p>
+                    {job.posted_by && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-bold text-[11px] shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        Posted by: {job.posted_by}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Database Button at the Bottom of Post with Total Count */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedDbJobUuid((prev) => (prev === job.uuid ? null : job.uuid));
+                    }}
+                    className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl font-bold cursor-pointer transition shadow-2xs ${
+                      expandedDbJobUuid === job.uuid
+                        ? "bg-purple-600 text-white shadow-sm ring-2 ring-purple-300"
+                        : "bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200"
+                    }`}
+                    title="View candidate database within 15 KM of this job"
+                  >
+                    <Database className={`w-3.5 h-3.5 ${expandedDbJobUuid === job.uuid ? "text-white" : "text-purple-600"}`} />
+                    <span>{expandedDbJobUuid === job.uuid ? "Close Database" : "Database"}</span>
+                    <span
+                      className={`text-[11px] px-2 py-0.2 rounded-full font-extrabold ${
+                        expandedDbJobUuid === job.uuid
+                          ? "bg-white text-purple-700"
+                          : "bg-purple-600 text-white"
+                      }`}
+                      title="Total candidates in 15 KM radius"
+                    >
+                      {job.nearby_candidates_count ?? 0}
                     </span>
-                  )}
+                  </button>
                 </div>
+
+                {/* 15 KM Candidate Database (Inline at bottom of post) */}
+                {expandedDbJobUuid === job.uuid && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3.5 pt-3.5 border-t-2 border-purple-200 animate-in fade-in slide-in-from-top-2 duration-200"
+                  >
+                    <NearbyDatabaseInline
+                      job={job}
+                      onClose={() => setExpandedDbJobUuid(null)}
+                    />
+                  </div>
+                )}
               </div>
             ))
           )}
         </div>
 
-          {/* In-Page Side View for Job Details (Right Column - Full Height, No Inner Scroller) */}
+          {/* In-Page Side View for Job Details (Independent Smooth Scroll & Distinct Contrast Header) */}
           {selectedJob && (
             <div
               id="admin-job-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border border-gray-200 rounded-3xl shadow-lg flex flex-col h-fit sticky top-6 z-10 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0 bg-white">
-                <div className="flex items-center gap-2 min-w-0 pr-2">
-                  <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">{selectedJob.title}</h3>
-                  {selectedJob.is_hot && <Flame className="w-4 h-4 text-orange-500 shrink-0" />}
+              {/* Header with High-Contrast Navy/Blue Gradient */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-white text-base truncate">{selectedJob.title}</h3>
+                      {selectedJob.is_hot && <Flame className="w-4 h-4 text-orange-400 shrink-0" />}
+                    </div>
+                    <p className="text-[11px] text-cyan-300 font-medium">{selectedJob.company || "ATS Client"} • Job Inspection</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedJob(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer transition shrink-0"
-                  title="Close (Esc)"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDatabaseModalJob(selectedJob)}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-200 hover:bg-purple-500/30 border border-purple-400/30 font-bold cursor-pointer transition shadow-2xs"
+                    title="View candidate database within 15 KM of this job"
+                  >
+                    <Database className="w-3.5 h-3.5 text-purple-300" />
+                    <span className="hidden sm:inline">Database</span>
+                    <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-purple-500 text-white font-extrabold">
+                      {selectedJob.nearby_candidates_count ?? 0}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJob(null)}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer transition shrink-0"
+                    title="Close (Esc)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* Natural Full Content (No Inner Scroller, Clean & Visible) */}
-              <div className="p-5 sm:p-6 space-y-4">
+              {/* Independent Scrollable Content Area */}
+              <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
                   <div className="flex flex-wrap gap-2">
                     <StatusBadge status={selectedJob.status} />
                     {(selectedJob.is_deleted || selectedJob.is_expired) && (
@@ -889,64 +1361,79 @@ export default function Jobs({
                 </div>
 
                 {/* Footer Actions */}
-                {canModerateJob && (
-                  <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/70">
-                    {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(selectedJob.uuid, "approved")}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> Approve
-                      </button>
-                    )}
-                    {can("reject_jobs") && selectedJob.status !== "rejected" && (
-                      <button
-                        title="Reject"
-                        type="button"
-                        onClick={() => {
-                          setRemarkModal({ job: selectedJob, newStatus: "rejected" });
-                          setRemark("");
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
-                      >
-                        <XCircle className="w-4 h-4" /> Reject
-                      </button>
-                    )}
-                    {can("hold_jobs") && selectedJob.status !== "hold" && (
-                      <button
-                        title="Hold"
-                        type="button"
-                        onClick={() => {
-                          setRemarkModal({ job: selectedJob, newStatus: "hold" });
-                          setRemark("");
-                        }}
-                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-orange-400 text-orange-600 rounded-xl text-sm font-bold hover:bg-orange-50 cursor-pointer transition"
-                      >
-                        <Clock className="w-4 h-4" /> Hold
-                      </button>
-                    )}
-                    {can("deactivate_jobs") && (selectedJob.status === "deactivated" ? (
-                      <button
-                        title="Activate"
-                        type="button"
-                        onClick={() => updateStatus(selectedJob.uuid, "active")}
-                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-blue-400 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 cursor-pointer transition"
-                      >
-                        <Eye className="w-4 h-4" /> Activate
-                      </button>
-                    ) : (
-                      <button
-                        title="Deactivate"
-                        type="button"
-                        onClick={() => updateStatus(selectedJob.uuid, "deactivated")}
-                        className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-gray-300 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 cursor-pointer transition"
-                      >
-                        <EyeOff className="w-4 h-4" /> Deactivate
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="p-4 border-t border-gray-100 flex flex-wrap gap-2 shrink-0 bg-gray-50/90 backdrop-blur-xs z-10">
+                  <button
+                    type="button"
+                    onClick={() => setDatabaseModalJob(selectedJob)}
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold cursor-pointer transition shadow-xs"
+                    title="View candidate database within 15 KM of this job"
+                  >
+                    <Database className="w-4 h-4" />
+                    <span>Candidate Database (15 KM)</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white text-purple-700 font-extrabold shadow-2xs">
+                      {selectedJob.nearby_candidates_count ?? 0}
+                    </span>
+                  </button>
+
+                  {canModerateJob && (
+                    <>
+                      {can("approve_jobs") && selectedJob.status !== "approved" && selectedJob.status !== "active" && (
+                        <button
+                          type="button"
+                          onClick={() => updateStatus(selectedJob.uuid, "approved")}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Approve
+                        </button>
+                      )}
+                      {can("reject_jobs") && selectedJob.status !== "rejected" && (
+                        <button
+                          title="Reject"
+                          type="button"
+                          onClick={() => {
+                            setRemarkModal({ job: selectedJob, newStatus: "rejected" });
+                            setRemark("");
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold cursor-pointer transition"
+                        >
+                          <XCircle className="w-4 h-4" /> Reject
+                        </button>
+                      )}
+                      {can("hold_jobs") && selectedJob.status !== "hold" && (
+                        <button
+                          title="Hold"
+                          type="button"
+                          onClick={() => {
+                            setRemarkModal({ job: selectedJob, newStatus: "hold" });
+                            setRemark("");
+                          }}
+                          className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-orange-400 text-orange-600 rounded-xl text-sm font-bold hover:bg-orange-50 cursor-pointer transition"
+                        >
+                          <Clock className="w-4 h-4" /> Hold
+                        </button>
+                      )}
+                      {can("deactivate_jobs") && (selectedJob.status === "deactivated" ? (
+                        <button
+                          title="Activate"
+                          type="button"
+                          onClick={() => updateStatus(selectedJob.uuid, "active")}
+                          className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-blue-400 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 cursor-pointer transition"
+                        >
+                          <Eye className="w-4 h-4" /> Activate
+                        </button>
+                      ) : (
+                        <button
+                          title="Deactivate"
+                          type="button"
+                          onClick={() => updateStatus(selectedJob.uuid, "deactivated")}
+                          className="flex items-center gap-1.5 py-2.5 px-4 border-2 border-gray-300 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 cursor-pointer transition"
+                        >
+                          <EyeOff className="w-4 h-4" /> Deactivate
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
             </div>
           )}
         </div>

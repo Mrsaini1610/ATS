@@ -20,6 +20,7 @@ import {
   Check,
 } from "lucide-react";
 import axios from "axios";
+import RealtimeNotificationToast from "@/Components/Common/RealtimeNotificationToast";
 
 // Curated Popular Localities for Top Cities
 const POPULAR_LOCALITIES_BY_CITY = {
@@ -121,8 +122,10 @@ export default function Header() {
     setMounted(true);
   }, []);
 
-  // 1. Initialize Google Places Service for live Area Autocomplete
+  // 1. Initialize Google Places Service for live Area Autocomplete (Lazy load when location modal opens)
   useEffect(() => {
+    if (!locationModalOpen) return;
+
     if (window.google?.maps?.places?.AutocompleteService) {
       autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
       return;
@@ -151,7 +154,7 @@ export default function Header() {
       }, 300);
       return () => clearInterval(timer);
     }
-  }, [GOOGLE_MAPS_API_KEY]);
+  }, [GOOGLE_MAPS_API_KEY, locationModalOpen]);
 
   // Fallback search when Google Places is blocked or unconfigured
   const searchAreasFallback = async (query) => {
@@ -343,7 +346,7 @@ export default function Header() {
     );
   };
 
-  // 1. Initial Load: Check saved location OR prompt browser permission auto-fetch
+  // 1. Initial Load: Check saved location from localStorage
   useEffect(() => {
     const savedLoc = localStorage.getItem("user_selected_location");
 
@@ -355,9 +358,6 @@ export default function Header() {
       } catch (e) {
         console.error(e);
       }
-    } else {
-      // Prompt browser permission and auto-detect on visit!
-      requestCurrentLocation(false);
     }
   }, []);
 
@@ -503,6 +503,8 @@ export default function Header() {
           <img
             src="/images/logo.png"
             alt="ATS.com"
+            width={36}
+            height={36}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
@@ -1021,6 +1023,7 @@ export default function Header() {
         </div>,
         document.body
       )}
+      <RealtimeNotificationToast />
     </header>
   );
 }

@@ -25,6 +25,8 @@ class Admin extends Authenticatable
         'permissions',
         'profile_image',
         'status',
+        'current_web_session_id',
+        'last_web_login_at',
         'must_change_password',
         'created_by',
         'remember_token',
@@ -162,5 +164,10 @@ class Admin extends Authenticatable
     public function assignedTasks()
     {
         return $this->hasMany(Task::class, 'member_id');
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
     }
 }

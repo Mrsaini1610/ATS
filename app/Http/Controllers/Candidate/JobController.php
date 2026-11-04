@@ -19,6 +19,8 @@ class JobController extends Controller
 {
     public function index(Request $request)
     {
+        JobPost::autoDeactivateExpiredPosts();
+
         // 1. JobPost Query with active/approved status (excluding expired / is_deleted = 1)
         $query = JobPost::with(['category'])
             ->activeForCandidate();

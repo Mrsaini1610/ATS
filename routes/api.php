@@ -52,8 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::match(['get', 'post'], '/', [NotificationController::class, 'index']);
         Route::post('/read-all', [NotificationController::class, 'markAllRead']);
         Route::post('/clear-all', [NotificationController::class, 'clearAll']);
-        Route::match(['post', 'put'], '/{id}/read', [NotificationController::class, 'markRead']);
-        Route::match(['delete', 'post'], '/{id}', [NotificationController::class, 'destroy']);
+        Route::match(['post', 'put'], '/{uuid}/read', [NotificationController::class, 'markRead']);
+        Route::match(['delete', 'post'], '/{uuid}', [NotificationController::class, 'destroy']);
     });
 
 Route::middleware(['admin.auth'])->prefix('admin/notifications')->name('api.admin.notifications.')->group(function () {
@@ -72,6 +72,7 @@ Route::middleware(['admin.auth'])->prefix('admin/notifications')->name('api.admi
         Route::controller(UserProfileController::class)->group(function () {
             Route::post('/', 'getProfile');
             Route::post('/update', 'updateProfile');
+            Route::post('/snooze-prompt', 'snoozeProfilePrompt');
         });
 
         // Resume Section (All POST with body payloads)
@@ -86,24 +87,24 @@ Route::middleware(['admin.auth'])->prefix('admin/notifications')->name('api.admi
         Route::controller(EducationController::class)->group(function () {
             Route::post('/education', 'getEducations');
             Route::post('/education-add', 'addEducation');
-            Route::post('/education-update/{id}', 'updateEducation');
-            Route::post('/education-delete/{id}', 'deleteEducation');
+            Route::post('/education-update/{uuid}', 'updateEducation');
+            Route::post('/education-delete/{uuid}', 'deleteEducation');
         });
 
         // Experience
         Route::controller(ExperienceController::class)->group(function () {
             Route::post('/experience', 'getExperiences');
             Route::post('/experience-add', 'addExperience');
-            Route::post('/experience-update/{id}', 'updateExperience');
-            Route::post('/experience-delete/{id}', 'deleteExperience');
+            Route::post('/experience-update/{uuid}', 'updateExperience');
+            Route::post('/experience-delete/{uuid}', 'deleteExperience');
         });
 
         // Certificate
         Route::controller(CertificateController::class)->group(function () {
             Route::post('/certificate', 'getCertificates');
             Route::post('/certificate-add', 'addCertificate');
-            Route::post('/certificate-update/{id}', 'updateCertificate');
-            Route::post('/certificate-delete/{id}', 'deleteCertificate');
+            Route::post('/certificate-update/{uuid}', 'updateCertificate');
+            Route::post('/certificate-delete/{uuid}', 'deleteCertificate');
         });
     });
 

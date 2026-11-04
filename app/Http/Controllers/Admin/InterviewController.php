@@ -89,14 +89,13 @@ class InterviewController extends Controller
                 ];
             });
 
-        // Team members for scheduling interview
+        // Team members & enriched jobs with address for scheduling interview
+        $jobsQuery = JobPost::query()->with('companyRelation:uuid,name,address,location');
+
         if ($admin->isSuperAdmin()) {
             $teamMembers = Admin::where('status', 1)
                 ->select('id', 'uuid', 'name', 'role', 'phone', 'email')
                 ->orderBy('name')
-                ->get();
-            $jobs = JobPost::select('id', 'uuid', 'title', 'company', 'location')
-                ->orderBy('title')
                 ->get();
         } elseif ($admin->isAdmin()) {
             $teamMembers = Admin::where('created_by', $admin->id)
@@ -107,27 +106,109 @@ class InterviewController extends Controller
                 ->get();
             $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
             $clusterIds = array_merge([$admin->id], $teamMemberIds);
-            $jobs = JobPost::whereIn('created_by', $clusterIds)
-                ->orWhereIn('assigned_to', $clusterIds)
-                ->select('id', 'uuid', 'title', 'company', 'location')
-                ->orderBy('title')
-                ->get();
+            $jobsQuery->where(function ($q) use ($clusterIds) {
+                $q->whereIn('created_by', $clusterIds)
+                  ->orWhereIn('assigned_to', $clusterIds);
+            });
         } else {
             $teamMembers = collect([$admin]);
-            $jobs = JobPost::where('created_by', $admin->id)
-                ->orWhere('assigned_to', $admin->id)
-                ->select('id', 'uuid', 'title', 'company', 'location')
-                ->orderBy('title')
-                ->get();
+            $jobsQuery->where(function ($q) use ($admin) {
+                $q->where('created_by', $admin->id)
+                  ->orWhere('assigned_to', $admin->id);
+            });
         }
+
+        $jobs = $jobsQuery->orderBy('title')->get()->map(function ($j) {
+            return [
+                'id'              => $j->id,
+                'uuid'            => $j->uuid,
+                'title'           => $j->title,
+                'company'         => $j->company,
+                'location'        => $j->location,
+                'company_address' => $j->companyRelation?->address ?: $j->location ?: '',
+            ];
+        });
+
+        // Registered candidates with applied jobs
+        $candidates = \App\Models\User::query()
+            ->select('id', 'uuid', 'full_name', 'phone', 'email', 'city', 'job_title')
+            ->latest()
+            ->take(300)
+            ->get()
+            ->map(function ($u) {
+                $appJobIds = \App\Models\JobApplication::where(function ($q) use ($u) {
+                    $q->where('candidate_uuid', $u->uuid)->orWhere('candidate_id', $u->id);
+                })
+                ->pluck('job_id')
+                ->toArray();
+
+                return [
+                    'id'              => $u->id,
+                    'uuid'            => $u->uuid,
+                    'name'            => $u->full_name,
+                    'phone'           => $u->phone,
+                    'email'           => $u->email,
+                    'city'            => $u->city,
+                    'job_title'       => $u->job_title,
+                    'applied_job_ids' => $appJobIds,
+                ];
+            });
 
         return Inertia::render('Admin/Interviews', [
             'interviews'  => $interviews,
             'teamMembers' => $teamMembers,
             'jobs'        => $jobs,
+            'candidates'  => $candidates,
             'canViewAll'  => $canViewAll,
             'scope'       => $scope,
         ]);
+    }
+
+    public function searchCandidates(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+        $jobId = $request->get('job_id');
+
+        $query = \App\Models\User::query()
+            ->select('id', 'uuid', 'full_name', 'phone', 'email', 'city', 'job_title');
+
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $w->where('full_name', 'like', "%{$q}%")
+                  ->orWhere('phone', 'like', "%{$q}%")
+                  ->orWhere('email', 'like', "%{$q}%");
+            });
+        }
+
+        $candidates = $query->latest()->take(50)->get()->map(function ($u) use ($jobId) {
+            $hasApplied = false;
+            $applicationId = null;
+            if ($jobId) {
+                $app = \App\Models\JobApplication::where(function ($q) use ($u) {
+                        $q->where('candidate_uuid', $u->uuid)->orWhere('candidate_id', $u->id);
+                    })
+                    ->where(function ($q) use ($jobId) {
+                        $q->where('job_uuid', $jobId)->orWhere('job_id', $jobId);
+                    })
+                    ->first();
+                if ($app) {
+                    $hasApplied = true;
+                    $applicationId = $app->uuid ?: $app->id;
+                }
+            }
+            return [
+                'id'             => $u->id,
+                'uuid'           => $u->uuid,
+                'name'           => $u->full_name,
+                'phone'          => $u->phone,
+                'email'          => $u->email,
+                'city'           => $u->city,
+                'has_applied'    => $hasApplied,
+                'application_id' => $applicationId,
+            ];
+        });
+
+        return response()->json(['candidates' => $candidates]);
     }
 
     public function store(Request $request)
@@ -135,14 +216,16 @@ class InterviewController extends Controller
         $validated = $request->validate([
             'candidateName'  => 'required|string|min:2|max:255',
             'candidatePhone' => ['required', 'regex:/^[6-9]\d{9}$/'],
+            'candidateEmail' => 'nullable|email|max:255',
             'jobTitle'       => 'nullable|string|max:255',
             'company'        => 'nullable|string|max:255',
+            'companyAddress' => 'nullable|string|max:1000',
             'date'           => 'required|date|after_or_equal:today',
             'time'           => 'required|string|max:20',
             'mode'           => 'required|in:phone,video,in_person',
             'interviewer'    => 'required|string|max:255',
             'round'          => 'nullable|string|max:100',
-            'meetingLink'    => 'nullable|string|max:500',
+            'meetingLink'    => 'nullable|string|max:1000',
             'applicationId'  => 'nullable|string|max:255',
         ], [
             'candidateName.required'  => 'Candidate name is required.',
@@ -156,30 +239,80 @@ class InterviewController extends Controller
             'interviewer.required'    => 'Please specify who will conduct the interview.',
         ]);
 
+        $venueOrMeeting = $validated['meetingLink'] ?? null;
+        if ($validated['mode'] === 'in_person' && empty($venueOrMeeting)) {
+            $venueOrMeeting = $validated['companyAddress'] ?? 'Company Premises';
+        }
+
+        $app = null;
+        if (!empty($validated['applicationId'])) {
+            $app = JobApplication::where('uuid', $validated['applicationId'])
+                ->orWhere('id', $validated['applicationId'])
+                ->first();
+        }
+
+        $candidateUser = User::where('phone', $validated['candidatePhone'])
+            ->orWhere('email', $validated['candidateEmail'] ?? null)
+            ->first();
+
         $interview = Interview::create([
-            'candidate_name'  => $validated['candidateName'],
-            'candidate_phone' => $validated['candidatePhone'],
-            'job_title'       => $validated['jobTitle'] ?? null,
-            'company'         => $validated['company'] ?? null,
-            'interview_date'  => $validated['date'],
-            'interview_time'  => $validated['time'],
-            'mode'            => $validated['mode'],
-            'scheduled_by'    => auth('admin')->user()->name ?? 'Admin',
-            'interviewer'     => $validated['interviewer'],
-            'round'           => $validated['round'] ?? 'HR Screening',
-            'meeting_link'    => $validated['meetingLink'] ?? null,
-            'application_id'  => $validated['applicationId'] ?? null,
-            'status'          => 'scheduled',
+            'candidate_uuid'   => $candidateUser?->uuid ?? $app?->candidate_uuid,
+            'job_uuid'         => $app?->job_uuid,
+            'application_uuid' => $app?->uuid,
+            'application_id'   => $app?->id ?? (is_numeric($validated['applicationId'] ?? null) ? $validated['applicationId'] : null),
+            'candidate_name'   => $validated['candidateName'],
+            'candidate_phone'  => $validated['candidatePhone'],
+            'job_title'        => $validated['jobTitle'] ?? null,
+            'company'          => $validated['company'] ?? null,
+            'interview_date'   => $validated['date'],
+            'interview_time'   => $validated['time'],
+            'mode'             => $validated['mode'],
+            'scheduled_by'     => auth('admin')->user()->name ?? 'Admin',
+            'interviewer'      => $validated['interviewer'],
+            'round'            => $validated['round'] ?? 'HR Screening',
+            'meeting_link'     => $venueOrMeeting,
+            'status'           => 'scheduled',
         ]);
 
-        // Dispatch MailService: Email to candidate, Push & In-app, Interviewer alert, and Super Admin alert
+        // 1. Dispatch MailService (Candidate + Interviewer + Admin)
         try {
-            MailService::sendInterviewScheduled($interview, $validated);
+            MailService::sendInterviewScheduled($interview, array_merge($validated, [
+                'candidateEmail'   => $validated['candidateEmail'] ?? null,
+                'interviewAddress' => $venueOrMeeting,
+            ]));
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Failed sending interview scheduled email/notifications: ' . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Interview scheduled successfully.');
+        // 2. Build WhatsApp invite message and log
+        $cleanPhone = preg_replace('/\D/', '', $validated['candidatePhone']);
+        $venueText = $validated['mode'] === 'in_person'
+            ? ("🏢 Venue / Address: " . ($venueOrMeeting ?: 'Company Office'))
+            : ($validated['mode'] === 'video' ? ("🎥 Meeting Link: " . ($venueOrMeeting ?: 'Will be shared shortly')) : "📞 Mode: Phone Call");
+
+        $waMsg = "Hello " . $validated['candidateName'] . ",\n\n"
+            . "Your interview for *" . ($validated['jobTitle'] ?: 'the job role') . "* at *" . ($validated['company'] ?: 'ATS Client') . "* is confirmed!\n\n"
+            . "📅 Date: " . $validated['date'] . "\n"
+            . "⏰ Time: " . $validated['time'] . "\n"
+            . "📌 Round: " . ($validated['round'] ?: 'HR Screening') . "\n"
+            . $venueText . "\n"
+            . "👤 Interviewer: " . $validated['interviewer'] . "\n\n"
+            . "Please be prepared 10 minutes prior.\nBest regards,\nATS Hiring Team";
+
+        $waUrl = "https://wa.me/91" . $cleanPhone . "?text=" . urlencode($waMsg);
+
+        try {
+            \App\Models\WhatsappLog::create([
+                'phone'   => $cleanPhone,
+                'message' => $waMsg,
+                'status'  => 'sent',
+            ]);
+        } catch (\Throwable $e) {}
+
+        return redirect()->back()->with([
+            'success'      => 'Interview scheduled! Email sent to candidate & interviewer, WhatsApp invite generated.',
+            'whatsapp_url' => $waUrl,
+        ]);
     }
 
     public function updateStatus(Request $request, Interview $interview)

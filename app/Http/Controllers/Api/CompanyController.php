@@ -49,7 +49,10 @@ class CompanyController extends Controller
         $savedJobUuids = [];
 
         if ($user) {
-            $appliedJobIds = JobApplication::where('candidate_id', $user->id)
+            $appliedJobIds = JobApplication::where(function ($q) use ($user) {
+                    $q->where('candidate_uuid', $user->uuid)
+                      ->orWhere('candidate_id', $user->id);
+                })
                 ->pluck('job_id')
                 ->toArray();
 

@@ -19,11 +19,11 @@ public function index()
         ->get()
         ->map(function ($comp) {
             $jobs = \App\Models\JobPost::where('company_uuid', trim($comp->uuid))
-                ->get(['uuid', 'title', 'status']);
+                ->get(['uuid', 'title', 'status', 'openings', 'job_type', 'min_salary', 'max_salary', 'location']);
 
             if ($jobs->isEmpty()) {
                 $jobs = \App\Models\JobPost::where('company', 'LIKE', '%' . trim($comp->name) . '%')
-                    ->get(['uuid', 'title', 'status']);
+                    ->get(['uuid', 'title', 'status', 'openings', 'job_type', 'min_salary', 'max_salary', 'location']);
             }
 
             $logo = $comp->logo;
@@ -43,14 +43,19 @@ public function index()
                 'address'      => $comp->address,
                 'latitude'     => $comp->latitude,
                 'longitude'    => $comp->longitude,
-                'company_size' => $comp->company_size, // <-- yahan map kiya gaya hai
+                'company_size' => $comp->company_size,
                 'description'  => $comp->description,
                 'status'       => $comp->status,
+                'created_at'   => $comp->created_at ? $comp->created_at->format('d M Y') : null,
                 'jobs_count'   => $jobs->count(),
                 'jobs'         => $jobs->map(fn($job) => [
-                    'uuid'   => $job->uuid,
-                    'title'  => $job->title,
-                    'status' => $job->status,
+                    'uuid'       => $job->uuid,
+                    'title'      => $job->title,
+                    'status'     => $job->status,
+                    'openings'   => $job->openings,
+                    'job_type'   => $job->job_type,
+                    'salary'     => ($job->min_salary && $job->max_salary) ? ("₹" . number_format($job->min_salary) . " - ₹" . number_format($job->max_salary)) : null,
+                    'location'   => $job->location,
                 ]),
             ];
         });

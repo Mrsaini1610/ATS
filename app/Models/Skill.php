@@ -24,4 +24,9 @@ class Skill extends Model
             }
         });
     }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 }

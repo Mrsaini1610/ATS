@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, useForm, router } from "@inertiajs/react";
 import {
@@ -9,7 +9,14 @@ import {
   CheckCircle2,
   X,
   UserPlus,
+  Globe,
+  Smartphone,
+  RefreshCw,
+  FileSpreadsheet,
+  Download,
+  MessageCircle,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { updateAdminField } from "@/Components/Admin/liveValidation";
 
 const INDIA_CITIES = [
@@ -34,6 +41,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("all"); // 'all' | 'web' | 'app' | 'both'
   const [selectedUser, setSelectedUser] = useState(null);
   const [addModal, setAddModal] = useState(false);
 
@@ -80,6 +88,50 @@ export default function Users({ users = [], categories = [], canViewAll = false,
     });
   };
 
+  // Auto-scroll detail panel smoothly into view when candidate is selected
+  useEffect(() => {
+    if (selectedUser) {
+      const el = document.getElementById("admin-user-detail-panel");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [selectedUser?.uuid]);
+
+  // Export filtered candidates to Excel (.xlsx)
+  const handleExportExcel = () => {
+    if (!filtered || filtered.length === 0) {
+      alert("No candidates found for the selected filter.");
+      return;
+    }
+
+    const exportRows = filtered.map((u, idx) => ({
+      "S.No": idx + 1,
+      "Candidate Name": u.name || "—",
+      "Phone": u.phone || "—",
+      "Email": u.email || "—",
+      "City": u.city || "—",
+      "Area": u.area || "—",
+      "Target Job Title": u.jobTitle || "—",
+      "Experience": u.experience || "—",
+      "Platform": u.platform === "both" ? "Both (Web & App)" : (u.platform === "app" ? "App" : "Web"),
+      "Registered Via": (u.registeredFrom || "web").toUpperCase(),
+      "Status": (u.status || "active").toUpperCase(),
+      "Joined Date": u.registeredAt || "—",
+      "Applied Jobs": u.appliedCount ?? 0,
+      "Web Last Active": u.webLastActive || "—",
+      "App Last Active": u.appLastActive || "—",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Candidates");
+
+    const filterSuffix = platformFilter !== "all" ? `_${platformFilter}` : "_all";
+    const fileName = `ATS_Candidates${filterSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
     const matchesSearch =
@@ -90,8 +142,17 @@ export default function Users({ users = [], categories = [], canViewAll = false,
       (u.jobTitle || "").toLowerCase().includes(q);
 
     const matchesStatus = statusFilter === "all" || u.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesPlatform = platformFilter === "all" || u.platform === platformFilter;
+    return matchesSearch && matchesStatus && matchesPlatform;
   });
+
+  // Platform statistics
+  const platformCounts = {
+    all: users.length,
+    web: users.filter((u) => u.platform === "web").length,
+    app: users.filter((u) => u.platform === "app").length,
+    both: users.filter((u) => u.platform === "both").length,
+  };
 
   return (
     <>
@@ -256,21 +317,35 @@ export default function Users({ users = [], categories = [], canViewAll = false,
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Users</h1>
+            <h1 className="text-xl font-extrabold text-gray-900">Registered Candidates</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {users.length} registered candidates
+              {users.length} total candidates ({platformCounts.web} Web, {platformCounts.app} App, {platformCounts.both} Both)
             </p>
           </div>
 
-          {can("add_users") && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Excel Export Button */}
             <button
               type="button"
-              onClick={openAddModal}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
+              onClick={handleExportExcel}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-md shadow-emerald-600/25 transition cursor-pointer shrink-0"
+              title="Export filtered candidates to Excel spreadsheet (.xlsx)"
             >
-              <UserPlus className="w-4 h-4" /> Add User
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Excel ({filtered.length})</span>
             </button>
-          )}
+
+            {can("add_users") && (
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-md shadow-blue-600/30 transition cursor-pointer shrink-0"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Add User</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* All vs Your Scope Tab (Visible when canViewAll is true) */}
@@ -298,129 +373,288 @@ export default function Users({ users = [], categories = [], canViewAll = false,
         )}
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, city..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        <div className="space-y-3 mb-5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, phone, city, job role..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {/* Status Filter */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {["all", "active", "inactive"].map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold capitalize transition-all border cursor-pointer shrink-0 ${
+                    statusFilter === s
+                      ? "bg-gray-900 text-white border-gray-900 shadow-xs"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {["all", "active", "inactive"].map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold capitalize transition-all border cursor-pointer shrink-0 ${
-                  statusFilter === s
-                    ? "bg-gray-900 text-white border-gray-900 shadow-xs"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+
+          {/* Platform Filter Buttons (Web, App, Both, All) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">
+              Platform:
+            </span>
+            {[
+              { id: "all", label: "All Platforms", count: platformCounts.all, icon: null },
+              { id: "web", label: "Web Portal", count: platformCounts.web, icon: Globe, color: "text-blue-600" },
+              { id: "app", label: "Mobile App", count: platformCounts.app, icon: Smartphone, color: "text-purple-600" },
+              { id: "both", label: "Both (Web & App)", count: platformCounts.both, icon: RefreshCw, color: "text-emerald-600" },
+            ].map((p) => {
+              const IconComp = p.icon;
+              const isActive = platformFilter === p.id;
+              return (
+                <button
+                  type="button"
+                  key={p.id}
+                  onClick={() => setPlatformFilter(p.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer shrink-0 ${
+                    isActive
+                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {IconComp && <IconComp className={`w-3.5 h-3.5 ${isActive ? "text-white" : p.color}`} />}
+                  <span>{p.label}</span>
+                  <span
+                    className={`ml-1 text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {p.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* Candidates Grid */}
-          <div className={`flex-1 w-full ${selectedUser ? "hidden lg:block" : ""}`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {filtered.map((user) => (
-                <div
-                  key={user.uuid}
-                  onClick={() => setSelectedUser(user)}
-                  className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all shadow-xs ${
-                    selectedUser?.uuid === user.uuid
-                      ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20"
-                      : "border-gray-100 hover:border-blue-200"
-                  }`}
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-xs">
-                      {(user.name || "C")
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{user.name}</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3 text-gray-400" />
-                        {user.phone}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize shrink-0 ${
-                        user.status === "active"
-                          ? "bg-green-50 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {user.status}
-                    </span>
-                  </div>
+          {/* Candidates List View (Table - Independent Scroll in View Mode) */}
+          <div
+            className={`flex-1 w-full min-w-0 ${
+              selectedUser
+                ? "hidden lg:block overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                : ""
+            }`}
+          >
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="overflow-x-auto [scrollbar-width:thin]">
+                <table className="w-full text-left border-collapse min-w-[780px]">
+                  <thead>
+                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">Candidate</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">Contact</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">Location</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Role & Experience</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[100px]">Platform</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[85px]">Status</th>
+                      <th className={`py-3.5 px-4 whitespace-nowrap min-w-[80px] ${selectedUser ? "hidden xl:table-cell" : ""}`}>Applied</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[110px] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {filtered.map((user) => {
+                      const cleanPhone = (user.phone || "").replace(/\D+/g, "");
+                      const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
+                        `Hello ${user.name}, we have opportunities matching your profile at ATS.`
+                      )}`;
 
-                  <div className="space-y-1 text-xs text-gray-500">
-                    <p className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                      {user.city || "Location not set"}
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <Briefcase className="w-3.5 h-3.5 text-gray-400" />
-                      {user.jobTitle || "Looking for opportunities"} · {user.experience}
-                    </p>
-                  </div>
+                      return (
+                        <tr
+                          key={user.uuid}
+                          onClick={() => setSelectedUser(user)}
+                          className={`cursor-pointer transition-colors ${
+                            selectedUser?.uuid === user.uuid
+                              ? "bg-blue-50/70 border-l-4 border-l-blue-600"
+                              : "hover:bg-gray-50/90"
+                          }`}
+                        >
+                          {/* Candidate info */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs">
+                                {(user.name || "C")
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .slice(0, 2)}
+                              </div>
+                              <div className="min-w-0 max-w-[170px]">
+                                <p className="font-bold text-gray-900 truncate hover:text-blue-600">
+                                  {user.name}
+                                </p>
+                                <p className="text-[11px] text-gray-400">
+                                  Joined {user.registeredAt}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
 
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                    <span className="text-[11px] text-gray-400">
-                      Joined {user.registeredAt}
-                    </span>
-                    <span className="text-xs font-semibold text-blue-600">
-                      {user.appliedCount ?? 0} applied
-                    </span>
-                  </div>
-                </div>
-              ))}
+                          {/* Contact */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <p className="font-medium text-gray-800 flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-gray-400 shrink-0" />
+                              <span>{user.phone}</span>
+                            </p>
+                            {user.email && (
+                              <p className="text-[11px] text-gray-400 truncate max-w-[140px]">
+                                {user.email}
+                              </p>
+                            )}
+                          </td>
 
-              {filtered.length === 0 && (
-                <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
-                  No users found
-                </div>
-              )}
+                          {/* Location */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <p className="text-gray-700 flex items-center gap-1 truncate max-w-[150px]">
+                              <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                              <span>
+                                {user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}
+                              </span>
+                            </p>
+                          </td>
+
+                          {/* Role & Experience */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <p className="font-semibold text-gray-800 truncate max-w-[160px]">
+                              {user.jobTitle || "Job Seeker"}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              {user.experience || "Fresher"}
+                            </p>
+                          </td>
+
+                          {/* Platform Badge */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {user.platform === "both" ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                <RefreshCw className="w-2.5 h-2.5 text-emerald-600" /> Both
+                              </span>
+                            ) : user.platform === "app" ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                                <Smartphone className="w-2.5 h-2.5 text-purple-600" /> App
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                <Globe className="w-2.5 h-2.5 text-blue-600" /> Web
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span
+                              className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold capitalize whitespace-nowrap ${
+                                user.status === "active"
+                                    ? "bg-green-50 text-green-700 border border-green-200"
+                                    : "bg-gray-100 text-gray-500 border border-gray-200"
+                              }`}
+                            >
+                              {user.status}
+                            </span>
+                          </td>
+
+                          {/* Applied Count */}
+                          <td className={`py-3.5 px-4 whitespace-nowrap ${selectedUser ? "hidden xl:table-cell" : ""}`}>
+                            <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap">
+                              {user.appliedCount ?? 0} applied
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {cleanPhone && (
+                                <>
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition"
+                                    title="WhatsApp candidate"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </a>
+                                  <a
+                                    href={`tel:${user.phone}`}
+                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition"
+                                    title={`Call ${user.phone}`}
+                                  >
+                                    <Phone className="w-3.5 h-3.5" />
+                                  </a>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUser(user)}
+                                className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                              >
+                                View
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="text-center py-16 text-gray-400">
+                          No candidates found matching the filters
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          {/* Candidate Drawer Panel */}
+          {/* Candidate Drawer Panel (Independent Smooth Scroll & Distinct Contrast Header) */}
           {selectedUser && (
-            <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col sticky top-20 max-h-[calc(100vh-120px)] shadow-xs">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div
+              id="admin-user-detail-panel"
+              className="w-full lg:w-80 xl:w-96 shrink-0 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] shadow-2xl shadow-blue-950/20 z-20"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedUser(null)}
-                    className="text-xs font-semibold text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg lg:hidden cursor-pointer"
+                    className="text-xs font-semibold text-blue-200 hover:text-white px-2 py-1 bg-white/10 rounded-lg lg:hidden cursor-pointer"
                   >
                     ← Back
                   </button>
-                  <h3 className="font-bold text-gray-900 text-sm">User Details</h3>
+                  <div>
+                    <h3 className="font-extrabold text-white text-sm truncate">{selectedUser.name || "Candidate"}</h3>
+                    <span className="text-[10px] text-cyan-300 font-medium">Candidate Inspection Dossier</span>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer shrink-0 transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-4">
+              <div className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-3 shadow-md shadow-blue-500/20">
                     {(selectedUser.name || "C")
@@ -430,24 +664,43 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                       .slice(0, 2)}
                   </div>
                   <p className="font-bold text-gray-900">{selectedUser.name}</p>
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-semibold inline-block mt-1 ${
-                      selectedUser.status === "active"
-                        ? "bg-green-50 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {selectedUser.status}
-                  </span>
+                  <div className="flex items-center justify-center gap-1.5 mt-1.5 flex-wrap">
+                    <span
+                      className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                        selectedUser.status === "active"
+                          ? "bg-green-50 text-green-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {selectedUser.status}
+                    </span>
+                    {selectedUser.platform === "both" ? (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 text-emerald-600" /> Both (Web & App)
+                      </span>
+                    ) : selectedUser.platform === "app" ? (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-1">
+                        <Smartphone className="w-3 h-3 text-purple-600" /> Mobile App
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-blue-600" /> Web Portal
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2.5">
                   {[
                     { label: "Phone", val: selectedUser.phone },
                     { label: "Email", val: selectedUser.email || "—" },
-                    { label: "City", val: selectedUser.city || "—" },
+                    { label: "City & Area", val: selectedUser.area && selectedUser.area !== "—" ? `${selectedUser.area}, ${selectedUser.city}` : (selectedUser.city || "—") },
                     { label: "Job Title", val: selectedUser.jobTitle || "—" },
                     { label: "Experience", val: selectedUser.experience || "—" },
+                    { label: "Platform", val: selectedUser.platform === "both" ? "Both (Web & App)" : (selectedUser.platform === "app" ? "Mobile App" : "Web Portal") },
+                    { label: "Registered Via", val: (selectedUser.registeredFrom || "web").toUpperCase() },
+                    { label: "Web Last Active", val: selectedUser.webLastActive || "Never" },
+                    { label: "App Last Active", val: selectedUser.appLastActive || "Never" },
                     { label: "Applied Jobs", val: `${selectedUser.appliedCount ?? 0} jobs` },
                     { label: "Joined", val: selectedUser.registeredAt },
                   ].map((r) => (
@@ -460,7 +713,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
               </div>
 
               {can("status_users") && (
-                <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                <div className="p-4 border-t border-gray-100 bg-gray-50/50 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleToggleStatus(selectedUser.uuid)}

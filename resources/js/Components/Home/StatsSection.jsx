@@ -2,10 +2,10 @@ import { Briefcase, Building2, Users, Award } from "lucide-react";
 
 export default function StatsSection({ stats }) {
   const statItems = [
-    { label: "Jobs Available", value: stats?.activeJobs ? `${stats.activeJobs}+` : "12,450+", icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Companies Hiring", value: stats?.companies ? `${stats.companies}+` : "3,200+", icon: Building2, color: "text-green-600", bg: "bg-green-50" },
-    { label: "Candidates Placed", value: stats?.jobSeekers ? `${stats.jobSeekers}+` : "85,000+", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-    { label: "Success Rate", value: `${stats?.successRate || 94}`, icon: Award, color: "text-orange-600", bg: "bg-orange-50" },
+    { label: "Jobs Available", value: stats?.activeJobs ? `${stats.activeJobs}+` : "12,450+", icon: Briefcase, color: "text-blue-700", bg: "bg-blue-50" },
+    { label: "Companies Hiring", value: stats?.companies ? `${stats.companies}+` : "3,200+", icon: Building2, color: "text-emerald-700", bg: "bg-green-50" },
+    { label: "Candidates Placed", value: stats?.jobSeekers ? `${stats.jobSeekers}+` : "85,000+", icon: Users, color: "text-purple-700", bg: "bg-purple-50" },
+    { label: "Success Rate", value: `${stats?.successRate || 94}`, icon: Award, color: "text-amber-800", bg: "bg-orange-50" },
   ];
 
   return (
