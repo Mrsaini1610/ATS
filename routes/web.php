@@ -107,10 +107,10 @@ Route::get('/auth/session-check', function (\Illuminate\Http\Request $request) {
     return response()->json(['active' => true]);
 })->name('auth.session-check');
 
-Route::post('/check-phone', [CandidateAuthController::class, 'checkPhoneLogin'])->name('check.phone');
-Route::post('/phone-login', [CandidateAuthController::class, 'phoneLogin'])->name('phone.login');
+Route::post('/check-phone', [CandidateAuthController::class, 'checkPhoneLogin'])->middleware('throttle:15,1')->name('check.phone');
+Route::post('/phone-login', [CandidateAuthController::class, 'phoneLogin'])->middleware('throttle:10,1')->name('phone.login');
 Route::post('/candidate/complete-profile', [CandidateAuthController::class, 'completeProfile'])->name('candidate.complete-profile');
-Route::post('/check-phone-register', [CandidateAuthController::class, 'checkPhoneRegister'])->name('check.phone.register');
+Route::post('/check-phone-register', [CandidateAuthController::class, 'checkPhoneRegister'])->middleware('throttle:15,1')->name('check.phone.register');
 Route::post('/candidate-logout', [CandidateAuthController::class, 'logout'])->name('candidate.logout');
 
 Route::middleware('auth:web')->group(function () {
@@ -167,7 +167,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // 1. Guest Routes (Login)
     Route::middleware(['guest:admin', 'no-cache'])->group(function () {
         Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-        Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
     });
 
     // 2. Authenticated Admin Group

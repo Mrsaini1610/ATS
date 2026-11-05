@@ -167,6 +167,7 @@ class JobApplicationController extends Controller
                 'jobTitle'           => $jobPost->title ?? 'General Position',
                 'company'            => $jobPost->company ?? ($jobPost->companyRelation->name ?? 'ATS Client'),
                 'jobLocation'        => $jobPost->location ?? null,
+                'companyAddress'     => $jobPost?->companyRelation?->address ?: ($jobPost?->location ?: ''),
                 'jobType'            => $jobPost->job_type ?? null,
                 'jobSalary'          => $jobSalaryText,
                 'jobSalaryType'      => $jobSalaryType,

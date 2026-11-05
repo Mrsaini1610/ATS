@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use App\Jobs\SendPasswordResetEmail;
 use App\Jobs\SuperSendPasswordResetEmail;
@@ -65,57 +66,75 @@ class HomeController extends Controller
      */
     public function AuthLogin(Request $request)
     {
+        $identifierInput = trim((string) $request->input('identifier', ''));
+        $ip = $request->ip();
+
+        // 1. IP-based & Identifier Rate Limiting (Brute-force protection)
+        $ipKey = 'home-login-ip:' . $ip;
+        $throttleKey = 'home-login:' . Str::lower($identifierInput) . '|' . $ip;
+
+        if (RateLimiter::tooManyAttempts($ipKey, 5) || RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = max(RateLimiter::availableIn($ipKey), RateLimiter::availableIn($throttleKey));
+            return back()->withErrors([
+                'identifier' => "Too many login attempts from this IP address. Please try again in {$seconds} seconds.",
+            ]);
+        }
+
+        // 2. Server-side validation
         $request->validate([
-            'identifier' => 'required',
-            'password' => 'required',
+            'identifier' => ['required', 'string', 'min:3', 'max:150'],
+            'password'   => ['required', 'string', 'min:6', 'max:150'],
+            'remember'   => ['nullable', 'boolean'],
+        ], [
+            'identifier.required' => 'Please enter your email, phone, or username.',
+            'identifier.min'      => 'Identifier must be at least 3 characters.',
+            'password.required'   => 'Please enter your password.',
+            'password.min'        => 'Password must be at least 6 characters.',
         ]);
 
         $fieldType = filter_var($request->identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
         $guards = ['admin', 'member', 'web'];
         $authenticatedGuard = null;
         $authenticatedUser = null;
-            $inactiveUser = null;
-       foreach ($guards as $guard) {
-        // First check if user exists with this identifier
-        $userModel = $this->getUserModelForGuard($guard);
-        $user = $userModel::where($fieldType, $request->identifier)->first();
 
-        if ($user) {
-            if ($guard === 'member' && $user->is_calling_team) {
-                continue;
-            }
+        foreach ($guards as $guard) {
+            $userModel = $this->getUserModelForGuard($guard);
+            $user = $userModel::where($fieldType, $request->identifier)->first();
 
-            // Check if account is inactive
-            if ($user->status == 0) {
-                $inactiveUser = $user;
-                continue; // Skip authentication attempt for inactive users
-            }
+            if ($user) {
+                if ($guard === 'member' && $user->is_calling_team) {
+                    continue;
+                }
 
-            // Attempt authentication for active users
-            if (Auth::guard($guard)->attempt([
-                $fieldType => $request->identifier,
-                'password' => $request->password,
-                'status' => 1,
-            ], $request->remember)) {
-                $authenticatedGuard = $guard;
-                $authenticatedUser = Auth::guard($guard)->user();
-                break;
+                // Check if account is inactive
+                if ((int) ($user->status ?? 1) === 0) {
+                    continue;
+                }
+
+                // Attempt authentication for active users
+                if (Auth::guard($guard)->attempt([
+                    $fieldType => $request->identifier,
+                    'password' => $request->password,
+                    'status'   => 1,
+                ], (bool) $request->boolean('remember'))) {
+                    $authenticatedGuard = $guard;
+                    $authenticatedUser = Auth::guard($guard)->user();
+                    break;
+                }
             }
         }
-    }
 
-    // If we found an inactive user but no active authenticated user
-    if ($inactiveUser && !$authenticatedUser) {
-        return back()->withErrors([
-            'identifier' => 'Your account is inactive. Please contact admin to activate your account.',
-        ]);
-    }
+        if (!$authenticatedUser) {
+            RateLimiter::hit($ipKey, 60);
+            RateLimiter::hit($throttleKey, 60);
 
-    if (!$authenticatedUser) {
-        return back()->withErrors([
-            'identifier' => 'The provided credentials do not match our records.',
-        ]);
-    }
+            return back()->withErrors([
+                'identifier' => 'The provided credentials do not match our records.',
+            ]);
+        }
+
+        RateLimiter::clear($ipKey);
+        RateLimiter::clear($throttleKey);
         $userRoles = is_array($authenticatedUser->roles) ? $authenticatedUser->roles : [];
         $correctGuard = $this->determineGuardFromRoles($userRoles);
         if ($authenticatedGuard !== $correctGuard) {

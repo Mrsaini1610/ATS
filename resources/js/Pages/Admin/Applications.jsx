@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
 import { Head, usePage, router } from "@inertiajs/react";
 import {
@@ -25,6 +25,7 @@ import {
   User,
   Tag,
   Sparkles,
+  Video,
 } from "lucide-react";
 
 const STATUS_CFG = {
@@ -44,7 +45,11 @@ const STATUS_CFG = {
 
 const ALL_STATUSES = Object.keys(STATUS_CFG);
 
-const toWANum = (phone) => (phone || "").replace(/\s/g, "").replace(/^\+/, "");
+const toWANum = (phone) => {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+};
 const waUrl = (phone, msg) =>
   `https://wa.me/${toWANum(phone)}?text=${encodeURIComponent(msg)}`;
 const mailUrl = (email, subject, body) =>
@@ -477,6 +482,484 @@ function AssignModal({ app, teamMembers = [], onAssign, onClose }) {
   );
 }
 
+/* ── Schedule Interview Modal ── */
+function ScheduleInterviewModal({ app, teamMembers = [], currentUser, onClose, onScheduled }) {
+  const defaultInterviewer = currentUser?.name
+    ? `${currentUser.name} (${(currentUser.role || "Admin").replace("_", " ")})`
+    : (teamMembers[0]?.name ? `${teamMembers[0].name} (${(teamMembers[0].role || "Staff").replace("_", " ")})` : "Admin Staff");
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const cleanPhone = (app.userPhone || "").replace(/\D/g, "").slice(0, 10);
+
+  const [candidateName, setCandidateName] = useState(app.userName || "");
+  const [candidatePhone, setCandidatePhone] = useState(cleanPhone);
+  const [candidateEmail, setCandidateEmail] = useState(app.userEmail || "");
+  const [jobTitle, setJobTitle] = useState(app.jobTitle || "");
+  const [company, setCompany] = useState(app.company || "");
+  const [companyAddress, setCompanyAddress] = useState(app.companyAddress || app.jobLocation || "");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [mode, setMode] = useState(app.interviewMode || "phone");
+  const [round, setRound] = useState("HR Screening");
+  const [interviewer, setInterviewer] = useState(app.interviewContact || defaultInterviewer);
+  const [meetingLink, setMeetingLink] = useState(
+    app.interviewMode === "in_person"
+      ? (app.interviewAddress || app.companyAddress || app.jobLocation || "")
+      : (app.interviewAddress || "")
+  );
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    if (newMode === "in_person") {
+      setMeetingLink(companyAddress || meetingLink || "Company Office Premises");
+    } else if (newMode === "phone") {
+      setMeetingLink("");
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setCandidatePhone(digitsOnly);
+    if (!digitsOnly) {
+      setErrors((prev) => ({ ...prev, candidatePhone: "10-digit mobile number is required." }));
+    } else if (digitsOnly.length < 10) {
+      setErrors((prev) => ({ ...prev, candidatePhone: `Must be exactly 10 digits (${digitsOnly.length}/10).` }));
+    } else if (!/^[6-9]/.test(digitsOnly)) {
+      setErrors((prev) => ({ ...prev, candidatePhone: "Mobile number must start with 6, 7, 8, or 9." }));
+    } else {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.candidatePhone;
+        return copy;
+      });
+    }
+  };
+
+  const handlePhonePaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text") || "";
+    let digits = pasted.replace(/\D/g, "");
+    if (digits.startsWith("91") && digits.length === 12) {
+      digits = digits.slice(2);
+    } else if (digits.startsWith("0") && digits.length === 11) {
+      digits = digits.slice(1);
+    }
+    digits = digits.slice(0, 10);
+    setCandidatePhone(digits);
+    if (digits.length === 10 && /^[6-9]/.test(digits)) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.candidatePhone;
+        return copy;
+      });
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const newErrors = {};
+
+    if (!candidateName.trim()) {
+      newErrors.candidateName = "Candidate name is required.";
+    }
+    if (!candidatePhone) {
+      newErrors.candidatePhone = "10-digit mobile number is required.";
+    } else if (candidatePhone.length !== 10) {
+      newErrors.candidatePhone = "Mobile number must be exactly 10 digits.";
+    } else if (!/^[6-9]/.test(candidatePhone)) {
+      newErrors.candidatePhone = "Mobile number must start with 6, 7, 8, or 9.";
+    }
+
+    if (!date) {
+      newErrors.date = "Interview date is required.";
+    } else if (date < todayStr) {
+      newErrors.date = "Interview date cannot be in the past.";
+    }
+
+    if (!time) {
+      newErrors.time = "Interview time is required.";
+    }
+
+    if (!interviewer.trim()) {
+      newErrors.interviewer = "Please specify who will conduct the interview.";
+    }
+
+    if (mode === "video" && meetingLink.trim() && !/^https?:\/\//i.test(meetingLink.trim())) {
+      newErrors.meetingLink = "Please enter a valid link starting with https://";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    setIsSubmitting(true);
+
+    const payload = {
+      candidateName,
+      candidatePhone,
+      candidateEmail: candidateEmail || null,
+      jobTitle,
+      company,
+      companyAddress,
+      date,
+      time,
+      mode,
+      interviewer,
+      round,
+      meetingLink: mode === "in_person" ? (meetingLink || companyAddress || "Company Premises") : meetingLink,
+      applicationId: app.uuid || app.id,
+    };
+
+    router.post(route("admin.interviews.store"), payload, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsSubmitting(false);
+        if (onScheduled) {
+          onScheduled({
+            status: "interview_scheduled",
+            interviewDate: `${date} at ${time}`,
+            interviewMode: mode,
+            interviewAddress: payload.meetingLink,
+            interviewContact: interviewer,
+            round,
+          });
+        }
+        onClose();
+      },
+      onError: (errs) => {
+        setIsSubmitting(false);
+        setErrors(errs || {});
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 sm:px-4 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-xl shadow-2xl border-2 border-purple-100 max-h-[92vh] overflow-y-auto [scrollbar-width:thin]">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center font-bold shadow-md shadow-purple-600/30">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-base">Schedule Candidate Interview</h3>
+              <p className="text-xs text-purple-700 font-medium">
+                {app.userName} • {app.jobTitle}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl cursor-pointer transition"
+            title="Close (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Job & Candidate Pre-filled Snapshot */}
+        <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/40 to-blue-50/50 border border-purple-100 rounded-2xl p-3.5 mb-4 space-y-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-200/50 pb-2">
+            <div className="flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <span className="font-bold text-gray-900">{jobTitle}</span>
+              <span className="text-gray-400">•</span>
+              <span className="font-semibold text-purple-800">{company}</span>
+            </div>
+            {app.id && (
+              <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded-md border border-purple-200 text-purple-900">
+                Application #{app.id}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-gray-600 text-[11px]">
+            <span className="flex items-center gap-1">
+              <User className="w-3 h-3 text-gray-400" /> {candidateName}
+            </span>
+            <span className="flex items-center gap-1 font-mono font-semibold text-gray-800">
+              <Phone className="w-3 h-3 text-gray-400" /> +91 {candidatePhone}
+            </span>
+            {candidateEmail && (
+              <span className="flex items-center gap-1">
+                <Mail className="w-3 h-3 text-gray-400" /> {candidateEmail}
+              </span>
+            )}
+            {companyAddress && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-gray-400" /> {companyAddress}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Timing & Mode */}
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3.5 space-y-3">
+            <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-purple-600" />
+              Interview Timing & Mode
+            </label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Interview Mode *
+                </label>
+                <select
+                  value={mode}
+                  onChange={(e) => handleModeChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-gray-800"
+                >
+                  <option value="phone">📞 Phone Call</option>
+                  <option value="video">🎥 Video Call</option>
+                  <option value="in_person">🏢 In Person</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Date *
+                </label>
+                <input
+                  type="date"
+                  min={todayStr}
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (e.target.value) {
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.date;
+                        return copy;
+                      });
+                    }
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-gray-800"
+                />
+                {errors.date && <p className="text-[10px] text-red-500 mt-0.5">{errors.date}</p>}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Time *
+                </label>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => {
+                    setTime(e.target.value);
+                    if (e.target.value) {
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.time;
+                        return copy;
+                      });
+                    }
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-gray-800"
+                />
+                {errors.time && <p className="text-[10px] text-red-500 mt-0.5">{errors.time}</p>}
+              </div>
+            </div>
+
+            {/* Round & Interviewer Panel */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Round / Stage
+                </label>
+                <select
+                  value={round}
+                  onChange={(e) => setRound(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-gray-800"
+                >
+                  <option value="HR Screening">1. HR Screening</option>
+                  <option value="Technical Round 1">2. Technical Round 1</option>
+                  <option value="Technical Round 2">3. Technical Round 2</option>
+                  <option value="Managerial Round">4. Managerial / HOD</option>
+                  <option value="Final / Culture Fit">5. Final / Culture Fit</option>
+                  <option value="Client Interview">6. Client Interview</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Interviewer / Panel Conductor *
+                </label>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setInterviewer(e.target.value);
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.interviewer;
+                        return copy;
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none text-gray-800"
+                >
+                  <option value="">-- Quick Choose Staff --</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={`${m.name} (${(m.role || "Staff").replace("_", " ")})`}>
+                      {m.name} — {(m.role || "Staff").replace("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <input
+                type="text"
+                value={interviewer}
+                onChange={(e) => {
+                  setInterviewer(e.target.value);
+                  if (e.target.value.trim()) {
+                    setErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.interviewer;
+                      return copy;
+                    });
+                  }
+                }}
+                placeholder="Type or customize interviewer name / panel details"
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-800 outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              {errors.interviewer && <p className="text-[10px] text-red-500 mt-0.5">{errors.interviewer}</p>}
+            </div>
+
+            {/* In-Person Venue Address */}
+            {mode === "in_person" && (
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-amber-700" />
+                    Company Office / Venue Address (Auto-filled) *
+                  </label>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                    Venue
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  placeholder="Company premises address / Floor / Cabin..."
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+                <p className="text-[10px] text-amber-800 font-medium">
+                  {companyAddress ? "✓ Auto-filled from company profile. You can edit room or landmark." : "Enter venue address for the candidate."}
+                </p>
+              </div>
+            )}
+
+            {/* Video Call Meeting Link */}
+            {mode === "video" && (
+              <div className="bg-purple-50/80 border border-purple-200 rounded-xl p-3 space-y-1">
+                <label className="block text-[11px] font-bold text-purple-900 flex items-center gap-1">
+                  <Video className="w-3.5 h-3.5 text-purple-700" />
+                  Meeting Link (Google Meet / Zoom / MS Teams)
+                </label>
+                <input
+                  type="url"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/xyz-abcd-efg"
+                  className="w-full px-3 py-2 border border-purple-300 rounded-lg text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                />
+                {errors.meetingLink && <p className="text-[10px] text-red-500 mt-0.5">{errors.meetingLink}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Candidate Verification */}
+          <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-3.5 space-y-2">
+            <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <User className="w-4 h-4 text-indigo-600" />
+              Candidate Verification & Notification Contact
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white border border-indigo-100 rounded-xl p-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                  Candidate Name *
+                </label>
+                <input
+                  type="text"
+                  value={candidateName}
+                  onChange={(e) => setCandidateName(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {errors.candidateName && <p className="text-[10px] text-red-500 mt-0.5">{errors.candidateName}</p>}
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                  10-Digit Mobile Number *
+                </label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={candidatePhone}
+                  onChange={handlePhoneChange}
+                  onPaste={handlePhonePaste}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {errors.candidatePhone && <p className="text-[10px] text-red-500 mt-0.5">{errors.candidatePhone}</p>}
+              </div>
+              <div className="col-span-full">
+                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">
+                  Candidate Email (For Official Email Invitation)
+                </label>
+                <input
+                  type="email"
+                  value={candidateEmail}
+                  onChange={(e) => setCandidateEmail(e.target.value)}
+                  placeholder="candidate@example.com"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/30 cursor-pointer transition disabled:opacity-60"
+            >
+              <Calendar className="w-4 h-4" />
+              {isSubmitting ? "Scheduling & Notifying..." : "Confirm & Schedule Interview"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ── */
 export default function Applications({
   applications = [],
@@ -494,6 +977,7 @@ export default function Applications({
   const [remark, setRemark] = useState("");
   const [assigningApp, setAssigningApp] = useState(null);
   const [offerApp, setOfferApp] = useState(null);
+  const [scheduleInterviewApp, setScheduleInterviewApp] = useState(null);
 
   const isTeamMember = currentUser?.role === "team_member";
 
@@ -553,13 +1037,25 @@ export default function Applications({
       `👋 Hi ${app.userName},\n\nThis is the ATS recruitment team regarding your application for *${app.jobTitle}* at *${app.company}*. We would like to update you on your application status. Please reply to connect.\n\n– ATS Recruitment Team`
     );
 
-  const interviewWA = (app) =>
-    waUrl(
-      app.userPhone,
-      `🎯 *Interview Scheduled – ${app.company}*\n\nDear ${app.userName},\n\nYour interview for *${app.jobTitle}* at *${app.company}* is scheduled on ${
-        app.interviewDate || "TBD"
-      }.\n\nPlease confirm your availability.\n\n– ATS Recruitment Team`
-    );
+  const interviewWA = (app) => {
+    const venueText =
+      app.interviewMode === "in_person"
+        ? `🏢 Venue / Address: ${app.interviewAddress || "Company Premises"}`
+        : app.interviewMode === "video"
+        ? `🎥 Meeting Link: ${app.interviewAddress || "Will be shared shortly"}`
+        : "📞 Mode: Telephonic Interview";
+
+    const msg =
+      `🎯 *Interview Scheduled – ${app.company || "Job Position"}*\n\n` +
+      `Dear ${app.userName || "Candidate"},\n\n` +
+      `Your interview for *${app.jobTitle || "Role"}* at *${app.company || "ATS Partner"}* is confirmed!\n\n` +
+      `📅 Date & Time: *${app.interviewDate || "Scheduled Soon"}*\n` +
+      `${venueText}\n` +
+      `👤 Interviewer / Panel: *${app.interviewContact || "HR Team"}*\n\n` +
+      `Please be prepared 10 minutes prior.\nBest regards,\nATS Hiring Team`;
+
+    return waUrl(app.userPhone, msg);
+  };
 
   const filtered = applications.filter((a) => {
     const q = search.toLowerCase();
@@ -603,6 +1099,20 @@ export default function Applications({
           <OfferLetterModal
             app={offerApp}
             onClose={() => setOfferApp(null)}
+          />
+        )}
+
+        {scheduleInterviewApp && (
+          <ScheduleInterviewModal
+            app={scheduleInterviewApp}
+            teamMembers={teamMembers}
+            currentUser={currentUser}
+            onClose={() => setScheduleInterviewApp(null)}
+            onScheduled={(updated) => {
+              if (selectedApp?.uuid === scheduleInterviewApp.uuid) {
+                setSelectedApp((prev) => (prev ? { ...prev, ...updated } : null));
+              }
+            }}
           />
         )}
 
@@ -848,6 +1358,14 @@ export default function Applications({
                                 <Users className="w-4 h-4" />
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => setScheduleInterviewApp(app)}
+                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition cursor-pointer"
+                              title={app.status === "interview_scheduled" ? "Reschedule / View Interview" : "Schedule Candidate Interview"}
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </button>
                             <a
                               href={followUpWA(app)}
                               target="_blank"
@@ -1210,9 +1728,18 @@ export default function Applications({
                 {/* Interview Information (if scheduled) */}
                 {(selectedApp.interviewDate || selectedApp.interviewMode || selectedApp.status === "interview_scheduled") && (
                   <div className="border border-purple-200 rounded-2xl p-4 bg-purple-50/50 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 font-bold text-purple-800 uppercase tracking-wider">
-                      <Calendar className="w-4 h-4 text-purple-600" />
-                      Interview Details
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-purple-800 uppercase tracking-wider">
+                        <Calendar className="w-4 h-4 text-purple-600" />
+                        Interview Details
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleInterviewApp(selectedApp)}
+                        className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-white px-2 py-0.5 rounded-md border border-purple-200 cursor-pointer shadow-2xs hover:bg-purple-50 transition"
+                      >
+                        Edit Details ↗
+                      </button>
                     </div>
                     <div className="space-y-1.5 text-gray-700">
                       {selectedApp.interviewDate && (
@@ -1237,6 +1764,18 @@ export default function Applications({
                     Quick Actions
                   </p>
                   <div className="grid grid-cols-2 gap-2">
+                    {/* Dedicated Schedule / Reschedule Button */}
+                    <button
+                      type="button"
+                      onClick={() => setScheduleInterviewApp(selectedApp)}
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition cursor-pointer col-span-2 shadow-2xs"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                      {selectedApp.status === "interview_scheduled"
+                        ? "Reschedule / Edit Interview Details"
+                        : "Schedule Candidate Interview"}
+                    </button>
+
                     <a
                       href={followUpWA(selectedApp)}
                       target="_blank"
@@ -1262,7 +1801,7 @@ export default function Applications({
                         href={interviewWA(selectedApp)}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-xs font-semibold hover:bg-purple-100 border border-purple-200 transition col-span-2"
+                        className="flex items-center justify-center gap-1.5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition col-span-2 shadow-xs cursor-pointer"
                       >
                         <Calendar className="w-3.5 h-3.5" /> Send Interview WA Reminder
                       </a>
@@ -1321,7 +1860,13 @@ export default function Applications({
                       <button
                         key={s}
                         type="button"
-                        onClick={() => updateStatus(selectedApp.uuid, s)}
+                        onClick={() => {
+                          if (s === "interview_scheduled") {
+                            setScheduleInterviewApp(selectedApp);
+                          } else {
+                            updateStatus(selectedApp.uuid, s);
+                          }
+                        }}
                         className={`text-xs py-2 px-2 rounded-xl font-semibold border transition-all cursor-pointer ${
                           selectedApp.status === s
                             ? "ring-2 ring-blue-500 font-bold " + STATUS_CFG[s].color

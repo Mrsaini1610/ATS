@@ -46,19 +46,40 @@ class CandidateAuthController extends Controller
      */
     public function checkPhoneLogin(Request $request)
     {
-        $request->validate([
+        // 1. IP-based Rate Limiter
+        $ipKey = 'candidate-check-phone-ip:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($ipKey, 10)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+            return response()->json([
+                'success' => false,
+                'message' => "Too many requests from this IP address. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
+        RateLimiter::hit($ipKey, 60);
+
+        // 2. Server-side validation
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'phone' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
         ], [
-            'phone.required' => 'Phone number zaroori hai.',
-            'phone.regex'    => 'Kripya sahi 10-digit mobile number darj karein.'
+            'phone.required' => 'Mobile number is required.',
+            'phone.regex'    => 'Please provide a valid 10-digit mobile number.',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide a valid 10-digit mobile number.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
 
         $user = User::where('phone', $request->phone)->first();
 
+        // 3. Generic response: avoid leaking sensitive status
         return response()->json([
             'success' => true,
             'exists'  => (bool) $user,
-            'message' => $user ? 'User mil gaya.' : 'Naya account banaya jayega.'
+            'message' => 'Phone verified successfully.',
         ]);
     }
 
@@ -67,104 +88,146 @@ class CandidateAuthController extends Controller
      */
     public function phoneLogin(Request $request, GeocodingService $geocodingService)
     {
-        $request->validate([
+        // 1. IP-based Rate Limiter
+        $ipKey = 'candidate-login-ip:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($ipKey, 5)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+            return response()->json([
+                'success' => false,
+                'message' => "Too many login attempts from this IP address. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
+
+        // 2. Server-Side Validation
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'phone'     => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
-            'job_id'    => ['nullable', 'string'],
-            'latitude'  => ['nullable', 'numeric'],
-            'longitude' => ['nullable', 'numeric'],
+            'job_id'    => ['nullable', 'string', 'max:100'],
+            'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ], [
+            'phone.required' => 'Mobile number is required.',
+            'phone.regex'    => 'Please provide a valid 10-digit Indian mobile number.',
         ]);
 
-        $phone = $request->phone;
-        $lat = $request->latitude;
-        $lng = $request->longitude;
-        $detectedCity = null;
-        $detectedArea = null;
-
-        if (!empty($lat) && !empty($lng) && is_numeric($lat) && is_numeric($lng)) {
-            $geo = $geocodingService->reverseGeocodeResult((float)$lat, (float)$lng);
-            $detectedCity = $geo['city'] ?? null;
-            $detectedArea = $geo['area'] ?? null;
+        if ($validator->fails()) {
+            RateLimiter::hit($ipKey, 60);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid login details. Please check your information and try again.',
+                'errors'  => $validator->errors(),
+            ], 422);
         }
 
-        $user = User::where('phone', $phone)->first();
-        $isNew = false;
+        try {
+            $phone = $request->phone;
+            $lat = $request->latitude;
+            $lng = $request->longitude;
+            $detectedCity = null;
+            $detectedArea = null;
 
-        if (!$user) {
-            // Auto-create user record in DB
-            $user = User::create([
-                'phone'               => $phone,
-                'full_name'           => 'Candidate ' . substr($phone, -4),
-                'username'            => 'user_' . $phone,
-                'password'            => Hash::make(uniqid('pass_')),
-                'registered_from'     => 'web',
-                'city'                => $detectedCity,
-                'area'                => $detectedArea,
-                'web_latitude'        => $lat,
-                'web_longitude'       => $lng,
-                'web_is_online'       => true,
-                'web_last_active'     => now(),
-                'is_online'           => true,
-                'last_active'         => now(),
-                'latitude'            => $lat,
-                'longitude'           => $lng,
-                'is_profile_complete' => false,
-            ]);
-            $isNew = true;
-        } else {
-            // Update web tracking fields for existing user
+            if (!empty($lat) && !empty($lng) && is_numeric($lat) && is_numeric($lng)) {
+                $geo = $geocodingService->reverseGeocodeResult((float)$lat, (float)$lng);
+                $detectedCity = $geo['city'] ?? null;
+                $detectedArea = $geo['area'] ?? null;
+            }
+
+            $user = User::where('phone', $phone)->first();
+            $isNew = false;
+
+            if (!$user) {
+                // Auto-create user record in DB
+                $user = User::create([
+                    'phone'               => $phone,
+                    'full_name'           => 'Candidate ' . substr($phone, -4),
+                    'username'            => 'user_' . $phone,
+                    'password'            => Hash::make(uniqid('pass_')),
+                    'registered_from'     => 'web',
+                    'city'                => $detectedCity,
+                    'area'                => $detectedArea,
+                    'web_latitude'        => $lat,
+                    'web_longitude'       => $lng,
+                    'web_is_online'       => true,
+                    'web_last_active'     => now(),
+                    'is_online'           => true,
+                    'last_active'         => now(),
+                    'latitude'            => $lat,
+                    'longitude'           => $lng,
+                    'is_profile_complete' => false,
+                ]);
+                $isNew = true;
+            } else {
+                // Update web tracking fields for existing user
+                $user->update([
+                    'web_is_online'   => true,
+                    'web_last_active' => now(),
+                    'web_latitude'    => $lat ?? $user->web_latitude,
+                    'web_longitude'   => $lng ?? $user->web_longitude,
+                    'is_online'       => true,
+                    'last_active'     => now(),
+                    'latitude'        => $lat ?? $user->latitude,
+                    'longitude'       => $lng ?? $user->longitude,
+                    'city'            => $user->city ?: $detectedCity,
+                    'area'            => $user->area ?: $detectedArea,
+                ]);
+            }
+
+            // Login candidate
+            Auth::guard('web')->login($user, remember: true);
+            $request->session()->regenerate();
+
+            // Enforce single web session (invalidates any older web session on other devices/browsers)
             $user->update([
-                'web_is_online'   => true,
-                'web_last_active' => now(),
-                'web_latitude'    => $lat ?? $user->web_latitude,
-                'web_longitude'   => $lng ?? $user->web_longitude,
-                'is_online'       => true,
-                'last_active'     => now(),
-                'latitude'        => $lat ?? $user->latitude,
-                'longitude'       => $lng ?? $user->longitude,
-                'city'            => $user->city ?: $detectedCity,
-                'area'            => $user->area ?: $detectedArea,
+                'current_web_session_id' => $request->session()->getId(),
+                'last_web_login_at'      => now(),
             ]);
+
+            // Clear rate limiter on successful login
+            RateLimiter::clear($ipKey);
+
+            // Check if profile is complete
+            $isProfileComplete = $user->isProfileComplete();
+
+            // Dynamic redirect URL
+            $redirectUrl = route('home');
+            if ($request->job_id) {
+                $redirectUrl = "/apply/{$request->job_id}";
+            }
+
+            return response()->json([
+                'success'          => true,
+                'is_new'           => $isNew,
+                'profile_complete' => $isProfileComplete,
+                'user'             => [
+                    'id'         => $user->id,
+                    'uuid'       => $user->uuid,
+                    'full_name'  => $user->full_name,
+                    'email'      => $user->email,
+                    'phone'      => $user->phone,
+                    'gender'     => $user->gender,
+                    'dob'        => $user->dob ? $user->dob->format('Y-m-d') : null,
+                    'city'       => $user->city,
+                    'area'       => $user->area,
+                    'job_title'  => $user->job_title,
+                    'education'  => $user->education,
+                    'experience' => $user->total_experience_years,
+                ],
+                'redirect'         => $redirectUrl,
+            ]);
+
+        } catch (\Throwable $e) {
+            RateLimiter::hit($ipKey, 60);
+
+            \Illuminate\Support\Facades\Log::error('Candidate phoneLogin exception', [
+                'ip'    => $request->ip(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // 3. Generic Error message
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to complete login at this time. Please try again later.',
+            ], 500);
         }
-
-        // Login candidate
-        Auth::guard('web')->login($user, remember: true);
-        $request->session()->regenerate();
-
-        // Enforce single web session (invalidates any older web session on other devices/browsers)
-        $user->update([
-            'current_web_session_id' => $request->session()->getId(),
-            'last_web_login_at'      => now(),
-        ]);
-
-        // Check if profile is complete
-        $isProfileComplete = $user->isProfileComplete();
-
-        // Dynamic redirect URL
-        $redirectUrl = route('home');
-        if ($request->job_id) {
-            $redirectUrl = "/apply/{$request->job_id}";
-        }
-
-        return response()->json([
-            'success'          => true,
-            'is_new'           => $isNew,
-            'profile_complete' => $isProfileComplete,
-            'user'             => [
-                'id'         => $user->id,
-                'uuid'       => $user->uuid,
-                'full_name'  => $user->full_name,
-                'email'      => $user->email,
-                'phone'      => $user->phone,
-                'gender'     => $user->gender,
-                'dob'        => $user->dob ? $user->dob->format('Y-m-d') : null,
-                'city'       => $user->city,
-                'area'       => $user->area,
-                'job_title'  => $user->job_title,
-                'education'  => $user->education,
-                'experience' => $user->total_experience_years,
-            ],
-            'redirect'         => $redirectUrl,
-        ]);
     }
 
     /**
@@ -182,11 +245,12 @@ class CandidateAuthController extends Controller
         }
 
         // Rate Limiter
-        $key = 'complete-profile:' . $user->id;
+        $key = 'complete-profile:' . $user->id . '|' . $request->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
+            $seconds = RateLimiter::availableIn($key);
             return response()->json([
                 'success' => false,
-                'message' => 'Too many attempts. Please try again after 1 minute.'
+                'message' => "Too many attempts from this IP. Please try again in {$seconds} seconds."
             ], 429);
         }
         RateLimiter::hit($key, 60);

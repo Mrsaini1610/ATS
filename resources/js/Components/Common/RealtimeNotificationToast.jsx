@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { usePage } from "@inertiajs/react";
 import { Bell, X, ExternalLink, CheckCircle2, Calendar, FileText, Briefcase, Info } from "lucide-react";
 
 /**
@@ -90,6 +91,14 @@ function getTypeConfig(type) {
 }
 
 export default function RealtimeNotificationToast() {
+  const { props } = usePage();
+  const user = props?.auth?.user || props?.auth?.admin || props?.auth?.member;
+
+  // Don't poll or render toasts for unauthenticated guest visitors
+  if (!user) {
+    return null;
+  }
+
   const [activeToasts, setActiveToasts] = useState([]);
   const seenIdsRef = useRef(new Set());
   const lastSyncTimeRef = useRef(null);
@@ -121,11 +130,15 @@ export default function RealtimeNotificationToast() {
     } catch (e) {}
   };
 
-  // Polling loop every 6 seconds for live real-time sync
+  // Polling loop for authenticated users: wait 15s after load, then poll every 30s only when tab is visible
   useEffect(() => {
     let isMounted = true;
 
     const pollLiveNotifications = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
       try {
         const params = new URLSearchParams();
         if (lastSyncTimeRef.current) {
@@ -182,9 +195,9 @@ export default function RealtimeNotificationToast() {
       }
     };
 
-    // Initial check after 2 seconds, then every 6 seconds
-    const initialTimer = setTimeout(pollLiveNotifications, 2000);
-    const interval = setInterval(pollLiveNotifications, 6000);
+    // Initial check delayed by 15s so it never impacts LCP or initial page load, then every 30s
+    const initialTimer = setTimeout(pollLiveNotifications, 15000);
+    const interval = setInterval(pollLiveNotifications, 30000);
 
     return () => {
       isMounted = false;

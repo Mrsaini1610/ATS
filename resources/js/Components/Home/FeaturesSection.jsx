@@ -22,7 +22,7 @@ export default function FeaturesSection({ categories = [] }) {
               <Link key={cat.label} href={cat.to || "/categories"} className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-blue-200 hover:bg-blue-50/40 transition-all text-center group">
                 <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">{cat.icon || "💼"}</div>
                 <p className="text-xs sm:text-sm font-bold text-gray-800 truncate">{cat.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{cat.count} jobs</p>
+                <p className="text-xs text-slate-600 font-medium mt-0.5">{cat.count} jobs</p>
               </Link>
             ))
           ) : (

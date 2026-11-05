@@ -485,6 +485,24 @@ class JobController extends Controller
                 $userUpdateData['skills'] = array_values($candidateSkills);
             }
             $user->update($userUpdateData);
+
+            if ($request->filled('educationDegree') || $request->filled('qualification')) {
+                $deg = $request->input('educationDegree') ?: $request->input('qualification');
+                $qualLower = strtolower((string)($request->input('qualification') ?: $deg));
+                $isSchool = str_contains($qualLower, '10th') || str_contains($qualLower, '12th') || str_contains($qualLower, 'matric') || str_contains($qualLower, 'school');
+                $defaultInst = $isSchool ? 'School / Board' : 'College / Institute';
+                $inst = $request->input('educationInstitute') ?: $defaultInst;
+                if (!$user->educations()->where('is_delete', 0)->exists()) {
+                    \App\Models\UserEducation::create([
+                        'user_uuid'   => $user->uuid,
+                        'degree'      => $deg,
+                        'institution' => $inst,
+                        'start_year'  => date('Y') - 3,
+                        'end_year'    => date('Y'),
+                        'is_delete'   => 0,
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             // Ignore user update error
         }

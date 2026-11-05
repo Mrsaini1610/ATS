@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Kreait\Firebase\Factory;
 use Throwable;
@@ -58,7 +59,29 @@ class AuthController extends Controller
      */
     public function sendOtp(Request $request)
     {
+        $ip = $request->ip();
+        $ipKey = 'api-send-otp-ip:' . $ip;
+
+        // 1. IP-based Rate Limiter (Brute-force / SMS flood prevention)
+        if (RateLimiter::tooManyAttempts($ipKey, 5)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+            return response()->json([
+                'status'  => false,
+                'message' => "Too many OTP requests from this IP address. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
+
+        // 2. Normalize and Server-Side Validate Phone
         $phone = $this->normalizePhone($request->input('phone'));
+        $phoneKey = 'api-send-otp-phone:' . ($phone ?: 'empty');
+
+        if (!empty($phone) && RateLimiter::tooManyAttempts($phoneKey, 3)) {
+            $seconds = RateLimiter::availableIn($phoneKey);
+            return response()->json([
+                'status'  => false,
+                'message' => "Too many OTP requests for this mobile number. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
 
         $validator = Validator::make(['phone' => $phone], [
             'phone' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
@@ -70,18 +93,22 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'status'  => false,
-                'message' => $validator->errors()->first('phone'),
+                'message' => 'Please provide a valid 10-digit Indian mobile number.',
                 'errors'  => $validator->errors(),
             ], 422);
         }
+
+        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($phoneKey, 60);
 
         $phoneNumber = '+91' . $phone;
         $apiKey = config('services.firebase.api_key') ?: env('VITE_FIREBASE_API_KEY');
 
         if (!$apiKey) {
+            Log::error('Firebase API key configuration is missing.');
             return response()->json([
                 'status'  => false,
-                'message' => 'Firebase API key configuration is missing.',
+                'message' => 'Unable to send verification code. Please try again later.',
             ], 500);
         }
 
@@ -95,22 +122,24 @@ class AuthController extends Controller
             if ($response->successful()) {
                 return response()->json([
                     'status'      => true,
-                    'message'     => 'OTP request processed successfully!',
+                    'message'     => 'Verification code sent successfully.',
                     'phone'       => $phone,
                     'sessionInfo' => $response->json('sessionInfo'),
                 ], 200);
             }
 
+            // 3. Generic Error message (prevent leaking Firebase details)
+            Log::warning('Firebase sendOtp error for IP ' . $ip . ' / Phone ' . $phone . ': ' . $response->body());
             return response()->json([
                 'status'  => false,
-                'message' => 'Firebase Auth Error',
-                'error'   => $response->json('error.message', 'Unknown error occurred.')
-            ], $response->status() ?: 400);
+                'message' => 'Unable to send verification code. Please verify your mobile number and try again.',
+            ], 400);
 
         } catch (Throwable $e) {
+            Log::error('API sendOtp exception for IP ' . $ip . ': ' . $e->getMessage());
             return response()->json([
                 'status'  => false,
-                'message' => 'Network/Server Error: ' . $e->getMessage()
+                'message' => 'An unexpected error occurred. Please try again later.',
             ], 500);
         }
     }
@@ -120,16 +149,42 @@ class AuthController extends Controller
      */
     public function verifyOtp(Request $request)
     {
+        $ip = $request->ip();
+        $ipKey = 'api-verify-otp-ip:' . $ip;
+
+        // 1. IP-based Rate Limiter (Brute-force protection on code guessing)
+        if (RateLimiter::tooManyAttempts($ipKey, 5)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+            return response()->json([
+                'status'  => false,
+                'message' => "Too many verification attempts from this IP address. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
+
+        // 2. Normalize and Server-Side Validate Input
         $phone = $this->normalizePhone($request->input('phone'));
+        $phoneKey = 'api-verify-otp-phone:' . ($phone ?: 'empty');
+
+        if (!empty($phone) && RateLimiter::tooManyAttempts($phoneKey, 5)) {
+            $seconds = RateLimiter::availableIn($phoneKey);
+            return response()->json([
+                'status'  => false,
+                'message' => "Too many verification attempts for this mobile number. Please try again in {$seconds} seconds.",
+            ], 429);
+        }
 
         $validator = Validator::make([
             'phone'       => $phone,
             'sessionInfo' => $request->input('sessionInfo'),
             'code'        => $request->input('code'),
+            'device_id'   => $request->input('device_id') ?? $request->input('deviceId'),
+            'fcm_token'   => $request->input('fcm_token') ?? $request->input('fcmToken'),
         ], [
             'phone'       => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
-            'sessionInfo' => ['required', 'string'],
+            'sessionInfo' => ['required', 'string', 'max:1000'],
             'code'        => ['required', 'digits:6'],
+            'device_id'   => ['nullable', 'string', 'max:100'],
+            'fcm_token'   => ['nullable', 'string', 'max:500'],
         ], [
             'phone.required'       => 'Mobile number is required.',
             'phone.regex'          => 'Please provide a valid 10-digit Indian mobile number.',
@@ -139,9 +194,10 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
+            RateLimiter::hit($ipKey, 60);
             return response()->json([
                 'status'  => false,
-                'message' => $validator->errors()->first(),
+                'message' => 'Invalid verification details. Please check and try again.',
                 'errors'  => $validator->errors()
             ], 422);
         }
@@ -151,14 +207,15 @@ class AuthController extends Controller
         $apiKey      = config('services.firebase.api_key') ?: env('VITE_FIREBASE_API_KEY');
 
         if (!$apiKey) {
+            Log::error('Firebase API key configuration is missing.');
             return response()->json([
                 'status'  => false,
-                'message' => 'Firebase API key configuration is missing.'
+                'message' => 'Unable to verify code at this time. Please try again later.'
             ], 500);
         }
 
         try {
-            // 1. Internally Exchange sessionInfo + OTP Code for Firebase ID Token
+            // 3. Internally Exchange sessionInfo + OTP Code for Firebase ID Token
             $response = Http::withoutVerifying()
                 ->timeout(15)
                 ->post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key={$apiKey}", [
@@ -167,10 +224,15 @@ class AuthController extends Controller
                 ]);
 
             if (!$response->successful()) {
+                RateLimiter::hit($ipKey, 60);
+                if (!empty($phone)) {
+                    RateLimiter::hit($phoneKey, 60);
+                }
+
+                Log::warning('Firebase verifyOtp failure for IP ' . $ip . ' / Phone ' . $phone . ': ' . $response->body());
                 return response()->json([
                     'status'  => false,
-                    'message' => 'OTP Verification Failed',
-                    'error'   => $response->json('error.message', 'Invalid or expired OTP.')
+                    'message' => 'Invalid or expired verification code. Please check and try again.',
                 ], 400);
             }
 
@@ -178,13 +240,23 @@ class AuthController extends Controller
             $formattedPhone = '+91' . $phone;
 
             if ($firebasePhone !== $formattedPhone) {
+                RateLimiter::hit($ipKey, 60);
+                if (!empty($phone)) {
+                    RateLimiter::hit($phoneKey, 60);
+                }
+
+                Log::warning('Firebase verifyOtp phone mismatch for IP ' . $ip);
                 return response()->json([
                     'status'  => false,
-                    'message' => 'Phone number mismatch with Firebase verification.'
+                    'message' => 'Verification failed. Please check your details and try again.',
                 ], 400);
             }
 
-            // 2. Fetch or Create User
+            // Verification succeeded: clear rate limiter
+            RateLimiter::clear($ipKey);
+            RateLimiter::clear($phoneKey);
+
+            // Fetch or Create User
             $user = User::where('phone', $phone)->first();
             $isNewUser = false;
 
@@ -209,7 +281,7 @@ class AuthController extends Controller
                 ]);
             }
 
-            // 3. Register or Update FCM Token if provided by mobile app
+            // Register or Update FCM Token if provided by mobile app
             $fcmToken = $request->input('fcm_token') ?? $request->input('fcmToken');
             $deviceId = $request->input('device_id') ?? $request->input('deviceId') ?? 'app_device';
 
@@ -244,7 +316,7 @@ class AuthController extends Controller
                 }
             }
 
-            // 4. Enforce Single App Session: Revoke all prior mobile app tokens
+            // Enforce Single App Session: Revoke all prior mobile app tokens
             $user->tokens()->where('name', 'auth_token')->delete();
 
             $user->update([
@@ -255,7 +327,7 @@ class AuthController extends Controller
             // Issue new Sanctum Token for this active app device
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            // 5. Load candidate relations
+            // Load candidate relations
             $user->load(['educations', 'experiences', 'resumes', 'certificates']);
 
             // Send welcome mail if candidate has email and profile complete
@@ -275,9 +347,12 @@ class AuthController extends Controller
             ], 200);
 
         } catch (Throwable $e) {
+            RateLimiter::hit($ipKey, 60);
+
+            Log::error('API verifyOtp exception for IP ' . $ip . ': ' . $e->getMessage());
             return response()->json([
                 'status'  => false,
-                'message' => 'Server Error: ' . $e->getMessage()
+                'message' => 'An unexpected error occurred during verification. Please try again later.'
             ], 500);
         }
     }

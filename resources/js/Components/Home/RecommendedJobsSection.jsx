@@ -117,6 +117,7 @@ export default function RecommendedJobsSection({
                       ) : (
                         <Link
                           href={`/apply/${job.uuid || job.id}`}
+                          aria-label={`Apply Now for ${job.title || 'role'} at ${job.company || 'Company'}`}
                           className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
                         >
                           <span>Apply Now</span>

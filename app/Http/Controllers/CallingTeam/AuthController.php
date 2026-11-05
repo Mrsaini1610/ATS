@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class AuthController extends Controller
@@ -21,45 +24,83 @@ class AuthController extends Controller
 
     public function verify(Request $request)
     {
+        $identifierInput = trim((string) $request->input('identifier', ''));
+        $ip = $request->ip();
+
+        // 1. IP-based & Identifier Rate Limiter
+        $ipKey = 'callingteam-login-ip:' . $ip;
+        $throttleKey = 'callingteam-login:' . Str::lower($identifierInput) . '|' . $ip;
+
+        if (RateLimiter::tooManyAttempts($ipKey, 5) || RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = max(RateLimiter::availableIn($ipKey), RateLimiter::availableIn($throttleKey));
+            return back()->withErrors([
+                'login' => "Too many login attempts from this IP address. Please try again in {$seconds} seconds.",
+            ]);
+        }
+
+        // 2. Strict Server-Side Validation
         $request->validate([
-            'identifier' => 'required|string',
-            'password' => 'required|string',
-            'remember' => 'sometimes|boolean',
+            'identifier' => ['required', 'string', 'min:3', 'max:150'],
+            'password'   => ['required', 'string', 'min:6', 'max:150'],
+            'remember'   => ['nullable', 'boolean'],
+        ], [
+            'identifier.required' => 'Please enter your username, email or phone.',
+            'identifier.min'      => 'Login identifier must be at least 3 characters.',
+            'password.required'   => 'Please enter your password.',
+            'password.min'        => 'Password must be at least 6 characters.',
         ]);
 
-        $field = $this->determineLoginField($request->string('identifier')->toString());
+        $identifier = $request->string('identifier')->trim()->toString();
+        $field = $this->determineLoginField($identifier);
 
-        $member = Member::query()
-            ->where($field, $request->string('identifier')->toString())
-            ->where('is_calling_team', true)
-            ->first();
+        try {
+            $member = Member::query()
+                ->where($field, $identifier)
+                ->where('is_calling_team', true)
+                ->first();
 
-        if (!$member) {
+            // 3. Generic Error: If member not found, inactive, or password fails,
+            // return the same generic message.
+            if (!$member || (int) ($member->status ?? 1) === 0 || !Auth::guard('callingteam')->attempt([
+                $field => $identifier,
+                'password' => $request->string('password')->toString(),
+                'status' => 1,
+                'is_calling_team' => 1,
+            ], (bool) $request->boolean('remember'))) {
+                RateLimiter::hit($ipKey, 60);
+                RateLimiter::hit($throttleKey, 60);
+
+                Log::warning('Failed calling team login attempt', [
+                    'ip'         => $request->ip(),
+                    'identifier' => $identifier,
+                ]);
+
+                return back()->withErrors([
+                    'login' => 'The provided credentials do not match our records.',
+                ]);
+            }
+
+            // Authentication succeeded: clear rate limiter
+            RateLimiter::clear($ipKey);
+            RateLimiter::clear($throttleKey);
+
+            $request->session()->regenerate();
+
+            return redirect()->route('callingteam.dashboard');
+
+        } catch (\Throwable $e) {
+            RateLimiter::hit($ipKey, 60);
+            RateLimiter::hit($throttleKey, 60);
+
+            Log::error('Calling team login exception', [
+                'ip'    => $request->ip(),
+                'error' => $e->getMessage(),
+            ]);
+
             return back()->withErrors([
-                'login' => 'The provided credentials do not match our calling team records.',
+                'login' => 'An unexpected error occurred during login. Please try again later.',
             ]);
         }
-
-        if ((int) ($member->status ?? 1) === 0) {
-            return back()->withErrors([
-                'login' => 'Your account is inactive. Please contact admin to activate your account.',
-            ]);
-        }
-
-        if (!Auth::guard('callingteam')->attempt([
-            $field => $request->string('identifier')->toString(),
-            'password' => $request->string('password')->toString(),
-            'status' => 1,
-            'is_calling_team' => 1,
-        ], (bool) $request->boolean('remember'))) {
-            return back()->withErrors([
-                'login' => 'The provided credentials do not match our calling team records.',
-            ]);
-        }
-
-        $request->session()->regenerate();
-
-        return redirect()->route('callingteam.dashboard');
     }
 
     protected function determineLoginField(string $identifier): string

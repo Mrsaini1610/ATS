@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Interview;
 use App\Models\Admin;
 use App\Models\JobPost;
+use App\Models\JobApplication;
+use App\Models\User;
 use App\Services\MailService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,37 +33,59 @@ class InterviewController extends Controller
             if ($admin->isAdmin()) {
                 $teamMemberIds = Admin::where('created_by', $admin->id)->pluck('id')->toArray();
                 $clusterIds = array_merge([$admin->id], $teamMemberIds);
-                $clusterNames = Admin::whereIn('id', $clusterIds)->pluck('name')->toArray();
+                $clusterNames = Admin::whereIn('id', $clusterIds)->pluck('name')->filter()->toArray();
                 $clusterJobIds = JobPost::whereIn('created_by', $clusterIds)
                     ->orWhereIn('assigned_to', $clusterIds)
                     ->pluck('id')
                     ->toArray();
-                $clusterAppIds = \App\Models\JobApplication::whereIn('job_id', $clusterJobIds)
-                    ->orWhereIn('assigned_calling_team_member_id', $clusterIds)
-                    ->pluck('id')
+                $clusterJobUuids = JobPost::whereIn('created_by', $clusterIds)
+                    ->orWhereIn('assigned_to', $clusterIds)
+                    ->pluck('uuid')
+                    ->filter()
                     ->toArray();
+                $clusterApps = JobApplication::whereIn('job_id', $clusterJobIds)
+                    ->orWhereIn('job_uuid', $clusterJobUuids)
+                    ->orWhereIn('assigned_calling_team_member_id', $clusterIds)
+                    ->get(['id', 'uuid']);
+                $clusterAppIds = $clusterApps->pluck('id')->toArray();
+                $clusterAppUuids = $clusterApps->pluck('uuid')->filter()->toArray();
 
-                $query->where(function ($q) use ($clusterIds, $clusterNames, $clusterAppIds) {
+                $query->where(function ($q) use ($clusterIds, $clusterNames, $clusterAppIds, $clusterAppUuids, $clusterJobUuids) {
                     $q->whereIn('scheduled_by', array_map('strval', $clusterIds))
                       ->orWhereIn('scheduled_by', $clusterNames)
-                      ->orWhereIn('interviewer', $clusterNames)
-                      ->orWhereIn('application_id', $clusterAppIds);
+                      ->orWhereIn('application_id', $clusterAppIds)
+                      ->orWhereIn('application_uuid', $clusterAppUuids)
+                      ->orWhereIn('job_uuid', $clusterJobUuids);
+
+                    foreach ($clusterNames as $name) {
+                        $q->orWhere('interviewer', 'like', "%{$name}%")
+                          ->orWhere('scheduled_by', 'like', "%{$name}%");
+                    }
                 });
             } else {
                 $myJobIds = JobPost::where('created_by', $admin->id)
                     ->orWhere('assigned_to', $admin->id)
                     ->pluck('id')
                     ->toArray();
-                $myAppIds = \App\Models\JobApplication::whereIn('job_id', $myJobIds)
-                    ->orWhere('assigned_calling_team_member_id', $admin->id)
-                    ->pluck('id')
+                $myJobUuids = JobPost::where('created_by', $admin->id)
+                    ->orWhere('assigned_to', $admin->id)
+                    ->pluck('uuid')
+                    ->filter()
                     ->toArray();
+                $myApps = JobApplication::whereIn('job_id', $myJobIds)
+                    ->orWhereIn('job_uuid', $myJobUuids)
+                    ->orWhere('assigned_calling_team_member_id', $admin->id)
+                    ->get(['id', 'uuid']);
+                $myAppIds = $myApps->pluck('id')->toArray();
+                $myAppUuids = $myApps->pluck('uuid')->filter()->toArray();
 
-                $query->where(function ($q) use ($admin, $myAppIds) {
+                $query->where(function ($q) use ($admin, $myAppIds, $myAppUuids, $myJobUuids) {
                     $q->where('scheduled_by', (string) $admin->id)
-                      ->orWhere('scheduled_by', $admin->name)
-                      ->orWhere('interviewer', $admin->name)
-                      ->orWhereIn('application_id', $myAppIds);
+                      ->orWhere('scheduled_by', 'like', "%{$admin->name}%")
+                      ->orWhere('interviewer', 'like', "%{$admin->name}%")
+                      ->orWhereIn('application_id', $myAppIds)
+                      ->orWhereIn('application_uuid', $myAppUuids)
+                      ->orWhereIn('job_uuid', $myJobUuids);
                 });
             }
         }
@@ -255,6 +280,20 @@ class InterviewController extends Controller
             ->orWhere('email', $validated['candidateEmail'] ?? null)
             ->first();
 
+        if (!$app && $candidateUser) {
+            $app = JobApplication::where(function ($q) use ($candidateUser) {
+                    $q->where('candidate_uuid', $candidateUser->uuid)
+                      ->orWhere('candidate_id', $candidateUser->id);
+                })
+                ->when(!empty($validated['jobTitle']), function ($q) use ($validated) {
+                    $q->whereHas('jobPost', function ($jq) use ($validated) {
+                        $jq->where('title', 'like', '%' . $validated['jobTitle'] . '%');
+                    });
+                })
+                ->latest()
+                ->first();
+        }
+
         $interview = Interview::create([
             'candidate_uuid'   => $candidateUser?->uuid ?? $app?->candidate_uuid,
             'job_uuid'         => $app?->job_uuid,
@@ -262,8 +301,8 @@ class InterviewController extends Controller
             'application_id'   => $app?->id ?? (is_numeric($validated['applicationId'] ?? null) ? $validated['applicationId'] : null),
             'candidate_name'   => $validated['candidateName'],
             'candidate_phone'  => $validated['candidatePhone'],
-            'job_title'        => $validated['jobTitle'] ?? null,
-            'company'          => $validated['company'] ?? null,
+            'job_title'        => $validated['jobTitle'] ?? ($app?->jobPost?->title),
+            'company'          => $validated['company'] ?? ($app?->jobPost?->company),
             'interview_date'   => $validated['date'],
             'interview_time'   => $validated['time'],
             'mode'             => $validated['mode'],
@@ -273,6 +312,22 @@ class InterviewController extends Controller
             'meeting_link'     => $venueOrMeeting,
             'status'           => 'scheduled',
         ]);
+
+        // If an associated application exists, sync its status and interview details immediately
+        if ($app) {
+            $app->status = 'interview_scheduled';
+            try {
+                $app->interview_date_time = Carbon::parse($validated['date'] . ' ' . $validated['time']);
+            } catch (\Throwable $e) {
+                $app->interview_date_time = now();
+            }
+            $app->interview_mode = $validated['mode'];
+            $app->interview_address = $venueOrMeeting;
+            $app->interview_contact_person = $validated['interviewer'];
+            $app->interview_confirmed_at = now();
+            $app->reviewed_at = now();
+            $app->save();
+        }
 
         // 1. Dispatch MailService (Candidate + Interviewer + Admin)
         try {

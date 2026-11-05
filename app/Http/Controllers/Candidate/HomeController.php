@@ -186,8 +186,12 @@ class HomeController extends Controller
                 $logo = $comp->logo;
                 if ($logo && str_contains($logo, 'photo-1509391365360-2e959784a276')) {
                     $logo = null;
-                } elseif ($logo && str_contains($logo, 'images.unsplash.com') && !str_contains($logo, 'auto=format')) {
-                    $logo .= '&auto=format&q=75';
+                } elseif ($logo && str_contains($logo, 'images.unsplash.com')) {
+                    $logo = preg_replace('/w=\d+/', 'w=96', $logo);
+                    $logo = preg_replace('/h=\d+/', 'h=96', $logo);
+                    if (!str_contains($logo, 'auto=format')) {
+                        $logo .= '&auto=format&q=65';
+                    }
                 }
 
                 return [
@@ -323,8 +327,12 @@ class HomeController extends Controller
             $companyImage = $job->company_image;
             if ($companyImage && str_contains($companyImage, 'photo-1509391365360-2e959784a276')) {
                 $companyImage = null;
-            } elseif ($companyImage && str_contains($companyImage, 'images.unsplash.com') && !str_contains($companyImage, 'auto=format')) {
-                $companyImage .= '&auto=format&q=75';
+            } elseif ($companyImage && str_contains($companyImage, 'images.unsplash.com')) {
+                $companyImage = preg_replace('/w=\d+/', 'w=96', $companyImage);
+                $companyImage = preg_replace('/h=\d+/', 'h=96', $companyImage);
+                if (!str_contains($companyImage, 'auto=format')) {
+                    $companyImage .= '&auto=format&q=65';
+                }
             }
 
             return [

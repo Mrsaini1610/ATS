@@ -29,9 +29,9 @@ Route::post('/profile/city-areas', [CityController::class, 'getCityAreas']);
 
 
 // ==========================================
-// Public Endpoints
+// Public Endpoints (IP Rate-limited)
 // ==========================================
-Route::controller(AuthController::class)->group(function () {
+Route::controller(AuthController::class)->middleware('throttle:10,1')->group(function () {
     Route::post('/send-otp', 'sendOtp');
     Route::post('/verify-otp', 'verifyOtp');
 });

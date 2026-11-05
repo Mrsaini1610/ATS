@@ -170,6 +170,31 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
   const initialDegree = initialEdu?.degree || candidate?.education || "";
   const initialInstitution = initialEdu?.institution || "";
 
+  // Deduce initial qualification from candidate degree or job requirements
+  const deduceInitialQualification = () => {
+    const deg = (initialDegree || "").toLowerCase();
+    if (deg.includes("10th") || deg.includes("matric")) return "10th Pass";
+    if (deg.includes("12th") || deg.includes("inter") || deg.includes("10+2")) return "12th Pass";
+    if (deg.includes("diploma") || deg.includes("polytechnic")) return "Diploma";
+    if (deg.includes("master") || deg.includes("m.") || deg.includes("mba") || deg.includes("mca")) return "Post Graduate / Master's";
+    if (deg.includes("phd") || deg.includes("doctorate")) return "Doctorate / PhD";
+    if (deg.includes("bachelor") || deg.includes("graduate") || deg.includes("b.")) return "Graduate / Bachelor's";
+
+    const jobReqs = [
+      ...(Array.isArray(jobDataFromBackend?.requirements) ? jobDataFromBackend.requirements : []),
+      jobDataFromBackend?.description || "",
+      jobDataFromBackend?.title || "",
+    ].join(" ").toLowerCase();
+
+    if (jobReqs.includes("10th pass") || jobReqs.includes("10th standard") || jobReqs.includes("matric")) return "10th Pass";
+    if (jobReqs.includes("12th pass") || jobReqs.includes("12th standard") || jobReqs.includes("intermediate") || jobReqs.includes("10+2")) return "12th Pass";
+    if (jobReqs.includes("diploma") || jobReqs.includes("polytechnic")) return "Diploma";
+    if (jobReqs.includes("post graduate") || jobReqs.includes("master")) return "Post Graduate / Master's";
+    if (jobReqs.includes("phd") || jobReqs.includes("doctorate")) return "Doctorate / PhD";
+
+    return "Graduate / Bachelor's";
+  };
+
   const [step, setStep] = useState(0);
   const [showForm, setShowForm] = useState(loggedIn);
   const [submitted, setSubmitted] = useState(false);
@@ -233,7 +258,7 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
     lastWorkingDay: "",
 
     // Education Qualifications
-    qualification: initialDegree ? (initialDegree.toLowerCase().includes("b.") || initialDegree.toLowerCase().includes("bachelor") ? "Graduate / Bachelor's" : "Graduate / Bachelor's") : "Graduate / Bachelor's",
+    qualification: deduceInitialQualification(),
     educationDegree: initialDegree,
     educationInstitute: initialInstitution,
 
@@ -1305,13 +1330,27 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                           {/* Degree / Stream Name */}
                           <div>
                             <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                              Degree / Field of Study
+                              {form.qualification === "10th Pass"
+                                ? "Board / Exam (Optional)"
+                                : form.qualification === "12th Pass"
+                                ? "Stream / Subjects (Optional)"
+                                : form.qualification === "Diploma"
+                                ? "Diploma / Specialization"
+                                : "Degree / Field of Study"}
                             </label>
                             <input
                               type="text"
                               value={form.educationDegree}
                               onChange={(e) => update("educationDegree", e.target.value)}
-                              placeholder="e.g. B.Tech in CSE, B.Com, 12th PCM"
+                              placeholder={
+                                form.qualification === "10th Pass"
+                                  ? "e.g. CBSE Board, RBSE, 2022"
+                                  : form.qualification === "12th Pass"
+                                  ? "e.g. Science (PCM), Commerce, Arts"
+                                  : form.qualification === "Diploma"
+                                  ? "e.g. Diploma in Electrical Engineering"
+                                  : "e.g. B.Tech in CSE, B.Com, MBA"
+                              }
                               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </div>
@@ -1319,13 +1358,25 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                           {/* Institute / University Name */}
                           <div>
                             <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                              College / University
+                              {form.qualification === "10th Pass"
+                                ? "School / Board Name"
+                                : form.qualification === "12th Pass"
+                                ? "School / Junior College Name"
+                                : form.qualification === "Diploma"
+                                ? "Polytechnic / Institute Name"
+                                : "College / University"}
                             </label>
                             <input
                               type="text"
                               value={form.educationInstitute}
                               onChange={(e) => update("educationInstitute", e.target.value)}
-                              placeholder="e.g. Delhi University, RTU, CBSE"
+                              placeholder={
+                                form.qualification === "10th Pass" || form.qualification === "12th Pass"
+                                  ? "e.g. Govt Senior Secondary School, Modern Public School"
+                                  : form.qualification === "Diploma"
+                                  ? "e.g. Govt Polytechnic College"
+                                  : "e.g. Delhi University, RTU"
+                              }
                               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </div>

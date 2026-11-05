@@ -499,10 +499,11 @@ export default function Header() {
     <header className="w-full bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 transition-all shadow-xs">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
         {/* Left: Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+        <Link href="/" aria-label="ATS Home" className="flex items-center gap-2.5 shrink-0 group">
           <img
             src="/images/logo.png"
-            alt="ATS.com"
+            alt=""
+            aria-hidden="true"
             width={36}
             height={36}
             onError={(e) => {

@@ -1049,7 +1049,10 @@ class JobController extends Controller
                 // Auto-create education entry if missing
                 if ($request->filled('education_degree') || $request->filled('qualification')) {
                     $deg = $request->input('education_degree') ?: $request->input('qualification');
-                    $inst = $request->input('education_institute') ?: 'University/College';
+                    $qualLower = strtolower((string)($request->input('qualification') ?: $deg));
+                    $isSchool = str_contains($qualLower, '10th') || str_contains($qualLower, '12th') || str_contains($qualLower, 'matric') || str_contains($qualLower, 'school');
+                    $defaultInst = $isSchool ? 'School / Board' : 'College / Institute';
+                    $inst = $request->input('education_institute') ?: $defaultInst;
                     if (!$user->educations()->where('is_delete', 0)->exists()) {
                         \App\Models\UserEducation::create([
                             'user_uuid'   => $user->uuid,

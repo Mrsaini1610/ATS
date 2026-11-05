@@ -24,10 +24,11 @@ export default function Footer() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
                     {/* Brand */}
                     <div className="col-span-2 md:col-span-1">
-                        <Link href="/" className="inline-flex items-center gap-2.5 mb-3 group">
+                        <Link href="/" aria-label="ATS Home" className="inline-flex items-center gap-2.5 mb-3 group">
                             <img
                                 src="/images/logo.png"
-                                alt="ATS.com"
+                                alt=""
+                                aria-hidden="true"
                                 width={36}
                                 height={36}
                                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
@@ -206,16 +207,16 @@ export default function Footer() {
 
             {/* Bottom Bar */}
             <div className="border-t border-slate-800/80">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-500">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-400">
                     <p>© {currentYear} ATS.com. All Rights Reserved.</p>
                     <div className="flex flex-wrap gap-4 text-xs">
-                        <Link href="/privacy-policy" className="hover:text-slate-300 transition">
+                        <Link href="/privacy-policy" className="text-slate-400 hover:text-white transition">
                             Privacy Policy
                         </Link>
-                        <Link href="/terms" className="hover:text-slate-300 transition">
+                        <Link href="/terms" className="text-slate-400 hover:text-white transition">
                             Terms & Conditions
                         </Link>
-                        <Link href="/cookies" className="hover:text-slate-300 transition">
+                        <Link href="/cookies" className="text-slate-400 hover:text-white transition">
                             Cookies Policy
                         </Link>
                     </div>

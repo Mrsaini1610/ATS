@@ -51,8 +51,8 @@ export default function TestimonialsSection({ testimonials = [] }) {
                 )}
                 <div>
                   <p className="text-xs font-bold text-slate-900">{t.name}</p>
-                  <p className="text-[11px] text-slate-400">
-                    {t.role} {t.company && <>at <span className="font-medium text-slate-600">{t.company}</span></>}
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    {t.role} {t.company && <>at <span className="font-semibold text-slate-700">{t.company}</span></>}
                   </p>
                 </div>
               </div>

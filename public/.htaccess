@@ -54,13 +54,15 @@
 
 <IfModule mod_headers.c>
     # 1 Year Immutable Cache for Vite Hashed Build Assets and Static Media
-    <FilesMatch "\.(css|js|woff2|woff|ttf|svg|png|jpg|jpeg|gif|webp|ico)$">
-        Header set Cache-Control "max-age=31536000, public"
+    <FilesMatch "\.(css|js|woff2|woff|ttf|svg|png|jpg|jpeg|gif|webp|ico|avif)$">
+        Header set Cache-Control "max-age=31536000, public, immutable"
+        Header always set Cache-Control "max-age=31536000, public, immutable"
     </FilesMatch>
 
     # Disable Cache for Dynamic HTML and Application endpoints
     <FilesMatch "\.(php|html)$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header always set Cache-Control "no-cache, no-store, must-revalidate"
     </FilesMatch>
 </IfModule>
 

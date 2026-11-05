@@ -27,8 +27,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'email'    => ['required', 'string', 'email', 'max:255'],
+            'password' => ['required', 'string', 'min:6', 'max:255'],
         ];
     }
 
@@ -42,7 +42,8 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), 60);
+            RateLimiter::hit($this->ipThrottleKey(), 60);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -50,6 +51,7 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+        RateLimiter::clear($this->ipThrottleKey());
     }
 
     /**
@@ -59,13 +61,19 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        $isLimited = RateLimiter::tooManyAttempts($this->throttleKey(), 5)
+            || RateLimiter::tooManyAttempts($this->ipThrottleKey(), 10);
+
+        if (! $isLimited) {
             return;
         }
 
         event(new Lockout($this));
 
-        $seconds = RateLimiter::availableIn($this->throttleKey());
+        $seconds = max(
+            RateLimiter::availableIn($this->throttleKey()),
+            RateLimiter::availableIn($this->ipThrottleKey())
+        );
 
         throw ValidationException::withMessages([
             'email' => trans('auth.throttle', [
@@ -81,5 +89,13 @@ class LoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+    }
+
+    /**
+     * Get the rate limiting throttle key for the client IP address.
+     */
+    public function ipThrottleKey(): string
+    {
+        return 'web-login-ip:'.$this->ip();
     }
 }
