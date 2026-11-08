@@ -457,4 +457,39 @@ class AuthController extends Controller
             'message' => 'User not authenticated'
         ], 401);
     }
+
+    /**
+     * Mobile App Heartbeat: Update app active/online presence
+     */
+    public function heartbeat(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $now = now();
+        $isOnline = $request->boolean('is_online', true);
+
+        if ($isOnline) {
+            $user->updateQuietly([
+                'app_is_online'   => true,
+                'app_last_active' => $now,
+                'is_online'       => true,
+                'last_active'     => $now,
+            ]);
+        } else {
+            $user->updateQuietly([
+                'app_is_online'   => false,
+                'app_last_active' => $now,
+                'is_online'       => (bool) $user->web_is_online,
+                'last_active'     => $now,
+            ]);
+        }
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Heartbeat recorded successfully',
+        ]);
+    }
 }

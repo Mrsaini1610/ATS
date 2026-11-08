@@ -77,6 +77,10 @@ class UserController extends Controller
                 'name'           => $user->full_name ?? ($user->username ?? 'Candidate'),
                 'phone'          => $user->phone ?? '—',
                 'email'          => $user->email ?? '—',
+                'dob'            => $user->dob ? $user->dob->format('d M Y') : '—',
+                'dob_raw'        => $user->dob ? $user->dob->format('Y-m-d') : null,
+                'qualification'  => $user->education ?? '—',
+                'state'          => $user->state ?? '—',
                 'city'           => $user->city ?? '—',
                 'area'           => $user->area ?? '—',
                 'jobTitle'       => $user->job_title ?? ($user->bio ?? 'General Candidate'),
@@ -88,6 +92,7 @@ class UserController extends Controller
                 'registeredFrom' => $user->registered_from ?? 'web',
                 'webLastActive'  => $user->web_last_active ? $user->web_last_active->format('d M Y, h:i A') : null,
                 'appLastActive'  => $user->app_last_active ? $user->app_last_active->format('d M Y, h:i A') : null,
+                'presence'       => \App\Services\PresenceService::getUserPresence($user),
                 'skills'         => is_array($user->skills) ? $user->skills : (json_decode($user->skills, true) ?: []),
             ];
         });
@@ -111,13 +116,29 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'       => 'required|string|max:255',
-            'phone'      => 'required|string|max:20|unique:users,phone',
-            'email'      => 'nullable|email|max:255|unique:users,email',
-            'city'       => 'nullable|string|max:255',
-            'jobTitle'   => 'nullable|string|max:255',
-            'experience' => 'nullable|string|max:50',
-            'category'   => 'nullable|string|max:255',
+            'name'          => 'required|string|max:255',
+            'phone'         => 'required|string|max:20|unique:users,phone',
+            'dob'           => 'required|date|before:today',
+            'qualification' => 'required|string|max:255',
+            'state'         => 'required|string|max:255',
+            'city'          => 'required|string|max:255',
+            'area'          => 'required|string|max:255',
+            'email'         => 'nullable|email|max:255|unique:users,email',
+            'jobTitle'      => 'nullable|string|max:255',
+            'experience'    => 'nullable|string|max:50',
+            'category'      => 'nullable|string|max:255',
+        ], [
+            'name.required'          => 'Candidate full name is required.',
+            'phone.required'         => 'Phone number is required.',
+            'phone.unique'           => 'This phone number is already registered with another candidate.',
+            'dob.required'           => 'Date of birth is required.',
+            'dob.before'             => 'Date of birth must be a past date.',
+            'qualification.required' => 'Qualification is required.',
+            'state.required'         => 'State is required.',
+            'city.required'          => 'City is required.',
+            'area.required'          => 'Area is required.',
+            'email.email'            => 'Please enter a valid email address.',
+            'email.unique'           => 'This email address is already registered.',
         ]);
 
         $baseSlug = Str::slug($validated['name']) ?: 'candidate';
@@ -127,17 +148,25 @@ class UserController extends Controller
         }
 
         $categoryModel = !empty($validated['category'])
-            ? \App\Models\Category::where('name', $validated['category'])->orWhere('id', $validated['category'])->first()
+            ? \App\Models\Category::where('name', $validated['category'])
+                ->orWhere('id', $validated['category'])
+                ->orWhere('uuid', $validated['category'])
+                ->first()
             : null;
 
-        User::create([
+        $user = User::create([
             'uuid'                   => (string) Str::uuid(),
             'full_name'              => $validated['name'],
             'username'               => $username,
             'phone'                  => $validated['phone'],
             'email'                  => $validated['email'] ?? null,
+            'dob'                    => $validated['dob'],
+            'education'              => $validated['qualification'],
+            'state'                  => $validated['state'],
+            'city'                   => $validated['city'],
+            'area'                   => $validated['area'],
             'category_id'            => $categoryModel?->id,
-            'city'                   => $validated['city'] ?? null,
+            'job_title'              => $validated['jobTitle'] ?? null,
             'bio'                    => $validated['jobTitle'] ?? null,
             'skills'                 => !empty($validated['category']) ? [$validated['category']] : null,
             'total_experience_years' => preg_replace('/[^0-9]/', '', $validated['experience'] ?? '0') ?: null,
@@ -146,6 +175,14 @@ class UserController extends Controller
             'created_by'             => auth('admin')->id(),
             'password'               => Hash::make('Password@123'),
         ]);
+
+        if (!empty($user->email)) {
+            try {
+                \App\Services\MailService::sendWelcomeCandidate($user);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Candidate welcome email error: " . $e->getMessage());
+            }
+        }
 
         return redirect()->back()->with('success', 'Candidate successfully registered.');
     }

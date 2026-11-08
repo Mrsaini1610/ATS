@@ -36,10 +36,11 @@ use App\Http\Controllers\Admin\AdminNotificationController;
 // CANDIDATE & PUBLIC ROUTES
 // ==========================================
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/jobs', [JobController::class, 'index'])->name('jobs');
-Route::get('/job', fn() => redirect()->route('job.listings'));
 Route::get('/job-search', [JobController::class, 'index'])->name('job.search');
-Route::get('/job-listings', [JobController::class, 'index'])->name('job.listings');
+Route::redirect('/job-listings', '/job-search', 301);
+Route::redirect('/jobs', '/job-search', 301);
+Route::get('/job', fn() => redirect()->route('job.search'));
+Route::get('/job-listings-redirect', fn() => redirect()->route('job.search'))->name('job.listings');
 Route::get('/public/jobs', [JobController::class, 'index'])->name('public.jobs');
 Route::get('/categories', [PageController::class, 'getCategories'])->name('categories');
 Route::get('/category', fn() => redirect()->route('categories'));
@@ -84,28 +85,79 @@ Route::post('/location/update', [LocationController::class, 'updateLocation']);
 Route::get('/login', [CandidateAuthController::class, 'showLogin'])->name('login');
 Route::get('/register', [CandidateAuthController::class, 'showLogin'])->name('register');
 Route::get('/auth/session-check', function (\Illuminate\Http\Request $request) {
+    $currentSessionId = $request->session()->getId();
+    $referer = (string) $request->header('referer', '');
+    $isAdminContext = str_contains($referer, '/admin') || $request->query('guard') === 'admin';
+    $now = now();
+
+    if ($isAdminContext) {
+        if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+            $admin = \Illuminate\Support\Facades\Auth::guard('admin')->user();
+            if ($admin && $admin->current_web_session_id && $admin->current_web_session_id !== $currentSessionId) {
+                return response()->json([
+                    'active'  => false,
+                    'guard'   => 'admin',
+                    'message' => 'Aapka Admin account kisi doosre device ya browser me login kiya gaya hai.',
+                ]);
+            }
+            if ($admin) {
+                $admin->updateQuietly([
+                    'is_online'       => true,
+                    'last_active'     => $now,
+                    'web_is_online'   => true,
+                    'web_last_active' => $now,
+                ]);
+            }
+        }
+    } else {
+        if (\Illuminate\Support\Facades\Auth::guard('web')->check()) {
+            $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
+            if ($user && $user->current_web_session_id && $user->current_web_session_id !== $currentSessionId) {
+                return response()->json([
+                    'active'  => false,
+                    'guard'   => 'web',
+                    'message' => 'Aapka account kisi doosre device ya browser me login kiya gaya hai.',
+                ]);
+            }
+            if ($user) {
+                $user->updateQuietly([
+                    'web_is_online'   => true,
+                    'web_last_active' => $now,
+                    'is_online'       => true,
+                    'last_active'     => $now,
+                ]);
+            }
+        }
+    }
+    return response()->json(['active' => true]);
+})->name('auth.session-check');
+
+Route::match(['get', 'post'], '/auth/set-offline', function (\Illuminate\Http\Request $request) {
+    $now = now();
     if (\Illuminate\Support\Facades\Auth::guard('web')->check()) {
         $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
-        if ($user->current_web_session_id && $user->current_web_session_id !== $request->session()->getId()) {
-            return response()->json([
-                'active'  => false,
-                'guard'   => 'web',
-                'message' => 'Aapka account kisi doosre device ya browser me login kiya gaya hai.',
+        if ($user) {
+            $user->updateQuietly([
+                'web_is_online'   => false,
+                'web_last_active' => $now,
+                'is_online'       => (bool) $user->app_is_online,
+                'last_active'     => $now,
             ]);
         }
     }
     if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
         $admin = \Illuminate\Support\Facades\Auth::guard('admin')->user();
-        if ($admin->current_web_session_id && $admin->current_web_session_id !== $request->session()->getId()) {
-            return response()->json([
-                'active'  => false,
-                'guard'   => 'admin',
-                'message' => 'Aapka Admin account kisi doosre device ya browser me login kiya gaya hai.',
+        if ($admin) {
+            $admin->updateQuietly([
+                'is_online'       => false,
+                'web_is_online'   => false,
+                'last_active'     => $now,
+                'web_last_active' => $now,
             ]);
         }
     }
-    return response()->json(['active' => true]);
-})->name('auth.session-check');
+    return response()->json(['status' => 'offline']);
+})->name('auth.set-offline');
 
 Route::post('/check-phone', [CandidateAuthController::class, 'checkPhoneLogin'])->middleware('throttle:15,1')->name('check.phone');
 Route::post('/phone-login', [CandidateAuthController::class, 'phoneLogin'])->middleware('throttle:10,1')->name('phone.login');
@@ -212,6 +264,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/jobs/create', [AdminJobController::class, 'create'])->name('jobs.create');
         Route::post('/jobs', [AdminJobController::class, 'store'])->middleware('permission:create_jobs')->name('jobs.store'); // Agar store method bhi hai
         Route::post('/jobs/{uuid}/update-status', [AdminJobController::class, 'updateStatus'])->middleware('permission:approve_jobs,reject_jobs,hold_jobs,deactivate_jobs')->name('jobs.update-status');
+        Route::delete('/jobs/{uuid}', [AdminJobController::class, 'destroy'])->middleware('permission:deactivate_jobs')->name('jobs.destroy');
         Route::post('/jobs/{uuid}/assign-team', [AdminJobController::class, 'assignTeam'])->name('jobs.assign-team');
         Route::get('/jobs/{uuid}/nearby-candidates', [AdminJobController::class, 'nearbyCandidates'])->name('jobs.nearby-candidates');
 

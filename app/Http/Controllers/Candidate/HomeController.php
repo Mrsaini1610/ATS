@@ -28,7 +28,7 @@ class HomeController extends Controller
         $stats = [
             'activeJobs'  => JobPost::activeForCandidate()->count(),
             'companies'   => Company::where('status', 'active')->count() ?: (JobPost::activeForCandidate()->distinct('company')->whereNotNull('company')->count('company') ?: 0),
-            'jobSeekers'  => Member::where('status', 1)->count() ?: 1250,
+            'jobSeekers'  => \App\Models\User::count() ?: 1250,
             'successRate' => '95%',
         ];
 
@@ -139,7 +139,7 @@ class HomeController extends Controller
             $recommendedJobs = $this->formatJobsData($recommendedJobs);
         }
 
-        // 4. Dynamic Categories with Job Count and Subcategories
+        // 4. Dynamic Categories with Job Count and Subcategories (Only categories with active job posts)
         $categoryQuery = Category::query();
         if (Schema::hasColumn('categories', 'status')) {
             $categoryQuery->whereIn('categories.status', ['active', '1', 1]);
@@ -156,11 +156,14 @@ class HomeController extends Controller
                 if (Schema::hasColumn('subcategories', 'status')) {
                     $q->whereIn('status', ['active', '1', 1]);
                 }
-                $q->take(4);
+                $q->take(6);
             }])
             ->orderByDesc('job_posts_count')
-            ->take(8)
+            ->orderBy('categories.name', 'asc')
             ->get()
+            ->filter(function ($cat) {
+                return ($cat->job_posts_count ?? 0) > 0;
+            })
             ->map(function ($cat) {
                 return [
                     'id'            => $cat->id,
@@ -170,7 +173,8 @@ class HomeController extends Controller
                     'icon'          => $cat->icon ?: '💼',
                     'subcategories' => $cat->subcategories->pluck('name')->toArray(),
                 ];
-            });
+            })
+            ->values();
 
         // 5. Dynamic Top Companies List (Only companies with active posts)
         $topCompanies = Company::where('status', 'active')
@@ -335,28 +339,58 @@ class HomeController extends Controller
                 }
             }
 
+            $skills = is_array($job->skills) ? $job->skills : (json_decode($job->skills, true) ?: []);
+            if (empty($skills) && is_string($job->skills)) {
+                $skills = array_filter(array_map('trim', explode(',', $job->skills)));
+            }
+
+            $responsibilities = is_array($job->key_responsibilities)
+                ? $job->key_responsibilities
+                : (is_string($job->key_responsibilities)
+                    ? array_filter(array_map('trim', explode("\n", $job->key_responsibilities)))
+                    : (is_array($job->responsibilities) ? $job->responsibilities : []));
+
+            $requirements = is_array($job->qualifications)
+                ? $job->qualifications
+                : (is_string($job->qualifications)
+                    ? array_filter(array_map('trim', explode("\n", $job->qualifications)))
+                    : (is_array($job->requirements) ? $job->requirements : []));
+
             return [
-                'id'                 => $job->id,
-                'uuid'               => $job->uuid,
-                'title'              => $job->title,
-                'company'            => $job->company,
-                'company_image'      => $companyImage,
-                'location'           => $job->location ?: 'Remote / India',
-                'salary'             => $salaryText,
-                'salary_type'        => $job->salary_type ?: 'monthly',
-                'job_type'           => $job->job_type ?: 'Full Time',
-                'experience'         => $job->experience ?: 'Any',
-                'skills'             => is_array($job->skills) ? $job->skills : (json_decode($job->skills, true) ?: []),
-                'category_name'      => $job->category?->name ?: 'General',
-                'category_icon'      => $job->category?->icon ?: '💼',
-                'badge'              => $job->badge,
-                'openings'           => $job->openings ?: 1,
-                'created_at_human'   => $job->created_at ? $job->created_at->diffForHumans() : 'Recently',
-                'match_percent'      => $job->match_percent ?? null,
-                'match_reasons'      => $job->match_reasons ?? [],
-                'is_applied'         => !empty($job->is_applied),
-                'can_apply'          => $job->can_apply ?? true,
-                'application_status' => $job->application_status ?? null,
+                'id'                   => $job->id,
+                'uuid'                 => $job->uuid,
+                'title'                => $job->title,
+                'company'              => $job->company,
+                'company_image'        => $companyImage,
+                'location'             => $job->location ?: 'Remote / India',
+                'salary'               => $salaryText,
+                'salary_type'          => $job->salary_type ?: 'monthly',
+                'job_type'             => $job->job_type ?: 'Full Time',
+                'experience'           => $job->experience ?: 'Any',
+                'skills'               => array_values($skills),
+                'category_name'        => $job->category?->name ?: 'General',
+                'category_icon'        => $job->category?->icon ?: '💼',
+                'badge'                => $job->badge,
+                'openings'             => $job->openings ?: 1,
+                'description'          => $job->description,
+                'key_responsibilities' => array_values($responsibilities),
+                'qualifications'       => array_values($requirements),
+                'working_days'         => $job->working_days,
+                'shift_timing'         => $job->shift_timing,
+                'interview_details'    => $job->interview_details,
+                'contact_person'       => $job->contact_person,
+                'contact_phone'        => $job->contact_phone,
+                'contact_email'        => $job->contact_email,
+                'perks'                => is_array($job->perks) ? $job->perks : (json_decode($job->perks, true) ?: []),
+                'min_age'              => $job->min_age,
+                'max_age'              => $job->max_age,
+                'languages'            => is_array($job->languages) ? $job->languages : (json_decode($job->languages, true) ?: []),
+                'created_at_human'     => $job->created_at ? $job->created_at->diffForHumans() : 'Recently',
+                'match_percent'        => $job->match_percent ?? null,
+                'match_reasons'        => $job->match_reasons ?? [],
+                'is_applied'           => !empty($job->is_applied),
+                'can_apply'            => $job->can_apply ?? true,
+                'application_status'   => $job->application_status ?? null,
             ];
         });
     }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { Flame, TrendingUp, ArrowRight, Zap } from "lucide-react";
 
 export default function TrendingSkillsSection({ trendingSkills = [] }) {
@@ -18,6 +18,18 @@ export default function TrendingSkillsSection({ trendingSkills = [] }) {
   ];
 
   const displaySkills = trendingSkills.length > 0 ? trendingSkills : defaultSkills;
+
+  const handleSkillClick = (skillName) => {
+    try {
+      sessionStorage.setItem(
+        "ats_job_filter",
+        JSON.stringify({ search: skillName })
+      );
+    } catch (e) {
+      // Ignore sessionStorage error
+    }
+    router.visit("/job-search");
+  };
 
   return (
     <section>
@@ -39,7 +51,7 @@ export default function TrendingSkillsSection({ trendingSkills = [] }) {
           href="/job-search"
           className="inline-flex items-center gap-1 text-xs sm:text-sm text-blue-600 font-bold hover:text-blue-700 self-start sm:self-auto"
         >
-          Search by skill <ArrowRight className="w-4 h-4" />
+          View all jobs <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
 
@@ -48,10 +60,11 @@ export default function TrendingSkillsSection({ trendingSkills = [] }) {
           const isHigh = skill.demand === "high";
 
           return (
-            <Link
+            <button
               key={skill.id || idx}
-              href={`/job-search?q=${encodeURIComponent(skill.name)}`}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all hover:scale-105 group cursor-pointer ${
+              type="button"
+              onClick={() => handleSkillClick(skill.name)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all hover:scale-105 group cursor-pointer text-left ${
                 isHigh
                   ? "bg-white border-rose-100 hover:border-rose-300 hover:shadow-md hover:bg-rose-50/30"
                   : "bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm"
@@ -70,11 +83,11 @@ export default function TrendingSkillsSection({ trendingSkills = [] }) {
               </span>
 
               {isHigh && (
-                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 uppercase tracking-wider">
+                <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 shrink-0">
                   Hot
                 </span>
               )}
-            </Link>
+            </button>
           );
         })}
       </div>

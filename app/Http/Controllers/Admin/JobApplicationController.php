@@ -137,7 +137,12 @@ class JobApplicationController extends Controller
             }
 
             // Job post salary string
-            $jobPost = $app->jobPost;
+            $jobPost = $app->jobPost ?: ($app->job ?: (!empty($app->job_id) ? \App\Models\JobPost::find($app->job_id) : null));
+            $isJobClosed = !$jobPost 
+                || (bool) ($jobPost->is_deleted ?? false) 
+                || !in_array(strtolower((string) ($jobPost->status ?? '')), ['active', 'approved']) 
+                || ($jobPost->last_date && \Carbon\Carbon::parse($jobPost->last_date)->endOfDay()->isPast());
+
             $jobSalaryMin = $jobPost?->min_salary;
             $jobSalaryMax = $jobPost?->max_salary;
             $jobSalaryType = $jobPost?->salary_type ?? 'monthly';
@@ -171,6 +176,37 @@ class JobApplicationController extends Controller
                 'jobType'            => $jobPost->job_type ?? null,
                 'jobSalary'          => $jobSalaryText,
                 'jobSalaryType'      => $jobSalaryType,
+                'isJobClosed'        => $isJobClosed,
+                'jobStatus'          => $jobPost?->status ?? 'closed',
+                'jobPost'            => $jobPost ? [
+                    'id'                   => $jobPost->id,
+                    'uuid'                 => $jobPost->uuid,
+                    'title'                => $jobPost->title,
+                    'company'              => $jobPost->company,
+                    'companyAbout'         => $jobPost->company_about,
+                    'companyAddress'       => $jobPost->company_address ?: ($jobPost->companyRelation?->address ?? ''),
+                    'location'             => $jobPost->location,
+                    'description'          => $jobPost->description,
+                    'jobType'              => $jobPost->job_type,
+                    'salary'               => $jobSalaryText,
+                    'salaryType'           => $jobSalaryType,
+                    'experience'           => $jobPost->experience,
+                    'minExperience'        => $jobPost->min_experience,
+                    'maxExperience'        => $jobPost->max_experience,
+                    'openings'             => $jobPost->openings,
+                    'status'               => $jobPost->status,
+                    'isDeleted'            => (bool) $jobPost->is_deleted,
+                    'isClosed'             => $isJobClosed,
+                    'skills'               => is_array($jobPost->skills) ? $jobPost->skills : (json_decode($jobPost->skills, true) ?: []),
+                    'responsibilities'     => is_array($jobPost->key_responsibilities) ? $jobPost->key_responsibilities : [],
+                    'qualifications'       => is_array($jobPost->qualifications) ? $jobPost->qualifications : (json_decode($jobPost->qualifications, true) ?: []),
+                    'perks'                => is_array($jobPost->perks) ? $jobPost->perks : [],
+                    'deadline'             => $jobPost->last_date ? $jobPost->last_date->format('d M Y') : null,
+                    'postedAt'             => $jobPost->created_at ? $jobPost->created_at->format('d M Y') : null,
+                    'contactPerson'        => $jobPost->contact_person,
+                    'contactPhone'         => $jobPost->contact_phone,
+                    'contactEmail'         => $jobPost->contact_email,
+                ] : null,
                 'status'             => $app->status ?? 'applied',
                 'appliedAt'          => $app->created_at ? $app->created_at->format('d M Y') : 'Recent',
                 'assignedTo'         => $app->assigned_calling_team_member_id,
@@ -197,6 +233,7 @@ class JobApplicationController extends Controller
                 'linkedin'           => $linkedin,
                 'offerSalaryPackage' => $app->offer_salary_package,
                 'offerJoiningDate'   => $app->offer_joining_date ? $app->offer_joining_date->format('d M Y') : null,
+                'presence'           => $app->candidate ? \App\Services\PresenceService::getUserPresence($app->candidate) : null,
             ];
         });
 

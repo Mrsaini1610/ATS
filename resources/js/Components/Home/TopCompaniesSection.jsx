@@ -28,8 +28,8 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-        {topCompanies.length > 0 ? (
-          topCompanies.map((comp, idx) => {
+        {topCompanies.filter((c) => (Number(c.jobs) || 0) > 0).length > 0 ? (
+          topCompanies.filter((c) => (Number(c.jobs) || 0) > 0).map((comp, idx) => {
             const hasImageLogo = comp.logo && (comp.logo.includes("/") || comp.logo.includes("."));
             const targetUrl = `/companies/${encodeURIComponent(comp.uuid || comp.name)}`;
 

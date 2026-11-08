@@ -1000,7 +1000,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
           <div
             className={`w-full min-w-0 ${
               selected
-                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin] space-y-3"
+                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] pr-2 [scrollbar-width:thin] space-y-3"
                 : "space-y-3.5"
             }`}
           >
@@ -1195,7 +1195,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
           {selected && (
             <div
               id="admin-interview-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-4 h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">

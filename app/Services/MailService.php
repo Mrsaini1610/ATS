@@ -970,4 +970,49 @@ class MailService
             );
         }
     }
+
+    /**
+     * Staff / Team Member / Admin Created Credentials Email + Super Admin Alert.
+     */
+    public static function sendStaffCreated(Admin $staff, string $plainPassword, ?string $createdByName = null): void
+    {
+        if (empty($staff->email)) {
+            return;
+        }
+
+        $loginUrl = url('/admin/login');
+        $staffName = $staff->name ?: 'Team Member';
+        $roleLabel = str_replace('_', ' ', ucwords($staff->role, '_'));
+
+        // 1. Send Login Credentials to New Staff Member
+        self::sendViewEmail(
+            $staff->email,
+            "Welcome to the ATS Team! Your Login Credentials 🚀",
+            'emails.staff_created',
+            [
+                'staff'         => $staff,
+                'staffName'     => $staffName,
+                'plainPassword' => $plainPassword,
+                'roleLabel'     => $roleLabel,
+                'loginUrl'      => $loginUrl,
+                'createdByName' => $createdByName ?: 'Administrator',
+            ],
+            $staffName
+        );
+
+        // 2. Super Admin ALWAYS Notified
+        self::notifySuperAdmin(
+            "New Staff Member Added: {$staffName} ({$roleLabel})",
+            "Staff member {$staffName} was created by " . ($createdByName ?: 'Administrator') . " with role {$roleLabel} and email {$staff->email}.",
+            [
+                'type'       => 'staff_created',
+                'staff_id'   => $staff->id,
+                'staff_name' => $staffName,
+                'role'       => $roleLabel,
+                'email'      => $staff->email,
+                'created_by' => $createdByName ?: 'Administrator',
+            ],
+            url('/admin/team')
+        );
+    }
 }

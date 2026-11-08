@@ -257,7 +257,7 @@ export default function Companies({ company = {} }) {
                       <p className="text-xs font-bold text-gray-700">No active job posts right now</p>
                       <p className="text-xs text-gray-400 mt-0.5">Check back soon or explore other verified employers.</p>
                       <Link
-                        href="/job-listings"
+                        href="/job-search"
                         className="mt-3 inline-block text-xs font-bold text-blue-600 hover:underline"
                       >
                         Explore all job vacancies →

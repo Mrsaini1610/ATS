@@ -35,6 +35,9 @@ class PageController extends Controller
         ->orderByDesc('job_posts_count')
         ->orderBy('categories.name', 'asc')
         ->get()
+        ->filter(function ($item) {
+            return ($item->job_posts_count ?? 0) > 0;
+        })
         ->map(function ($item) {
             return [
                 'id'    => $item->uuid ?: $item->id,

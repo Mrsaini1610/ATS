@@ -41,6 +41,7 @@ Route::controller(AuthController::class)->middleware('throttle:10,1')->group(fun
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/user/heartbeat', [AuthController::class, 'heartbeat']);
     Route::post('/get-home-data', [JobController::class, 'getHomeData']);
     Route::post('/user/update-location', [CityController::class, 'updateLocation']);
     Route::post('/user/update-fcm-token', [AuthController::class, 'updateFcmToken']);

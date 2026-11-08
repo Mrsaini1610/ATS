@@ -81,12 +81,23 @@ class AuthController extends Controller
             $request->session()->put('admin_logged_in_id', $admin->id);
             $request->session()->save();
             $request->session()->regenerate();
+            $newSessionId = $request->session()->getId();
 
             // Enforce single admin web session
             $admin->update([
-                'current_web_session_id' => $request->session()->getId(),
+                'current_web_session_id' => $newSessionId,
                 'last_web_login_at'      => now(),
             ]);
+
+            // Sync candidate session ID if Candidate is already authenticated in this session
+            if (Auth::guard('web')->check()) {
+                $currentCandidate = Auth::guard('web')->user();
+                if ($currentCandidate) {
+                    $currentCandidate->update([
+                        'current_web_session_id' => $newSessionId,
+                    ]);
+                }
+            }
 
             // Database role ke mutabiq redirection URL set karein
             $redirectUrl = route('admin.dashboard');
@@ -115,10 +126,22 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $admin = Auth::guard('admin')->user();
+        if ($admin) {
+            $admin->update([
+                'current_web_session_id' => null,
+            ]);
+        }
+
         Auth::guard('admin')->logout();
         $request->session()->forget('admin_logged_in_id');
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->session()->forget(Auth::guard('admin')->getName());
+
+        // Only invalidate entire session if candidate is not logged in
+        if (!Auth::guard('web')->check()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return Inertia::location(route('admin.login'));
     }

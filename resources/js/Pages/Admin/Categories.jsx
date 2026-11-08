@@ -331,14 +331,18 @@ export default function Categories({ categories = [] }) {
 
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
-              <FolderTree className="w-6 h-6 text-blue-600" />
-              Category & Hierarchy Management
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Organize industry job domains, subcategories, and active role mappings.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/25 shrink-0">
+              <FolderTree className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                Category & Hierarchy Management
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Organize industry job domains, subcategories, and active role mappings.
+              </p>
+            </div>
           </div>
 
           {can("create_categories") && (
@@ -354,10 +358,10 @@ export default function Categories({ categories = [] }) {
 
         {/* Top Summary Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Categories</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
                 <Tags className="w-4 h-4" />
               </div>
             </div>
@@ -365,10 +369,10 @@ export default function Categories({ categories = [] }) {
             <p className="text-[11px] text-slate-400 mt-0.5">Top-level industries</p>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Subcategories</span>
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
@@ -376,10 +380,10 @@ export default function Categories({ categories = [] }) {
             <p className="text-[11px] text-slate-400 mt-0.5">Specialized sub-tracks</p>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Jobs Linked</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs">
                 <Briefcase className="w-4 h-4" />
               </div>
             </div>
@@ -387,10 +391,10 @@ export default function Categories({ categories = [] }) {
             <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Live role mappings</p>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Active Status</span>
-              <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs">
                 <Check className="w-4 h-4" />
               </div>
             </div>

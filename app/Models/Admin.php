@@ -25,6 +25,10 @@ class Admin extends Authenticatable
         'permissions',
         'profile_image',
         'status',
+        'is_online',
+        'last_active',
+        'web_is_online',
+        'web_last_active',
         'current_web_session_id',
         'last_web_login_at',
         'must_change_password',
@@ -44,6 +48,10 @@ class Admin extends Authenticatable
     {
         return [
             'status' => 'boolean',
+            'is_online' => 'boolean',
+            'last_active' => 'datetime',
+            'web_is_online' => 'boolean',
+            'web_last_active' => 'datetime',
             'must_change_password' => 'boolean',
             'permissions' => 'array',
             'reset_password_token_expires_at' => 'datetime',

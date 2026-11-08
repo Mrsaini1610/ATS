@@ -209,7 +209,7 @@ export default function MyApplications({
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
-              href="/job-listings"
+              href="/job-search"
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:shadow-md transition"
             >
               <Briefcase className="w-4 h-4" /> Browse More Jobs
@@ -364,7 +364,7 @@ export default function MyApplications({
             </p>
             {appList.length === 0 ? (
               <Link
-                href="/job-listings"
+                href="/job-search"
                 className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:shadow-md transition"
               >
                 Explore Vacancies <ChevronRight className="w-4 h-4" />
@@ -387,6 +387,14 @@ export default function MyApplications({
           <div className="space-y-4">
             {filteredApps.map((app) => {
               const job = app.jobPost || app.job || {};
+              const isJobClosed = Boolean(
+                app.is_job_closed ||
+                app.is_closed ||
+                !job ||
+                job.is_deleted ||
+                job.is_closed ||
+                (job.status && !["active", "approved"].includes(String(job.status).toLowerCase()))
+              );
               const statusCfg = getStatusConfig(app.status);
               const StatusIcon = statusCfg.icon;
 
@@ -439,10 +447,16 @@ export default function MyApplications({
                           <div className="flex items-center gap-2 flex-wrap">
                             <h2
                               onClick={() => {
-                                setSelectedApp(app);
-                                setModalTab("timeline");
+                                if (!isJobClosed) {
+                                  setSelectedApp(app);
+                                  setModalTab("timeline");
+                                }
                               }}
-                              className="text-base sm:text-lg font-bold text-gray-900 hover:text-blue-600 transition cursor-pointer truncate"
+                              className={`text-base sm:text-lg font-bold text-gray-900 truncate ${
+                                isJobClosed
+                                  ? "cursor-default"
+                                  : "hover:text-blue-600 transition cursor-pointer"
+                              }`}
                             >
                               {job.title || "Job Application"}
                             </h2>
@@ -489,6 +503,12 @@ export default function MyApplications({
 
                       {/* Right: Status Badge & Primary Action */}
                       <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 shrink-0">
+                        {isJobClosed && (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-1 rounded-full border bg-red-50 text-red-600 border-red-200 shadow-2xs">
+                            <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                            <span>Job Closed</span>
+                          </span>
+                        )}
                         <span
                           className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${statusCfg.badgeClass}`}
                         >
@@ -602,31 +622,40 @@ export default function MyApplications({
                         </button>
                       )}
 
-                      {/* View Job Post Details */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedApp(app);
-                          setModalTab("job_details");
-                        }}
-                        className="px-3 py-1.5 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Briefcase className="w-3.5 h-3.5" />
-                        <span>Job Details</span>
-                      </button>
+                      {isJobClosed ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-200 text-xs font-bold select-none">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>Job Closed</span>
+                        </span>
+                      ) : (
+                        <>
+                          {/* View Job Post Details */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedApp(app);
+                              setModalTab("job_details");
+                            }}
+                            className="px-3 py-1.5 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Briefcase className="w-3.5 h-3.5" />
+                            <span>Job Details</span>
+                          </button>
 
-                      {/* Track Live Application Status */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedApp(app);
-                          setModalTab("timeline");
-                        }}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Track Status</span>
-                      </button>
+                          {/* Track Live Application Status */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedApp(app);
+                              setModalTab("timeline");
+                            }}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Track Status</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -639,7 +668,7 @@ export default function MyApplications({
       {/* ============================================================== */}
       {/*  APPLICATION DETAILS & LIVE STATUS TRACKER MODAL               */}
       {/* ============================================================== */}
-      {selectedApp && (() => {
+      {selectedApp && !selectedApp.is_job_closed && (() => {
         const job = selectedApp.jobPost || selectedApp.job || {};
         const statusCfg = getStatusConfig(selectedApp.status);
         const StatusIcon = statusCfg.icon;

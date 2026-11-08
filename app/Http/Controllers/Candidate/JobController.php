@@ -211,33 +211,39 @@ class JobController extends Controller
             ];
         });
 
-        // 10. Only categories that have active/approved job posts created
-        $categories = Category::whereIn('id', function ($q) {
-            $q->select('category_id')
-              ->from('job_posts')
-              ->whereIn('status', ['active', 'approved'])
-              ->where(function ($sub) {
-                  $sub->where('is_deleted', 0)->orWhereNull('is_deleted');
-              })
-              ->where(function ($sub) {
-                  $sub->whereNull('last_date')
-                      ->orWhereDate('last_date', '>=', now()->toDateString());
-              })
-              ->whereNotNull('category_id');
-        })
-        ->withCount(['jobPosts' => function ($q) {
-            $q->whereIn('job_posts.status', ['active', 'approved'])
-              ->where(function ($sub) {
-                  $sub->where('job_posts.is_deleted', 0)->orWhereNull('job_posts.is_deleted');
-              })
-              ->where(function ($sub) {
-                  $sub->whereNull('job_posts.last_date')
-                      ->orWhereDate('job_posts.last_date', '>=', now()->toDateString());
-              });
-        }])
-        ->orderByDesc('job_posts_count')
-        ->get()
-        ->map(function ($cat) {
+        // 10. All active categories for filter
+        $categoryQuery = Category::query();
+        if (Schema::hasColumn('categories', 'status')) {
+            $categoryQuery->whereIn('categories.status', ['active', '1', 1]);
+        }
+        $categories = $categoryQuery
+            ->whereHas('jobPosts', function ($q) {
+                $q->whereIn('job_posts.status', ['active', 'approved'])
+                  ->where(function ($sub) {
+                      $sub->where('job_posts.is_deleted', 0)->orWhereNull('job_posts.is_deleted');
+                  })
+                  ->where(function ($sub) {
+                      $sub->whereNull('job_posts.last_date')
+                          ->orWhereDate('job_posts.last_date', '>=', now()->toDateString());
+                  });
+            })
+            ->withCount(['jobPosts' => function ($q) {
+                $q->whereIn('job_posts.status', ['active', 'approved'])
+                  ->where(function ($sub) {
+                      $sub->where('job_posts.is_deleted', 0)->orWhereNull('job_posts.is_deleted');
+                  })
+                  ->where(function ($sub) {
+                      $sub->whereNull('job_posts.last_date')
+                          ->orWhereDate('job_posts.last_date', '>=', now()->toDateString());
+                  });
+            }])
+            ->orderByDesc('job_posts_count')
+            ->orderBy('categories.name', 'asc')
+            ->get()
+            ->filter(function ($cat) {
+                return ($cat->job_posts_count ?? 0) > 0;
+            })
+            ->map(function ($cat) {
             return [
                 'id'    => $cat->uuid ?: $cat->id,
                 'uuid'  => $cat->uuid,
@@ -515,6 +521,13 @@ class JobController extends Controller
             \Illuminate\Support\Facades\Log::warning('Web Candidate application email/notifications error: ' . $e->getMessage());
         }
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Your application has been submitted successfully.',
+            ]);
+        }
+
         return redirect()->route('my-applications')->with('success', 'Your application has been submitted successfully.');
     }
 
@@ -525,7 +538,12 @@ class JobController extends Controller
             return redirect()->route('login');
         }
 
-        $allApplications = JobApplication::where('candidate_id', $user->id)->get();
+        $allApplications = JobApplication::where(function ($q) use ($user) {
+            $q->where('candidate_id', $user->id)
+              ->orWhere('candidate_uuid', $user->uuid)
+              ->orWhere('user_uuid', $user->uuid);
+        })->get();
+
         $statusCounts = [
             'all' => $allApplications->count(),
             'applied' => $allApplications->where('status', 'applied')->count(),
@@ -535,8 +553,12 @@ class JobController extends Controller
             'rejected' => $allApplications->filter(fn($a) => in_array($a->status, ['rejected', 'calling_rejected', 'not_selected']))->count(),
         ];
 
-        $applications = JobApplication::with(['job', 'jobPost'])
-            ->where('candidate_id', $user->id)
+        $applications = JobApplication::with(['job', 'jobPost.companyRelation'])
+            ->where(function ($q) use ($user) {
+                $q->where('candidate_id', $user->id)
+                  ->orWhere('candidate_uuid', $user->uuid)
+                  ->orWhere('user_uuid', $user->uuid);
+            })
             ->latest()
             ->paginate(15);
 

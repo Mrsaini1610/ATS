@@ -26,6 +26,7 @@ import {
   Compass,
   Loader2,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import axios from "axios";
@@ -809,7 +810,7 @@ export default function Jobs({
           <div
             className={`w-full ${
               selectedJob
-                ? "lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                ? "lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] pr-2 [scrollbar-width:thin]"
                 : "w-full"
             } space-y-3 transition-all duration-300 ease-out`}
           >
@@ -996,7 +997,7 @@ export default function Jobs({
           {selectedJob && (
             <div
               id="admin-job-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-4 h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
             >
               {/* Header with High-Contrast Navy/Blue Gradient */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
@@ -1431,6 +1432,20 @@ export default function Jobs({
                           <EyeOff className="w-4 h-4" /> Deactivate
                         </button>
                       ))}
+                      {can("deactivate_jobs") && (
+                        <button
+                          title="Delete / Close Job Post"
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm("Are you sure you want to delete/close this job post? Applied candidates will see 'Job Closed' and all application history will be preserved.")) {
+                              router.delete(route("jobs.destroy", selectedJob.uuid));
+                            }
+                          }}
+                          className="flex items-center gap-1.5 py-2.5 px-3.5 border-2 border-red-300 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 cursor-pointer transition"
+                        >
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </button>
+                      )}
                     </>
                   )}
                 </div>

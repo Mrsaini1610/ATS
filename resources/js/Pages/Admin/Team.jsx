@@ -217,22 +217,42 @@ function MemberCard({ member, onEdit, onToggle, onDelete, onAssignAdmin, canEdit
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0">
-            {(member.name || "U")
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .slice(0, 2)}
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-sm font-bold">
+              {(member.name || "U")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .slice(0, 2)}
+            </div>
+            {member.presence?.is_online && (
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white"></span>
+              </span>
+            )}
           </div>
           <div>
             <p className="font-bold text-gray-900 text-sm">{member.name}</p>
-            <span
-              className={`text-[11px] px-2 py-0.5 rounded-full font-medium capitalize ${
-                ROLE_COLOR[member.role] || "bg-gray-100"
-              }`}
-            >
-              {(member.role || "staff").replace("_", " ")}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-medium capitalize ${
+                  ROLE_COLOR[member.role] || "bg-gray-100"
+                }`}
+              >
+                {(member.role || "staff").replace("_", " ")}
+              </span>
+              {member.presence?.is_online ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Online
+                </span>
+              ) : (
+                <span className="text-[10px] text-gray-400 font-medium">
+                  {member.presence?.status_text || "Offline"}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <span

@@ -81,6 +81,29 @@ export default function Header() {
   const auth = props?.auth;
   const user = auth?.user;
 
+  const [currentUser, setCurrentUser] = useState(user || null);
+
+  useEffect(() => {
+    setCurrentUser(auth?.user || null);
+  }, [auth?.user]);
+
+  useEffect(() => {
+    const handleLogin = (e) => {
+      if (e.detail) {
+        setCurrentUser(e.detail);
+      }
+    };
+    const handleLogoutEvent = () => {
+      setCurrentUser(null);
+    };
+    window.addEventListener("ats_user_logged_in", handleLogin);
+    window.addEventListener("ats_user_logged_out", handleLogoutEvent);
+    return () => {
+      window.removeEventListener("ats_user_logged_in", handleLogin);
+      window.removeEventListener("ats_user_logged_out", handleLogoutEvent);
+    };
+  }, []);
+
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -475,10 +498,13 @@ export default function Header() {
 
   const handleLogout = () => {
     setProfileOpen(false);
-    router.post(route("logout"));
+    window.dispatchEvent(new Event("ats_user_logged_out"));
+    router.post("/candidate-logout");
   };
 
-  const displayName = user?.full_name ? user.full_name.split(" ")[0] : (user?.name ? user.name.split(" ")[0] : "Candidate");
+  const displayName = currentUser?.full_name
+    ? currentUser.full_name.split(" ")[0]
+    : (currentUser?.name ? currentUser.name.split(" ")[0] : "Candidate");
   const initials = displayName ? displayName.substring(0, 2).toUpperCase() : "CA";
 
   // Auth Button: Unified Sign In / Register
@@ -566,7 +592,7 @@ export default function Header() {
           </nav>
 
           {/* User Logged In */}
-          {user ? (
+          {currentUser ? (
             <div className="flex items-center gap-2">
               <Link
                 href="/notifications"
@@ -603,10 +629,10 @@ export default function Header() {
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
                       <div className="px-4 py-3 border-b border-gray-100 mb-1">
                         <p className="text-sm font-bold text-gray-900 truncate">
-                          {user.full_name || user.name || "Candidate"}
+                          {currentUser.full_name || currentUser.name || "Candidate"}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
-                          {user.phone || user.email}
+                          {currentUser.phone || currentUser.email}
                         </p>
                       </div>
 
@@ -709,7 +735,7 @@ export default function Header() {
           </nav>
 
           {/* Mobile Guest Auth: Only ONE button */}
-          {!user && (
+          {!currentUser && (
             <div className="pt-2 border-t border-gray-100">
               <Link
                 href={authButtonConfig.href}

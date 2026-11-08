@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
-import { Sparkles, MapPin, Briefcase, IndianRupee, ArrowRight, UserCheck, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Sparkles, MapPin, Briefcase, ArrowRight, UserCheck, CheckCircle2 } from "lucide-react";
 
 export default function RecommendedJobsSection({
   recommendedJobs = [],
   isLoggedIn = false,
   candidateProfile = null,
+  onSelectJob,
 }) {
   if (!isLoggedIn) {
     return null;
@@ -38,115 +39,120 @@ export default function RecommendedJobsSection({
       </div>
 
       {recommendedJobs.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recommendedJobs.map((job) => {
-              const matchPercent = job.match_percent || 85;
-              const reasons = job.match_reasons || ["Profile Match"];
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {recommendedJobs.map((job) => {
+            const matchPercent = job.match_percent || 85;
+            const reasons = job.match_reasons || ["Profile Match"];
 
-              return (
-                <div
-                  key={job.id}
-                  className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-emerald-300 hover:shadow-lg transition-all flex flex-col justify-between relative group"
-                >
-                  <div>
-                    {/* Top: Match Badge */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <Sparkles className="w-3 h-3 text-emerald-600" />
-                        {matchPercent}% Match
-                      </span>
-                      <span className="text-[11px] font-semibold text-gray-400">
-                        {job.created_at_human}
-                      </span>
+            return (
+              <div
+                key={job.id}
+                onClick={() => onSelectJob && onSelectJob(job)}
+                className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-emerald-300 hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative group cursor-pointer"
+              >
+                <div>
+                  {/* Top: Match Badge */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      {matchPercent}% Match
+                    </span>
+                    <span className="text-[11px] font-semibold text-gray-400">
+                      {job.created_at_human}
+                    </span>
+                  </div>
+
+                  {/* Company & Title */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white text-sm font-black shrink-0 shadow-xs">
+                      {job.company ? job.company.substring(0, 2).toUpperCase() : "ATS"}
                     </div>
-
-                    {/* Company & Title */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white text-sm font-black shrink-0 shadow-xs">
-                        {job.company ? job.company.substring(0, 2).toUpperCase() : "ATS"}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                          {job.title}
-                        </h3>
-                        <p className="text-xs text-gray-500 font-medium truncate mt-0.5">
-                          {job.company || "Verified Hiring Partner"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Match Reasons Tags */}
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {reasons.map((reason, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-md"
-                        >
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          {reason}
-                        </span>
-                      ))}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                        {job.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 font-medium truncate mt-0.5">
+                        {job.company || "Verified Hiring Partner"}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Footer Meta & Action */}
-                  <div className="pt-3 border-t border-gray-100 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs text-gray-600">
-                      <span className="flex items-center gap-1 truncate font-medium">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {job.location}
+                  {/* Match Reasons Tags */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {reasons.map((reason, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-md"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        {reason}
                       </span>
-                      <span className="font-bold text-emerald-700">
-                        {job.salary}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
-                      <span className="flex items-center gap-1">
-                        <Briefcase className="w-3.5 h-3.5 text-gray-400" />
-                        {job.experience}
-                      </span>
-                      {job.is_applied ? (
-                        <Link
-                          href="/my-applications"
-                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition shadow-2xs"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Applied</span>
-                        </Link>
-                      ) : (
-                        <Link
-                          href={`/apply/${job.uuid || job.id}`}
-                          aria-label={`Apply Now for ${job.title || 'role'} at ${job.company || 'Company'}`}
-                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
-                        >
-                          <span>Apply Now</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </Link>
-                      )}
-                    </div>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-xl mx-auto shadow-xs">
-            <UserCheck className="w-12 h-12 text-blue-500 mx-auto mb-3" />
-            <h3 className="font-bold text-gray-900 text-base mb-1">
-              Add your skills & location for instant matching
-            </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              We couldn't find an exact match yet. Update your profile with your preferred job title, skills, and city.
-            </p>
-            <Link
-              href="/profile"
-              className="inline-flex px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
-            >
-              Update Profile
-            </Link>
-          </div>
-        )}
+
+                {/* Footer Meta & Action */}
+                <div className="pt-3 border-t border-gray-100 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span className="flex items-center gap-1 truncate font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      {job.location}
+                    </span>
+                    <span className="font-bold text-emerald-700">
+                      {job.salary}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                    <span className="flex items-center gap-1">
+                      <Briefcase className="w-3.5 h-3.5 text-gray-400" />
+                      {job.experience}
+                    </span>
+                    {job.is_applied ? (
+                      <Link
+                        href="/my-applications"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition shadow-2xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Applied</span>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSelectJob) onSelectJob(job);
+                        }}
+                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                      >
+                        <span>Apply Now</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-xl mx-auto shadow-xs">
+          <UserCheck className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+          <h3 className="font-bold text-gray-900 text-base mb-1">
+            Add your skills & location for instant matching
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            We couldn't find an exact match yet. Update your profile with your preferred job title, skills, and city.
+          </p>
+          <Link
+            href="/profile"
+            className="inline-flex px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+          >
+            Update Profile
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

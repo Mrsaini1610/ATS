@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
+import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import {
   Search,
@@ -23,6 +24,7 @@ import {
   User,
   Sparkles,
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   Building2,
   RotateCcw,
@@ -105,11 +107,18 @@ function JobDetailPanel({
         : [];
 
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [job?.uuid || job?.id]);
 
   return (
-    <div className="flex flex-col h-fit w-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-white overflow-hidden">
       {/* Top Header Bar */}
-      <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between z-10 shrink-0">
+      <div className="shrink-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between z-10">
         {/* Left: Category Tag */}
         <div>
           {job.category_name && (
@@ -155,8 +164,8 @@ function JobDetailPanel({
         </div>
       </div>
 
-      {/* Main Content Area (Natural Height, No Inner Scroller) */}
-      <div className="px-5 sm:px-7 py-5 space-y-5">
+      {/* Main Content Area (Independent Scroller) */}
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar overscroll-contain px-5 sm:px-7 py-5 space-y-5">
         {/* Company + Title */}
         <div className="flex items-start gap-4">
           <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shrink-0 shadow-sm shadow-blue-500/10 overflow-hidden">
@@ -438,7 +447,7 @@ function JobDetailPanel({
       </div>
 
       {/* Footer Bar: Apply Button */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 sm:px-7 py-3.5 z-10 shadow-md">
+      <div className="shrink-0 bg-white border-t border-gray-100 px-5 sm:px-7 py-3.5 z-10 shadow-md">
         {isApplied ? (
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs sm:text-sm font-bold flex-1 shadow-2xs">
@@ -538,7 +547,7 @@ function FilterSidebar({
           >
             <span>All Categories</span>
           </button>
-          {categories.map((cat) => {
+          {categories.filter((cat) => (cat.count ?? cat.job_posts_count ?? 0) > 0).map((cat) => {
             const catKey = cat.uuid || cat.id || cat.name;
             const isSelected =
               (cat.uuid && String(selectedCategory).toLowerCase() === String(cat.uuid).toLowerCase()) ||
@@ -712,7 +721,8 @@ export default function JobListings({
   appliedJobs = [],
 }) {
   const pageProps = usePage()?.props || {};
-  const user = auth?.user || pageProps?.auth?.user;
+  const [activeUser, setActiveUser] = useState(auth?.user || pageProps?.auth?.user || null);
+  const user = activeUser || auth?.user || pageProps?.auth?.user;
   const isLoggedIn = !!user;
   const appliedJobsList = Array.isArray(appliedJobs) && appliedJobs.length > 0
     ? appliedJobs
@@ -736,6 +746,7 @@ export default function JobListings({
   const [search, setSearch] = useState(safeFilters?.search || safeFilters?.skill || "");
   const [location, setLocation] = useState(safeFilters?.location || "all");
   const [selectedCategory, setSelectedCategory] = useState(safeFilters?.category || "all");
+  const [selectedCompany, setSelectedCompany] = useState(safeFilters?.company || "all");
   const [selectedJobType, setSelectedJobType] = useState(safeFilters?.job_type || "all");
   const [selectedExperience, setSelectedExperience] = useState(safeFilters?.experience || "all");
   const [salaryRange, setSalaryRange] = useState(safeFilters?.salary || "all");
@@ -744,8 +755,81 @@ export default function JobListings({
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [loginGateAction, setLoginGateAction] = useState(null);
+  const [candidateLoginOpen, setCandidateLoginOpen] = useState(false);
   const [savedJobs, setSavedJobs] = useState(initialSavedJobs);
   const [now, setNow] = useState(Date.now());
+  const categoryScrollRef = useRef(null);
+
+  // Sort categories so that whichever category is currently selected is placed right in front (at index 0, immediately next to All Roles)
+  const sortedCategories = useMemo(() => {
+    const list = categories.filter((cat) => (cat.count ?? cat.job_posts_count ?? 0) > 0);
+    if (!selectedCategory || selectedCategory === "all" || selectedCategory === "All") {
+      return list;
+    }
+    const catVal = String(selectedCategory).toLowerCase().trim();
+    const selectedIdx = list.findIndex((cat) => {
+      return (
+        (cat.uuid && String(cat.uuid).toLowerCase().trim() === catVal) ||
+        (cat.id && String(cat.id).toLowerCase().trim() === catVal) ||
+        String(cat.name).toLowerCase().trim() === catVal ||
+        String(cat.name).toLowerCase().trim().includes(catVal) ||
+        catVal.includes(String(cat.name).toLowerCase().trim())
+      );
+    });
+
+    if (selectedIdx > 0) {
+      const selectedItem = list[selectedIdx];
+      const rest = list.filter((_, idx) => idx !== selectedIdx);
+      return [selectedItem, ...rest];
+    }
+    return list;
+  }, [categories, selectedCategory]);
+
+  // Identify currently selected category object for clean badge rendering
+  const selectedCategoryObj = useMemo(() => {
+    if (!selectedCategory || selectedCategory === "all" || selectedCategory === "All") return null;
+    const catVal = String(selectedCategory).toLowerCase().trim();
+    return sortedCategories.find(
+      (c) =>
+        (c.uuid && String(c.uuid).toLowerCase().trim() === catVal) ||
+        (c.id && String(c.id).toLowerCase().trim() === catVal) ||
+        String(c.name).toLowerCase().trim() === catVal ||
+        String(c.name).toLowerCase().trim().includes(catVal) ||
+        catVal.includes(String(c.name).toLowerCase().trim())
+    );
+  }, [selectedCategory, sortedCategories]);
+
+  // Restore any clean filter passed via sessionStorage (e.g. from Categories, Skills, Companies)
+  useEffect(() => {
+    try {
+      const savedFilter = sessionStorage.getItem("ats_job_filter");
+      if (savedFilter) {
+        const parsed = JSON.parse(savedFilter);
+        if (parsed.search) setSearch(parsed.search);
+        if (parsed.category) setSelectedCategory(parsed.category);
+        if (parsed.company) setSelectedCompany(parsed.company);
+        if (parsed.location) setLocation(parsed.location);
+        sessionStorage.removeItem("ats_job_filter");
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    // Keep URL clean without visible IDs or query parameters in browser address bar
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  // When selected category changes, smoothly scroll the container to 0 so the selected category (now at index 0) is front and center
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (categoryScrollRef.current) {
+        categoryScrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (Array.isArray(initialSavedJobs)) {
@@ -840,19 +924,31 @@ export default function JobListings({
         }
       }
 
+      if (selectedCompany !== "all" && selectedCompany !== "All") {
+        const compVal = String(selectedCompany).toLowerCase().trim();
+        const jComp = (job.company || "").toLowerCase().trim();
+        const jCompUuid = (job.company_uuid || "").toLowerCase().trim();
+        const compMatch =
+          jComp !== "" &&
+          (jComp === compVal || jComp.includes(compVal) || compVal.includes(jComp) || (jCompUuid && jCompUuid === compVal));
+        if (!compMatch) {
+          return false;
+        }
+      }
+
       if (selectedCategory !== "all" && selectedCategory !== "All") {
-        const catVal = String(selectedCategory).toLowerCase();
-        const catUuidMatch = job.category_uuid && String(job.category_uuid).toLowerCase() === catVal;
-        const catIdMatch = (job.category_id || job.uuid) && String(job.category_id || job.uuid).toLowerCase() === catVal;
+        const catVal = String(selectedCategory).toLowerCase().trim();
+        const catUuidMatch = job.category_uuid && String(job.category_uuid).toLowerCase().trim() === catVal;
+        const catIdMatch = job.category_id && String(job.category_id).toLowerCase().trim() === catVal;
         const catName = (
           job.category_name ||
           job.category?.name ||
-          job.category ||
+          (typeof job.category === "string" ? job.category : "") ||
           ""
-        ).toLowerCase();
+        ).toLowerCase().trim();
         const catMatch =
-          catName === catVal ||
-          catName.includes(catVal);
+          catName !== "" &&
+          (catName === catVal || catName.includes(catVal) || catVal.includes(catName));
         if (!catUuidMatch && !catIdMatch && !catMatch) {
           return false;
         }
@@ -897,7 +993,7 @@ export default function JobListings({
       // Default: 'latest' -> Newest posts first
       return (Number(b.id) || 0) - (Number(a.id) || 0);
     });
-  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, salaryRange, sortBy]);
+  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, selectedCompany, salaryRange, sortBy]);
 
   useEffect(() => {
     if (selectedJob) {
@@ -928,6 +1024,7 @@ export default function JobListings({
     search.trim() !== "" ||
     location !== "all" ||
     selectedCategory !== "all" ||
+    selectedCompany !== "all" ||
     selectedJobType !== "all" ||
     selectedExperience !== "all" ||
     salaryRange !== "all";
@@ -936,6 +1033,7 @@ export default function JobListings({
     setSearch("");
     setLocation("all");
     setSelectedCategory("all");
+    setSelectedCompany("all");
     setSelectedJobType("all");
     setSelectedExperience("all");
     setSalaryRange("all");
@@ -979,10 +1077,21 @@ export default function JobListings({
             onClose={() => setLoginGateAction(null)}
             onLogin={() => {
               setLoginGateAction(null);
-              router.get(route("login"));
+              setCandidateLoginOpen(true);
             }}
           />
         )}
+
+        {/* Inline Candidate Phone & OTP Login Modal */}
+        <CandidateLoginModal
+          isOpen={candidateLoginOpen}
+          onClose={() => setCandidateLoginOpen(false)}
+          onSuccess={(loggedInUser) => {
+            setActiveUser(loggedInUser);
+            setCandidateLoginOpen(false);
+          }}
+          jobTitle={selectedJob?.title || ""}
+        />
 
         <div className="w-full max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
           {/* Header Title Section */}
@@ -1067,7 +1176,7 @@ export default function JobListings({
                   className="w-full text-xs sm:text-sm text-gray-700 bg-transparent border-0 ring-0 focus:ring-0 cursor-pointer outline-none font-medium"
                 >
                   <option value="all">All Categories</option>
-                  {categories.map((cat) => (
+                  {sortedCategories.map((cat) => (
                     <option key={cat.uuid || cat.id || cat.name} value={cat.uuid || cat.name}>
                       {cat.name} ({cat.count ?? 0})
                     </option>
@@ -1094,58 +1203,89 @@ export default function JobListings({
             </div>
           </div>
 
-          {/* Quick Category Tabs Bar */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none whitespace-nowrap">
+          {/* Quick Category Tabs Bar with Auto-Scroll & Controls */}
+          <div className="relative flex items-center gap-1.5 w-full">
+            {/* Scroll Left Button */}
             <button
               type="button"
-              onClick={() => setSelectedCategory("all")}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${selectedCategory === "all" || selectedCategory === "All"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                }`}
+              onClick={() => categoryScrollRef.current?.scrollBy({ left: -220, behavior: "smooth" })}
+              aria-label="Scroll categories left"
+              className="hidden sm:flex shrink-0 p-1.5 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
             >
-              All Roles {jobs.length > 0 && `(${jobs.length})`}
+              <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {categories.map((cat) => {
-              const catKey = cat.uuid || cat.name;
-              const isSelected =
-                (cat.uuid && String(selectedCategory).toLowerCase() === String(cat.uuid).toLowerCase()) ||
-                (cat.id && String(selectedCategory).toLowerCase() === String(cat.id).toLowerCase()) ||
-                String(selectedCategory).toLowerCase() === String(cat.name).toLowerCase();
-              const count = cat.count ?? cat.job_posts_count ?? 0;
-
-              return (
-                <button
-                  key={catKey}
-                  type="button"
-                  onClick={() => setSelectedCategory(isSelected ? "all" : catKey)}
-                  className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${isSelected
-                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+            {/* Scrollable Tabs */}
+            <div
+              ref={categoryScrollRef}
+              className="flex gap-2 overflow-x-auto pb-1 scrollbar-none whitespace-nowrap scroll-smooth flex-1"
+            >
+              <button
+                type="button"
+                data-selected={selectedCategory === "all" || selectedCategory === "All" ? "true" : "false"}
+                onClick={() => setSelectedCategory("all")}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+                  selectedCategory === "all" || selectedCategory === "All"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-200"
                     : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                    }`}
-                >
-                  {cat.icon && <span>{cat.icon}</span>}
-                  <span>{cat.name}</span>
-                  {count > 0 && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-                        }`}
+                }`}
+              >
+                All Roles {jobs.length > 0 && `(${jobs.length})`}
+              </button>
+
+              {sortedCategories.map((cat) => {
+                  const catKey = cat.uuid || cat.name;
+                  const isSelected =
+                    (cat.uuid && String(selectedCategory).toLowerCase() === String(cat.uuid).toLowerCase()) ||
+                    (cat.id && String(selectedCategory).toLowerCase() === String(cat.id).toLowerCase()) ||
+                    String(selectedCategory).toLowerCase() === String(cat.name).toLowerCase();
+                  const count = cat.count ?? cat.job_posts_count ?? 0;
+
+                  return (
+                    <button
+                      key={catKey}
+                      type="button"
+                      data-selected={isSelected ? "true" : "false"}
+                      onClick={() => setSelectedCategory(isSelected ? "all" : catKey)}
+                      className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300 font-extrabold scale-[1.02]"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                      }`}
                     >
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                      {cat.icon && <span>{cat.icon}</span>}
+                      <span>{cat.name}</span>
+                      {count > 0 && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+
+            {/* Scroll Right Button */}
+            <button
+              type="button"
+              onClick={() => categoryScrollRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
+              aria-label="Scroll categories right"
+              className="hidden sm:flex shrink-0 p-1.5 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Main 2-Column Portal Section */}
           <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
             {/* Desktop Left Sidebar: Permanent Filters */}
-            <aside className="hidden lg:block w-56 xl:w-60 shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3.5 sm:p-4 shadow-2xs sticky top-20">
+            <aside className="hidden lg:block w-56 xl:w-60 shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3.5 sm:p-4 shadow-2xs sticky top-20 max-h-[calc(100vh-6.25rem)] overflow-y-auto custom-scrollbar">
               <FilterSidebar
-                categories={categories}
+                categories={sortedCategories}
                 selectedCategory={selectedCategory}
                 setSelectedCategory={setSelectedCategory}
                 availableJobTypes={availableJobTypes}
@@ -1169,16 +1309,58 @@ export default function JobListings({
             <main className="flex-1 min-w-0 w-full space-y-4">
               {/* Results Status & Sorting Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-gray-200/80 shadow-2xs">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-xs sm:text-sm text-gray-600">
                     Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> open positions
                   </p>
+
+                  {selectedCategoryObj && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                      <span>Category: {selectedCategoryObj.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory("all")}
+                        className="hover:text-red-600 transition cursor-pointer"
+                        title="Remove category filter"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {selectedCompany !== "all" && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                      <span>Company: {selectedCompany}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCompany("all")}
+                        className="hover:text-red-600 transition cursor-pointer"
+                        title="Remove company filter"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {search.trim() !== "" && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                      <span>Search: "{search}"</span>
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="hover:text-red-600 transition cursor-pointer"
+                        title="Clear search"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
 
                   {hasActiveFilters && (
                     <button
                       type="button"
                       onClick={clearAllFilters}
-                      className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer ml-2"
+                      className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer ml-1"
                     >
                       Clear filters
                     </button>
@@ -1221,9 +1403,15 @@ export default function JobListings({
                 </div>
               ) : (
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
-                  {/* Left Column: Job Cards */}
-                  <div className={`w-full ${selectedJob ? "lg:w-[48%] xl:w-1/2" : "w-full"} transition-all duration-500 ease-out`}>
-                    <div className={selectedJob ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"}>
+                  {/* Left Column: Job Cards List with Independent Scroller when Details Open */}
+                  <div
+                    className={`w-full ${
+                      selectedJob
+                        ? "lg:w-[48%] xl:w-1/2 lg:h-[calc(100vh-6.25rem)] lg:sticky lg:top-20 lg:overflow-y-auto custom-scrollbar pr-1.5"
+                        : "w-full"
+                    } transition-all duration-300 ease-out`}
+                  >
+                    <div className={selectedJob ? "space-y-3.5" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"}>
                       {filteredJobs.map((job) => {
                         const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
                         const jobKey = job.uuid || job.id;
@@ -1346,8 +1534,8 @@ export default function JobListings({
                               </span>
                             )}
                             <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
-                              <span>Details</span>
-                              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                              <span>{isCurrentSelected ? "Viewing Details" : "Details"}</span>
+                              <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isCurrentSelected ? "translate-x-1 text-blue-700" : "group-hover:translate-x-0.5"}`} />
                             </span>
                           </div>
                         </div>
@@ -1357,9 +1545,9 @@ export default function JobListings({
                     </div>
                   </div>
 
-                  {/* Right Column: In-Page Side View for Job Details (Full Height, No Inner Scroller) */}
+                  {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
                   {selectedJob && (
-                    <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-24 h-fit flex flex-col animate-in fade-in slide-in-from-right-4 duration-500 ease-out">
+                    <div className="hidden lg:flex w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-20 lg:h-[calc(100vh-6.25rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
                       <JobDetailPanel
                         job={selectedJob}
                         onClose={() => setSelectedJob(null)}
@@ -1402,7 +1590,7 @@ export default function JobListings({
                 </div>
 
                 <FilterSidebar
-                  categories={categories}
+                  categories={sortedCategories}
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
                   availableJobTypes={availableJobTypes}
@@ -1432,6 +1620,22 @@ export default function JobListings({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Mobile Job Details Full-Screen Sheet */}
+        {selectedJob && (
+          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-white animate-in slide-in-from-bottom duration-300">
+            <JobDetailPanel
+              job={selectedJob}
+              onClose={() => setSelectedJob(null)}
+              isLoggedIn={isLoggedIn}
+              onLoginRequired={(action) => setLoginGateAction(action)}
+              onSaveJob={(id) => handleToggleSaveJob(null, id)}
+              isSaved={savedJobs.includes(selectedJob.uuid) || savedJobs.includes(selectedJob.id)}
+              isApplied={isJobApplied(selectedJob)}
+              getCountdown={getCountdown}
+            />
           </div>
         )}
       </HomepageLayout>

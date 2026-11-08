@@ -1,8 +1,8 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
-import { Clock, MapPin, Briefcase, Sparkles, ArrowRight, Flame, CheckCircle2 } from "lucide-react";
+import { Clock, MapPin, Briefcase, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
 
-export default function RecentJobsSection({ recentJobs = [] }) {
+export default function RecentJobsSection({ recentJobs = [], onSelectJob }) {
   return (
     <section>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
@@ -35,7 +35,8 @@ export default function RecentJobsSection({ recentJobs = [] }) {
             return (
               <div
                 key={job.id}
-                className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-blue-300 hover:shadow-lg transition-all flex flex-col justify-between group"
+                onClick={() => onSelectJob && onSelectJob(job)}
+                className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between group cursor-pointer"
               >
                 <div>
                   {/* Top Bar: Company Logo, Badges & Time */}
@@ -104,20 +105,24 @@ export default function RecentJobsSection({ recentJobs = [] }) {
                     {job.is_applied ? (
                       <Link
                         href="/my-applications"
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition shadow-2xs"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Applied</span>
                       </Link>
                     ) : (
-                      <Link
-                        href={`/apply/${job.uuid || job.id}`}
-                        aria-label={`Apply Now for ${job.title || 'role'} at ${job.company || 'Company'}`}
-                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition shadow-xs"
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSelectJob) onSelectJob(job);
+                        }}
+                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                       >
                         <span>Apply Now</span>
                         <ArrowRight className="w-3 h-3" />
-                      </Link>
+                      </button>
                     )}
                   </div>
                 </div>

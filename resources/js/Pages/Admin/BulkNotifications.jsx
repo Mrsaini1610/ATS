@@ -45,7 +45,7 @@ const TEMPLATES = [
   {
     id: "follow_up",
     label: "Follow-up / Reminder",
-    body: "👋 Hi,\n\nWe noticed you recently registered on ATS but haven't applied to any jobs yet.\n\nWe have active jobs matching your profile right now!\n\nOpen ATS and explore: atsjobs.in/job-listings\n\n– ATS Team",
+    body: "👋 Hi,\n\nWe noticed you recently registered on ATS but haven't applied to any jobs yet.\n\nWe have active jobs matching your profile right now!\n\nOpen ATS and explore: atsjobs.in/job-search\n\n– ATS Team",
   },
   {
     id: "welcome",

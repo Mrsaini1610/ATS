@@ -174,12 +174,23 @@ class CandidateAuthController extends Controller
             // Login candidate
             Auth::guard('web')->login($user, remember: true);
             $request->session()->regenerate();
+            $newSessionId = $request->session()->getId();
 
             // Enforce single web session (invalidates any older web session on other devices/browsers)
             $user->update([
-                'current_web_session_id' => $request->session()->getId(),
+                'current_web_session_id' => $newSessionId,
                 'last_web_login_at'      => now(),
             ]);
+
+            // Sync admin session ID if an Admin is already authenticated in this session
+            if (Auth::guard('admin')->check()) {
+                $currentAdmin = Auth::guard('admin')->user();
+                if ($currentAdmin) {
+                    $currentAdmin->update([
+                        'current_web_session_id' => $newSessionId,
+                    ]);
+                }
+            }
 
             // Clear rate limiter on successful login
             RateLimiter::clear($ipKey);
@@ -345,16 +356,22 @@ class CandidateAuthController extends Controller
 
         if ($user) {
             $user->update([
-                'web_is_online'   => false,
-                'web_last_active' => now(),
-                'is_online'       => (bool) $user->app_is_online,
-                'last_active'     => now(),
+                'web_is_online'          => false,
+                'web_last_active'        => now(),
+                'is_online'              => (bool) $user->app_is_online,
+                'last_active'            => now(),
+                'current_web_session_id' => null,
             ]);
         }
 
         Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->session()->forget(Auth::guard('web')->getName());
+
+        // Only invalidate entire session if admin is not logged in
+        if (!Auth::guard('admin')->check()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return redirect()->route('login');
     }

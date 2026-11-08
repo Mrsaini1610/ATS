@@ -66,6 +66,33 @@ class JobApplication extends Model
         'reviewed_at'         => 'datetime',
     ];
 
+    protected $appends = [
+        'is_job_closed',
+    ];
+
+    public function getIsJobClosedAttribute(): bool
+    {
+        $job = $this->jobPost ?: ($this->job ?: (
+            !empty($this->job_id) 
+                ? JobPost::find($this->job_id) 
+                : (!empty($this->job_uuid) ? JobPost::where('uuid', $this->job_uuid)->first() : null)
+        ));
+
+        if (!$job) {
+            return true;
+        }
+        if ((bool) ($job->is_deleted ?? false)) {
+            return true;
+        }
+        if (!in_array(strtolower((string) ($job->status ?? '')), ['active', 'approved'])) {
+            return true;
+        }
+        if ($job->last_date && \Carbon\Carbon::parse($job->last_date)->endOfDay()->isPast()) {
+            return true;
+        }
+        return false;
+    }
+
     protected static function booted()
     {
         static::creating(function ($application) {

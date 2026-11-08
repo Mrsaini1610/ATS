@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Services\MailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,6 +60,7 @@ class StaffController extends Controller
                 'assignedAdminId'   => $member->created_by,
                 'assignedAdminName' => $member->creator ? $member->creator->name : ($member->role === 'team_member' ? 'Super Admin' : 'System'),
                 'createdAt'         => $member->created_at ? $member->created_at->format('d M Y') : 'Recent',
+                'presence'          => \App\Services\PresenceService::getAdminPresence($member),
             ];
         });
 
@@ -110,7 +113,7 @@ class StaffController extends Controller
             $createdBy = (int) $validated['assigned_admin_id'];
         }
 
-        Admin::create([
+        $staff = Admin::create([
             'name'                 => $validated['name'],
             'username'             => $validated['username'],
             'email'                => $validated['email'],
@@ -123,7 +126,14 @@ class StaffController extends Controller
             'must_change_password' => false,
         ]);
 
-        return redirect()->back()->with('success', 'Staff member successfully created.');
+        // Dispatch credentials email to newly created staff member and alert Super Admin
+        try {
+            MailService::sendStaffCreated($staff, $validated['password'], $currentUser->name);
+        } catch (\Throwable $e) {
+            Log::error("Staff creation mail error: " . $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Staff member successfully created. Login credentials sent to ' . $staff->email);
     }
 
     public function update(Request $request, Admin $admin)

@@ -31,8 +31,13 @@ class AdminAuthenticate
         // 2. Account active status check
         if (! $admin || ! $admin->status) {
             Auth::guard('admin')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            $request->session()->forget('admin_logged_in_id');
+            $request->session()->forget(Auth::guard('admin')->getName());
+
+            if (!Auth::guard('web')->check()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
 
             return redirect()->route('admin.login')->withErrors([
                 'error' => 'Aapka account currently deactivated ya suspended hai.',

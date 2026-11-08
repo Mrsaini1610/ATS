@@ -628,11 +628,11 @@ export default function Companies({ companies = [] }) {
         </div>
 
         {/* Companies Grid */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           <div
-            className={`transition-all ${
+            className={`transition-all duration-300 ease-out ${
               selectedCompany
-                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3.5 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3 overflow-y-auto h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] pr-2 [scrollbar-width:thin]"
                 : "w-full flex-1 flex flex-wrap gap-4"
             }`}
           >
@@ -650,20 +650,20 @@ export default function Companies({ companies = [] }) {
                 <div
                   key={company.uuid}
                   onClick={() => setSelectedCompany(company)}
-                  className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`bg-white border rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
                     selectedCompany
                       ? "w-full ring-1 ring-blue-100"
                       : "w-full sm:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]"
                   } ${
                     isSelected
-                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30"
-                      : "border-gray-100 hover:border-blue-200"
+                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 shadow-sm"
+                      : "border-gray-200/90 hover:border-blue-300"
                   }`}
                 >
                   <div>
-                    <div className="flex items-start gap-3 mb-4">
+                    <div className="flex items-start gap-3 mb-3">
                       {isImageUrl ? (
-                        <div className="w-12 h-12 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+                        <div className="w-11 h-11 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                           <img
                             src={
                               company.logo.startsWith("http")
@@ -676,7 +676,7 @@ export default function Companies({ companies = [] }) {
                               e.currentTarget.style.display = "none";
                               const parent = e.currentTarget.parentElement;
                               if (parent) {
-                                parent.className = `w-12 h-12 ${randomColor} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs`;
+                                parent.className = `w-11 h-11 ${randomColor} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs`;
                                 parent.innerText = (company.name || "C").slice(0, 2).toUpperCase();
                               }
                             }}
@@ -684,19 +684,19 @@ export default function Companies({ companies = [] }) {
                         </div>
                       ) : (
                         <div
-                          className={`w-12 h-12 ${randomColor} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs`}
+                          className={`w-11 h-11 ${randomColor} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs`}
                         >
                           {company.logo || (company.name || "C").slice(0, 2).toUpperCase()}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-gray-900 truncate">{company.name}</p>
+                          <p className="font-extrabold text-gray-900 truncate hover:text-blue-600">{company.name}</p>
                           <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                               company.status === "active"
-                                ? "bg-green-50 text-green-700"
-                                : "bg-gray-100 text-gray-500"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-gray-100 text-gray-500 border border-gray-200"
                             }`}
                           >
                             {company.status}
@@ -712,36 +712,24 @@ export default function Companies({ companies = [] }) {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5 truncate"
                           >
-                            <Globe className="w-3 h-3" />
-                            {company.website.replace(/^https?:\/\//, "")}
+                            <Globe className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{company.website.replace(/^https?:\/\//, "")}</span>
                           </a>
                         )}
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 mb-4">
+                    <div className="space-y-1.5 mb-3 text-xs text-gray-600">
                       {company.location && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                        <p className="flex items-center gap-1.5 truncate">
                           <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                           <span className="truncate">{company.location}</span>
                         </p>
                       )}
-                      {company.address && (
-                        <p className="text-[11px] text-gray-400 flex items-center gap-1.5 line-clamp-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                          <span className="truncate">{company.address}</span>
-                        </p>
-                      )}
-                      {company.latitude && company.longitude && (
-                        <p className="text-[10px] font-mono text-emerald-600 flex items-center gap-1">
-                          <Compass className="w-3 h-3" />
-                          GPS: {Number(company.latitude).toFixed(4)}, {Number(company.longitude).toFixed(4)}
-                        </p>
-                      )}
                       {company.company_size && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                        <p className="flex items-center gap-1.5 text-gray-500">
                           <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                           <span>{company.company_size}</span>
                         </p>
@@ -749,10 +737,10 @@ export default function Companies({ companies = [] }) {
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" />
-                      {company.jobs_count || 0} active {company.jobs_count === 1 ? "job" : "jobs"}
+                  <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Briefcase className="w-3 h-3 text-purple-600" />
+                      {company.jobs_count || 0} active openings
                     </span>
 
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -760,10 +748,10 @@ export default function Companies({ companies = [] }) {
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(company.uuid)}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
                             company.status === "active"
-                              ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
-                              : "text-green-600 bg-green-50 hover:bg-green-100"
+                              ? "text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200"
+                              : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200"
                           }`}
                         >
                           {company.status === "active" ? "Pause" : "Activate"}
@@ -773,7 +761,7 @@ export default function Companies({ companies = [] }) {
                         <button
                           type="button"
                           onClick={() => openEditModal(company)}
-                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition"
+                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
                           title="Edit"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -783,7 +771,7 @@ export default function Companies({ companies = [] }) {
                         <button
                           type="button"
                           onClick={() => setDeleteUuid(company.uuid)}
-                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer transition"
+                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer transition"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -804,7 +792,7 @@ export default function Companies({ companies = [] }) {
 
           {/* Right side comprehensive Company Details & Jobs inspection panel */}
           {selectedCompany && (
-            <div className="w-full lg:w-96 xl:w-[420px] bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] lg:sticky lg:top-3 shadow-2xl shadow-blue-950/20 shrink-0 z-20 mb-12">
+            <div className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] lg:sticky lg:top-4 shadow-2xl shadow-blue-950/20 shrink-0 z-20">
               {/* Distinct High-Contrast Inspection Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-3 min-w-0">

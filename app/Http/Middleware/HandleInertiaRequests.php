@@ -45,6 +45,7 @@ class HandleInertiaRequests extends Middleware
                     'role'          => $adminUser->role, // super_admin, admin, team_member
                     'permissions'   => $adminUser->permissionList(),
                     'profile_image' => $adminUser->profile_image,
+                    'presence'      => \App\Services\PresenceService::getAdminPresence($adminUser),
                 ] : null,
             ],
             'csrf_token' => csrf_token(),

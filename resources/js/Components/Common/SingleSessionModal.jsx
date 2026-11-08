@@ -27,11 +27,14 @@ export default function SingleSessionModal() {
 
   // Periodic heartbeat session check while logged in
   useEffect(() => {
-    if (!user && !admin) return;
+    const isCurrentAdminPath = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+    if (isCurrentAdminPath && !admin) return;
+    if (!isCurrentAdminPath && !user) return;
 
     const checkSession = async () => {
       try {
-        const response = await fetch("/auth/session-check", {
+        const guardParam = isCurrentAdminPath ? "admin" : "web";
+        const response = await fetch(`/auth/session-check?guard=${guardParam}`, {
           headers: {
             "Accept": "application/json",
             "X-Requested-With": "XMLHttpRequest",
@@ -57,12 +60,30 @@ export default function SingleSessionModal() {
     const onFocus = () => checkSession();
     window.addEventListener("focus", onFocus);
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkSession();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const onBeforeUnload = () => {
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/auth/set-offline");
+        }
+      } catch (e) {}
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
     // Heartbeat every 20 seconds
     const interval = setInterval(checkSession, 20000);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [user?.id, admin?.id]);
 

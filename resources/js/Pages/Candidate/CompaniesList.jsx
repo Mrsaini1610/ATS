@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import {
   Search,
   Building2,
@@ -19,23 +19,29 @@ export default function CompaniesList({ companies = [] }) {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("all");
 
-  const totalOpenings = useMemo(() => {
-    return companies.reduce((acc, c) => acc + (Number(c.jobs_count) || 0), 0);
+  // Only display companies that have active job openings
+  const companiesWithJobs = useMemo(() => {
+    return (companies || []).filter((c) => (Number(c.jobs_count) || 0) > 0);
   }, [companies]);
+
+  const totalOpenings = useMemo(() => {
+    return companiesWithJobs.reduce((acc, c) => acc + (Number(c.jobs_count) || 0), 0);
+  }, [companiesWithJobs]);
 
   const availableLocations = useMemo(() => {
     const set = new Set();
-    companies.forEach((c) => {
+    companiesWithJobs.forEach((c) => {
       if (c.location && typeof c.location === "string") {
         set.add(c.location.trim());
       }
     });
     return Array.from(set);
-  }, [companies]);
+  }, [companiesWithJobs]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return companies.filter((c) => {
+    return companiesWithJobs.filter((c) => {
+      if ((Number(c.jobs_count) || 0) <= 0) return false;
       if (q) {
         const nameMatch = (c.name || "").toLowerCase().includes(q);
         const locMatch = (c.location || "").toLowerCase().includes(q);
@@ -56,13 +62,25 @@ export default function CompaniesList({ companies = [] }) {
 
       return true;
     });
-  }, [companies, search, location]);
+  }, [companiesWithJobs, search, location]);
 
   const hasActiveFilters = search.trim() !== "" || location !== "all";
 
   const clearAllFilters = () => {
     setSearch("");
     setLocation("all");
+  };
+
+  const handleExploreJobs = (companyName) => {
+    try {
+      sessionStorage.setItem(
+        "ats_job_filter",
+        JSON.stringify({ company: companyName })
+      );
+    } catch (e) {
+      // Ignore sessionStorage error
+    }
+    router.visit("/job-search");
   };
 
   return (
@@ -195,7 +213,7 @@ export default function CompaniesList({ companies = [] }) {
                 const compKey = comp.uuid || comp.id || comp.name;
                 const hasImageLogo = comp.logo && (comp.logo.includes("/") || comp.logo.includes("."));
                 const targetProfileUrl = `/companies/${encodeURIComponent(comp.uuid || comp.name)}`;
-                const targetJobsUrl = `/job-listings?company=${encodeURIComponent(comp.uuid || comp.name)}`;
+                const targetJobsUrl = `/job-search?company=${encodeURIComponent(comp.uuid || comp.name)}`;
                 const openings = Number(comp.jobs_count) || 0;
                 const openRoles = Array.isArray(comp.open_roles) ? comp.open_roles : [];
 
@@ -272,12 +290,13 @@ export default function CompaniesList({ companies = [] }) {
 
                       {/* Card Footer: Explore Jobs & Profile Buttons */}
                       <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between gap-3">
-                        <Link
-                          href={targetJobsUrl}
-                          className="flex-1 text-center py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-colors shadow-xs"
+                        <button
+                          type="button"
+                          onClick={() => handleExploreJobs(comp.name)}
+                          className="flex-1 text-center py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-colors shadow-xs cursor-pointer"
                         >
                           Explore Jobs ({openings})
-                        </Link>
+                        </button>
 
                         <Link
                           href={targetProfileUrl}

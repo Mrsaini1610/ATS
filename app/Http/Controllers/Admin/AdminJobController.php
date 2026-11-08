@@ -365,9 +365,13 @@ class AdminJobController extends Controller
             'status' => $validated['status'],
         ];
 
-        if ($validated['status'] === 'rejected' || $validated['status'] === 'hold') {
+        if ($validated['status'] === 'deactivated' || $validated['status'] === 'rejected') {
+            $updateData['is_deleted'] = 1;
+            $updateData['rejection_reason'] = $validated['remark'] ?? $job->rejection_reason;
+        } elseif ($validated['status'] === 'hold') {
             $updateData['rejection_reason'] = $validated['remark'] ?? $job->rejection_reason;
         } elseif ($validated['status'] === 'approved' || $validated['status'] === 'active') {
+            $updateData['is_deleted'] = 0;
             $updateData['approved_at'] = now();
             $updateData['approved_by'] = auth('admin')->id();
 
@@ -408,6 +412,37 @@ class AdminJobController extends Controller
         );
 
         return redirect()->back()->with('success', "Job status changed to {$validated['status']}.");
+    }
+
+    public function destroy(Request $request, $uuid)
+    {
+        $user = auth('admin')->user();
+        $job = JobPost::where('uuid', $uuid)->orWhere('id', $uuid)->firstOrFail();
+
+        $canDelete = $user->isSuperAdmin()
+            || ($job->assigned_to && $job->assigned_to == $user->id)
+            || in_array('deactivate_jobs', $user->permissionList(), true)
+            || in_array('delete_jobs', $user->permissionList(), true);
+
+        if (!$canDelete) {
+            abort(403, 'Unauthorized: You do not have permission to delete this job.');
+        }
+
+        // Soft delete / mark as closed and deleted so candidate applications are fully preserved
+        $job->update([
+            'status'     => 'deactivated',
+            'is_deleted' => 1,
+        ]);
+
+        AuditLogService::log(
+            'job_deleted',
+            "Job '{$job->title}' marked as deleted/closed",
+            ['job_id' => $job->id, 'job_uuid' => $job->uuid],
+            'jobs',
+            $job
+        );
+
+        return redirect()->back()->with('success', 'Job has been marked as closed/deleted and removed from active listings.');
     }
 
     public function assignTeam(Request $request, $uuid)
@@ -562,6 +597,7 @@ class AdminJobController extends Controller
                     'registeredFrom' => $user->registered_from ?? 'web',
                     'is_applied'     => in_array($user->id, $appliedCandidateIds, true) || in_array($user->uuid, $appliedCandidateUuids, true),
                     'registeredAt'   => $user->created_at ? $user->created_at->format('d M Y') : '—',
+                    'presence'       => \App\Services\PresenceService::getUserPresence($user),
                 ];
             }
         }

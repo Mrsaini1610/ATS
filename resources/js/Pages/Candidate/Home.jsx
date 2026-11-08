@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
 import HeroSection from "@/Components/Home/HeroSection";
 import StatsSection from "@/Components/Home/StatsSection";
@@ -10,7 +10,9 @@ import TopCompaniesSection from "@/Components/Home/TopCompaniesSection";
 import TrendingSkillsSection from "@/Components/Home/TrendingSkillsSection";
 import TestimonialsSection from "@/Components/Home/TestimonialsSection";
 import CTASection from "@/Components/Home/CTASection";
-import { usePage, Head } from "@inertiajs/react";
+import JobDetailModal from "@/Components/Candidate/JobDetailModal";
+import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
+import { usePage, Head, router } from "@inertiajs/react";
 
 export default function Homepage() {
   const {
@@ -26,9 +28,29 @@ export default function Homepage() {
     testimonials = [],
   } = usePage().props;
 
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [activeUser, setActiveUser] = useState(auth?.user || null);
+
+  const userIsLoggedIn = isLoggedIn || Boolean(auth?.user) || Boolean(activeUser);
+
   // Ensure job posts are strictly displayed in descending order (newest first)
   const sortedRecentJobs = [...recentJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
   const sortedRecommendedJobs = [...recommendedJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+
+  const handleSelectJob = (job) => {
+    setSelectedJob(job);
+  };
+
+  const handleRequireLogin = (job) => {
+    // Open login modal without closing or resetting the selected job
+    setLoginModalOpen(true);
+  };
+
+  const handleLoginSuccess = (user) => {
+    setActiveUser(user);
+    setLoginModalOpen(false);
+  };
 
   return (
     <HomepageLayout>
@@ -44,29 +66,31 @@ export default function Homepage() {
         />
       </Head>
 
-      {/* Hero Section Banner (Search bar removed as requested) */}
-      <HeroSection user={auth?.user} />
+      {/* Hero Section Banner */}
+      <HeroSection user={activeUser || auth?.user} />
 
       <div className="px-4 sm:px-6 space-y-10 sm:space-y-14 max-w-7xl mx-auto py-8">
         {/* Stats Strip */}
         <StatsSection stats={stats} />
 
-        {/* Quick Actions (Browse Jobs, Applications, Saved Jobs, Alerts) - Only shown after login, ABOVE Recent Jobs */}
-        {(isLoggedIn || Boolean(auth?.user)) && (
-          <QuickActionsSection />
-        )}
+        {/* Quick Actions - Only shown after login */}
+        {userIsLoggedIn && <QuickActionsSection />}
 
         {/* 1. Recommended Jobs Section (Only visible when logged in) */}
-        {(isLoggedIn || Boolean(auth?.user)) && (
+        {userIsLoggedIn && (
           <RecommendedJobsSection
             recommendedJobs={sortedRecommendedJobs}
-            isLoggedIn={isLoggedIn || Boolean(auth?.user)}
+            isLoggedIn={userIsLoggedIn}
             candidateProfile={candidateProfile}
+            onSelectJob={handleSelectJob}
           />
         )}
 
-        {/* 2. Recent Jobs Openings (In descending order) */}
-        <RecentJobsSection recentJobs={sortedRecentJobs} />
+        {/* 2. Recent Jobs Openings */}
+        <RecentJobsSection
+          recentJobs={sortedRecentJobs}
+          onSelectJob={handleSelectJob}
+        />
 
         {/* 3. Browse by Category */}
         <FeaturesSection categories={categories} />
@@ -81,8 +105,32 @@ export default function Homepage() {
         <TestimonialsSection testimonials={testimonials} />
 
         {/* 7. Call To Action Banner */}
-        <CTASection user={auth?.user} />
+        <CTASection user={activeUser || auth?.user} />
       </div>
+
+      {/* Job Details Modal */}
+      <JobDetailModal
+        job={selectedJob}
+        isOpen={Boolean(selectedJob)}
+        onClose={() => setSelectedJob(null)}
+        isLoggedIn={userIsLoggedIn}
+        user={activeUser || auth?.user}
+        onRequireLogin={handleRequireLogin}
+        onApplicationSuccess={(job) => {
+          // Update local status of job
+          if (selectedJob && (selectedJob.uuid === job.uuid || selectedJob.id === job.id)) {
+            setSelectedJob({ ...selectedJob, is_applied: true });
+          }
+        }}
+      />
+
+      {/* Inline Candidate Phone & OTP Login Modal */}
+      <CandidateLoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        onSuccess={handleLoginSuccess}
+        jobTitle={selectedJob?.title || ""}
+      />
     </HomepageLayout>
   );
 }
