@@ -28,6 +28,7 @@ class AuditLogController extends Controller
         $search      = $request->input('search');
         $module      = $request->input('module', 'all');
         $status      = $request->input('status', 'all');
+        $actorType   = $request->input('actor_type', 'all'); // all, candidate, admin, system
         $tab         = $request->input('tab', 'audit'); // audit, incomplete, errors, server_log
         $filterMode  = $request->input('filter_mode', 'all'); // all, month, date_range, preset
         $month       = $request->input('month', now()->format('Y-m'));
@@ -56,13 +57,26 @@ class AuditLogController extends Controller
             $auditQuery->where('status', $status);
         }
 
+        if ($actorType !== 'all') {
+            if ($actorType === 'candidate') {
+                $auditQuery->where('actor_type', 'candidate');
+            } elseif ($actorType === 'admin') {
+                $auditQuery->whereIn('actor_type', ['admin', 'super_admin', 'team_member', 'staff']);
+            } elseif ($actorType === 'system') {
+                $auditQuery->where('actor_type', 'system');
+            } else {
+                $auditQuery->where('actor_type', $actorType);
+            }
+        }
+
         // Apply Date / Month Filter to Audit Logs
         $dateRange = $this->resolveDateRange($filterMode, $month, $fromDate, $toDate, $preset);
         if ($dateRange) {
             $auditQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
         }
 
-        $activities = $auditQuery->paginate(25)->withQueryString();
+        // 10 records per page maximum as requested by user
+        $activities = $auditQuery->paginate(10)->withQueryString();
 
         // 2. Incomplete / Half-Finished Processes ("Kisne konsi process aadhi ki")
         $incompleteProcesses = AuditLogService::getIncompleteProcesses(60);
@@ -80,7 +94,7 @@ class AuditLogController extends Controller
         if ($dateRange && $tab === 'errors') {
             $errorQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
         }
-        $errorLogs = $errorQuery->paginate(25, ['*'], 'error_page')->withQueryString();
+        $errorLogs = $errorQuery->paginate(10, ['*'], 'error_page')->withQueryString();
 
         // 4. Server Log File Details (`storage/logs/laravel.log`)
         $serverLog = AuditLogService::getServerLogDetails(250);
@@ -105,6 +119,7 @@ class AuditLogController extends Controller
                 'search'      => $search,
                 'module'      => $module,
                 'status'      => $status,
+                'actor_type'  => $actorType,
                 'tab'         => $tab,
                 'filter_mode' => $filterMode,
                 'month'       => $month,
@@ -128,6 +143,7 @@ class AuditLogController extends Controller
         $toDate     = $request->input('to_date');
         $preset     = $request->input('preset', 'all');
         $module     = $request->input('module', 'all');
+        $actorType  = $request->input('actor_type', 'all');
 
         $dateRange = $this->resolveDateRange($filterMode, $month, $fromDate, $toDate, $preset);
 
@@ -144,7 +160,7 @@ class AuditLogController extends Controller
         $fileName = "ats_{$type}_logs_{$periodLabel}_{$timestamp}." . ($format === 'csv' ? 'csv' : 'xlsx');
 
         // Fetch Export Data
-        $data = $this->getExportData($type, $dateRange, $module);
+        $data = $this->getExportData($type, $dateRange, $module, $actorType);
 
         if ($format === 'csv') {
             return $this->exportToCsv($fileName, $data['headers'], $data['rows']);
@@ -195,7 +211,7 @@ class AuditLogController extends Controller
     /**
      * Compile table headers and rows based on type.
      */
-    protected function getExportData(string $type, ?array $dateRange, string $module = 'all'): array
+    protected function getExportData(string $type, ?array $dateRange, string $module = 'all', string $actorType = 'all'): array
     {
         if ($type === 'errors') {
             $query = SystemErrorLog::query()->latest();
@@ -264,6 +280,17 @@ class AuditLogController extends Controller
         }
         if ($module !== 'all') {
             $query->where('module', $module);
+        }
+        if ($actorType !== 'all') {
+            if ($actorType === 'candidate') {
+                $query->where('actor_type', 'candidate');
+            } elseif ($actorType === 'admin') {
+                $query->whereIn('actor_type', ['admin', 'super_admin', 'team_member', 'staff']);
+            } elseif ($actorType === 'system') {
+                $query->where('actor_type', 'system');
+            } else {
+                $query->where('actor_type', $actorType);
+            }
         }
 
         $headers = ['ID', 'Date Time', 'Actor Role', 'Actor Name', 'Actor Email', 'Action', 'Module', 'Status', 'Description', 'Platform', 'IP Address', 'Metadata / Payload'];

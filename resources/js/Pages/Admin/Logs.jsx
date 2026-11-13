@@ -14,6 +14,7 @@ import {
   User,
   Shield,
   Smartphone,
+  Laptop,
   Globe,
   Trash2,
   ExternalLink,
@@ -39,6 +40,7 @@ export default function Logs({
   const [search, setSearch] = useState(filters.search || "");
   const [moduleFilter, setModuleFilter] = useState(filters.module || "all");
   const [statusFilter, setStatusFilter] = useState(filters.status || "all");
+  const [actorTypeFilter, setActorTypeFilter] = useState(filters.actor_type || "all"); // all, candidate, admin, system
   
   // Date & Month filter state
   const [filterMode, setFilterMode] = useState(filters.filter_mode || "all"); // all, month, date_range, preset
@@ -71,6 +73,7 @@ export default function Logs({
         search,
         module: moduleFilter,
         status: statusFilter,
+        actor_type: actorTypeFilter,
         filter_mode: filterMode,
         month: selectedMonth,
         from_date: fromDate,
@@ -129,6 +132,7 @@ export default function Logs({
       to_date: exportToDate,
       preset: exportPreset,
       module: moduleFilter,
+      actor_type: actorTypeFilter,
     });
 
     window.location.href = `${route("admin.logs.export")}?${params.toString()}`;
@@ -166,26 +170,49 @@ export default function Logs({
     );
   };
 
-  // Actor badge styling
+  // Actor badge styling (Candidate, Admin, Super Admin, System)
   const getActorBadge = (type, name) => {
     const t = (type || "").toLowerCase();
-    let bg = "bg-blue-50 text-blue-700 border-blue-200";
-    let icon = User;
-    if (t === "super_admin") {
-      bg = "bg-purple-50 text-purple-700 border-purple-200";
-      icon = Shield;
-    } else if (t === "admin" || t === "team_member") {
-      bg = "bg-indigo-50 text-indigo-700 border-indigo-200";
-      icon = User;
-    } else if (t === "system") {
-      bg = "bg-gray-100 text-gray-700 border-gray-200";
-      icon = Activity;
+    if (t === "candidate" || t === "user") {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-emerald-50 text-emerald-800 border-emerald-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+          <span className="font-bold">Candidate:</span>
+          <span className="truncate max-w-[130px]">{name || "Candidate"}</span>
+        </span>
+      );
     }
-    const Icon = icon;
+    if (t === "guest") {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-amber-50 text-amber-800 border-amber-200">
+          <Globe className="w-3 h-3 text-amber-600 shrink-0" />
+          <span className="font-bold">Guest:</span>
+          <span className="truncate max-w-[130px]">{name || "Visitor"}</span>
+        </span>
+      );
+    }
+    if (t === "super_admin") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-purple-50 text-purple-700 border-purple-200">
+          <Shield className="w-3 h-3 shrink-0" />
+          <span className="font-bold">Super Admin:</span>
+          <span className="truncate max-w-[130px]">{name || "Super Admin"}</span>
+        </span>
+      );
+    }
+    if (t === "admin" || t === "team_member" || t === "staff") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-indigo-50 text-indigo-700 border-indigo-200">
+          <User className="w-3 h-3 shrink-0" />
+          <span className="font-bold">{t === "team_member" ? "Staff:" : "Admin:"}</span>
+          <span className="truncate max-w-[130px]">{name || "Admin"}</span>
+        </span>
+      );
+    }
     return (
-      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border ${bg}`}>
-        <Icon className="w-3 h-3 shrink-0" />
-        <span className="capitalize">{name || type}</span>
+      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-gray-100 text-gray-700 border-gray-200">
+        <Activity className="w-3 h-3 shrink-0" />
+        <span>{name || "System"}</span>
       </span>
     );
   };
@@ -533,6 +560,21 @@ export default function Logs({
               </div>
 
               <select
+                value={actorTypeFilter}
+                onChange={(e) => {
+                  setActorTypeFilter(e.target.value);
+                  applyFilters({ actor_type: e.target.value });
+                }}
+                className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white outline-none cursor-pointer"
+              >
+                <option value="all">All Actors (Everyone)</option>
+                <option value="candidate">Candidates Only</option>
+                <option value="admin">Admins & Staff Only</option>
+                <option value="guest">Guest Visitors (Not Logged In)</option>
+                <option value="system">System Automations</option>
+              </select>
+
+              <select
                 value={moduleFilter}
                 onChange={(e) => {
                   setModuleFilter(e.target.value);
@@ -543,6 +585,7 @@ export default function Logs({
                 <option value="all">All Modules</option>
                 <option value="jobs">Job Posts</option>
                 <option value="applications">Applications</option>
+                <option value="navigation">Page Views & Navigation</option>
                 <option value="offers">Offer Letters</option>
                 <option value="users">Candidates / Users</option>
                 <option value="interviews">Interviews</option>
@@ -572,21 +615,21 @@ export default function Logs({
               </button>
             </form>
 
-            {/* Activities Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+            {/* Activities Table Card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col">
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-20rem)] min-h-[380px] custom-scrollbar">
+                <table className="w-full min-w-[1020px] text-left text-xs border-collapse">
+                  <thead className="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-xs border-b border-gray-200 text-gray-600 font-bold uppercase tracking-wider text-[10px] shadow-xs">
                     <tr>
-                      <th className="px-4 py-3">Time & Platform</th>
-                      <th className="px-4 py-3">Actor (Who)</th>
-                      <th className="px-4 py-3">Action & Module</th>
-                      <th className="px-4 py-3">Description</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Details</th>
+                      <th className="w-[160px] min-w-[150px] px-4 py-3.5">Time & Platform</th>
+                      <th className="w-[190px] min-w-[180px] px-4 py-3.5">Actor (Who)</th>
+                      <th className="w-[170px] min-w-[160px] px-4 py-3.5">Action & Module</th>
+                      <th className="min-w-[340px] px-4 py-3.5">Description</th>
+                      <th className="w-[130px] min-w-[120px] px-4 py-3.5 text-center">Status</th>
+                      <th className="w-[70px] min-w-[70px] px-4 py-3.5 text-right">Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 bg-white">
                     {activities.data.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
@@ -600,9 +643,9 @@ export default function Logs({
                           <React.Fragment key={item.id}>
                             <tr
                               onClick={() => setExpandedRow(isExpanded ? null : item.id)}
-                              className="hover:bg-blue-50/30 transition cursor-pointer"
+                              className="hover:bg-blue-50/40 transition cursor-pointer"
                             >
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="w-[160px] min-w-[150px] px-4 py-3 whitespace-nowrap align-middle">
                                 <div className="font-semibold text-gray-800">
                                   {new Date(item.created_at).toLocaleDateString("en-GB", {
                                     day: "2-digit",
@@ -610,7 +653,7 @@ export default function Logs({
                                     year: "numeric",
                                   })}
                                 </div>
-                                <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5 font-medium">
                                   <span>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                   <span>•</span>
                                   <span className="flex items-center gap-0.5">
@@ -624,16 +667,33 @@ export default function Logs({
                                 </div>
                               </td>
 
-                              <td className="px-4 py-3">
-                                {getActorBadge(item.actor_type, item.actor_name)}
+                              <td className="w-[190px] min-w-[180px] px-4 py-3 align-middle">
+                                <div className="truncate max-w-[180px]">
+                                  {getActorBadge(item.actor_type, item.actor_name)}
+                                </div>
                                 {item.actor_email && (
-                                  <p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-[140px]">
+                                  <p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-[175px]" title={item.actor_email}>
                                     {item.actor_email}
                                   </p>
                                 )}
+                                {item.device_name && (
+                                  <div className="mt-1 flex items-center gap-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                                      title={`Device: ${item.device_name}${item.user_agent ? ' • ' + item.user_agent : ''}`}
+                                    >
+                                      {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
+                                        <Smartphone className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                                      ) : (
+                                        <Laptop className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                      )}
+                                      <span className="truncate max-w-[140px]">{item.device_name}</span>
+                                    </span>
+                                  </div>
+                                )}
                               </td>
 
-                              <td className="px-4 py-3">
+                              <td className="w-[170px] min-w-[160px] px-4 py-3 align-middle">
                                 <div className="font-bold text-gray-900 leading-tight">
                                   {item.action.replace(/_/g, " ")}
                                 </div>
@@ -642,8 +702,8 @@ export default function Logs({
                                 </span>
                               </td>
 
-                              <td className="px-4 py-3 max-w-md">
-                                <p className="text-gray-700 font-medium leading-relaxed">
+                              <td className="min-w-[340px] px-4 py-3 pr-6 align-middle">
+                                <p className="text-gray-800 font-medium leading-relaxed break-words">
                                   {item.description}
                                 </p>
                                 {item.ip_address && (
@@ -653,14 +713,14 @@ export default function Logs({
                                 )}
                               </td>
 
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="w-[130px] min-w-[120px] px-4 py-3 whitespace-nowrap text-center align-middle">
                                 {getStatusBadge(item.status)}
                               </td>
 
-                              <td className="px-4 py-3 text-right">
+                              <td className="w-[70px] min-w-[70px] px-4 py-3 text-right align-middle">
                                 <button
                                   type="button"
-                                  className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700"
+                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
                                 >
                                   <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                                 </button>
@@ -671,10 +731,27 @@ export default function Logs({
                             {isExpanded && (
                               <tr className="bg-gray-50/80">
                                 <td colSpan={6} className="px-6 py-4">
-                                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5">
+                                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5 shadow-2xs">
                                     <div className="flex items-center justify-between text-xs">
                                       <span className="font-bold text-gray-700">Audit Metadata & Details:</span>
                                       <span className="text-gray-400">ID #{item.id}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                      {item.device_name && (
+                                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg font-semibold flex items-center gap-1.5">
+                                          {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
+                                            <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+                                          ) : (
+                                            <Laptop className="w-3.5 h-3.5 text-slate-600" />
+                                          )}
+                                          <span>Device: <strong>{item.device_name}</strong></span>
+                                        </span>
+                                      )}
+                                      {item.ip_address && (
+                                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg font-mono text-[11px]">
+                                          IP: <strong>{item.ip_address}</strong>
+                                        </span>
+                                      )}
                                     </div>
                                     {item.user_agent && (
                                       <p className="text-[11px] text-gray-500 font-mono break-all bg-gray-50 p-2 rounded-lg border border-gray-100">
@@ -702,11 +779,13 @@ export default function Logs({
 
               {/* Pagination */}
               {activities.links && activities.links.length > 3 && (
-                <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-white text-xs text-gray-500">
+                <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white text-xs text-gray-500 shrink-0">
                   <span>
-                    Showing {activities.from || 0} to {activities.to || 0} of {activities.total} records
+                    Showing <span className="font-bold text-gray-800">{activities.from || 0}</span> to{" "}
+                    <span className="font-bold text-gray-800">{activities.to || 0}</span> of{" "}
+                    <span className="font-bold text-gray-800">{activities.total}</span> records (10 per page)
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap justify-center">
                     {activities.links.map((link, idx) => (
                       <Link
                         key={idx}
@@ -714,7 +793,7 @@ export default function Logs({
                         preserveScroll
                         className={`px-3 py-1 rounded-lg border font-semibold transition ${
                           link.active
-                            ? "bg-blue-600 text-white border-blue-600"
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
                             : link.url
                             ? "bg-white text-gray-700 hover:bg-gray-50 border-gray-200"
                             : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"

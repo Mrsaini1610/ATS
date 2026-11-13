@@ -52,7 +52,83 @@ class User extends Authenticatable
         'is_open_to_work'              => 'boolean',
     ];
 
-    protected $appends = ['profile_picture_url', 'name', 'platform'];
+    protected $appends = ['profile_picture_url', 'name', 'platform', 'education_level'];
+
+    /**
+     * Deduce candidate highest education qualification level
+     * Levels:
+     * 0: Below 10th
+     * 1: 10th Pass
+     * 2: 12th Pass
+     * 3: Diploma / ITI
+     * 4: Graduate / Bachelor's
+     * 5: Post Graduate / Master's
+     * 6: Doctorate / PhD
+     */
+    public function getEducationLevel(): array
+    {
+        $maxLevel = 0;
+        $bestLabel = '12th Pass'; // default baseline for job seekers if unspecified
+
+        $eduStr = strtolower((string) ($this->education ?? ''));
+        if ($eduStr) {
+            if (str_contains($eduStr, 'phd') || str_contains($eduStr, 'doctor')) {
+                $maxLevel = max($maxLevel, 6);
+                $bestLabel = 'Doctorate / PhD';
+            } elseif (str_contains($eduStr, 'post graduate') || str_contains($eduStr, 'master') || str_contains($eduStr, 'mba') || str_contains($eduStr, 'mca') || str_contains($eduStr, 'm.tech') || str_contains($eduStr, 'm.com') || str_contains($eduStr, 'm.sc') || str_contains($eduStr, 'pgdm')) {
+                $maxLevel = max($maxLevel, 5);
+                $bestLabel = 'Post Graduate';
+            } elseif (str_contains($eduStr, 'graduate') || str_contains($eduStr, 'bachelor') || str_contains($eduStr, 'b.tech') || str_contains($eduStr, 'bca') || str_contains($eduStr, 'b.com') || str_contains($eduStr, 'bba') || str_contains($eduStr, 'b.sc') || str_contains($eduStr, 'degree')) {
+                $maxLevel = max($maxLevel, 4);
+                $bestLabel = 'Graduate';
+            } elseif (str_contains($eduStr, 'diploma') || str_contains($eduStr, 'polytechnic') || str_contains($eduStr, 'iti')) {
+                $maxLevel = max($maxLevel, 3);
+                $bestLabel = 'Diploma';
+            } elseif (str_contains($eduStr, '12th') || str_contains($eduStr, 'intermediate') || str_contains($eduStr, '10+2') || str_contains($eduStr, 'senior secondary')) {
+                $maxLevel = max($maxLevel, 2);
+                $bestLabel = '12th Pass';
+            } elseif (str_contains($eduStr, '10th') || str_contains($eduStr, 'matric') || str_contains($eduStr, 'high school')) {
+                $maxLevel = max($maxLevel, 1);
+                $bestLabel = '10th Pass';
+            } elseif (str_contains($eduStr, 'below')) {
+                $maxLevel = max($maxLevel, 0);
+                $bestLabel = 'Below 10th';
+            }
+        }
+
+        // Check user_educations records if available
+        try {
+            $educations = $this->relationLoaded('educations') ? $this->educations : $this->educations()->get();
+            foreach ($educations as $edu) {
+                $deg = strtolower((string) ($edu->degree ?? ''));
+                if (str_contains($deg, 'phd') || str_contains($deg, 'doctor')) {
+                    if (6 >= $maxLevel) { $maxLevel = 6; $bestLabel = $edu->degree ?: 'Doctorate'; }
+                } elseif (str_contains($deg, 'master') || str_contains($deg, 'mba') || str_contains($deg, 'mca') || str_contains($deg, 'm.tech') || str_contains($deg, 'post graduate') || str_contains($deg, 'pgdm')) {
+                    if (5 >= $maxLevel) { $maxLevel = 5; $bestLabel = $edu->degree ?: 'Post Graduate'; }
+                } elseif (str_contains($deg, 'bachelor') || str_contains($deg, 'graduate') || str_contains($deg, 'b.tech') || str_contains($deg, 'bca') || str_contains($deg, 'b.com') || str_contains($deg, 'bba') || str_contains($deg, 'degree')) {
+                    if (4 >= $maxLevel) { $maxLevel = 4; $bestLabel = $edu->degree ?: 'Graduate'; }
+                } elseif (str_contains($deg, 'diploma') || str_contains($deg, 'polytechnic') || str_contains($deg, 'iti')) {
+                    if (3 >= $maxLevel) { $maxLevel = 3; $bestLabel = $edu->degree ?: 'Diploma'; }
+                } elseif (str_contains($deg, '12th') || str_contains($deg, 'inter') || str_contains($deg, '10+2')) {
+                    if (2 >= $maxLevel) { $maxLevel = 2; $bestLabel = '12th Pass'; }
+                } elseif (str_contains($deg, '10th') || str_contains($deg, 'school') || str_contains($deg, 'matric')) {
+                    if (1 >= $maxLevel) { $maxLevel = 1; $bestLabel = '10th Pass'; }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Relation check fallback
+        }
+
+        return [
+            'label' => $bestLabel,
+            'level' => $maxLevel,
+        ];
+    }
+
+    public function getEducationLevelAttribute(): array
+    {
+        return $this->getEducationLevel();
+    }
 
     public function getPlatformAttribute(): string
     {

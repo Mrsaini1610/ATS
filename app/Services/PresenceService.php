@@ -32,15 +32,15 @@ class PresenceService
         }
 
         $now = Carbon::now();
-        $diffSeconds = $datetime->diffInSeconds($now);
+        $diffSeconds = (int) $datetime->diffInSeconds($now);
 
         if ($diffSeconds < 60) {
             return 'last seen just now';
         }
 
-        $diffMinutes = $datetime->diffInMinutes($now);
+        $diffMinutes = (int) round($datetime->diffInMinutes($now));
         if ($diffMinutes < 60) {
-            return "last seen {$diffMinutes}m ago";
+            return $diffMinutes <= 1 ? 'last seen 1 min ago' : "last seen {$diffMinutes} mins ago";
         }
 
         if ($datetime->isToday()) {

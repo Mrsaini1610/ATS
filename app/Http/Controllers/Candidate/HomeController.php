@@ -15,12 +15,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
+use App\Services\AuditLogService;
 
 class HomeController extends Controller
 {
     public function index(Request $request)
     {
         JobPost::autoDeactivateExpiredPosts();
+
+        // Track page visit in audit logs (candidate or guest)
+        AuditLogService::logPageView('Home Page', '/');
 
         $user = Auth::guard('web')->user();
 
@@ -52,9 +56,37 @@ class HomeController extends Controller
             $candidateCity = strtolower(trim($user->city ?: ''));
             $candidateAddress = strtolower(trim($user->address ?: ''));
 
+            // Candidate applied job IDs (exclude from recommendations)
+            $appliedJobIds = \App\Models\JobApplication::where('candidate_id', $user->id)
+                ->orWhere('candidate_uuid', $user->uuid)
+                ->pluck('job_id')
+                ->map(fn($id) => (string) $id)
+                ->toArray();
+
+            $candidateEdu = $user->getEducationLevel();
+            $candidateLevel = (int) ($candidateEdu['level'] ?? 0);
+
+            // Fetch active jobs, strictly filtering out already applied jobs and jobs where candidate is ineligible
             $allActiveJobs = JobPost::with(['category'])
                 ->activeForCandidate()
-                ->get();
+                ->get()
+                ->filter(function ($job) use ($appliedJobIds, $candidateLevel) {
+                    // 1. Exclude already applied jobs
+                    if (in_array((string) $job->id, $appliedJobIds) || in_array((string) $job->uuid, $appliedJobIds)) {
+                        return false;
+                    }
+
+                    // 2. Exclude jobs where candidate's qualification is strictly below required minimum qualification
+                    if ($candidateLevel > 0) {
+                        $minQual = $job->getMinimumQualification();
+                        $minLevel = (int) ($minQual['level'] ?? 0);
+                        if ($minLevel > 0 && $candidateLevel < $minLevel) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
 
             $scoredJobs = $allActiveJobs->map(function ($job) use ($user, $candidateTitle, $candidateSkills, $candidateExp, $candidateCity, $candidateAddress) {
                 $score = 0;
@@ -363,6 +395,9 @@ class HomeController extends Controller
                 'company'              => $job->company,
                 'company_image'        => $companyImage,
                 'location'             => $job->location ?: 'Remote / India',
+                'latitude'             => $job->latitude,
+                'longitude'            => $job->longitude,
+                'min_qualification'    => $job->getMinimumQualification(),
                 'salary'               => $salaryText,
                 'salary_type'          => $job->salary_type ?: 'monthly',
                 'job_type'             => $job->job_type ?: 'Full Time',

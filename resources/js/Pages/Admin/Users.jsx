@@ -1229,23 +1229,23 @@ export default function Users({ users = [], categories = [], canViewAll = false,
               )
             ) : (
               /* Full-width Data Table (when not inspecting and Table View is chosen) */
-              <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
-                <div className="overflow-x-auto [scrollbar-width:thin]">
-                  <table className="w-full text-left border-collapse min-w-[780px]">
-                    <thead>
-                      <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">Candidate</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">Contact</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">Location</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Role & Experience</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[100px]">Platform</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">Activity Presence</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[85px]">Status</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[80px]">Applied</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[110px] text-right">Actions</th>
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-17rem)] min-h-[380px] custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[860px]">
+                    <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-gray-200 text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-3 whitespace-nowrap min-w-[135px]">Candidate</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[115px]">Contact</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[95px]">Location</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[120px]">Role & Experience</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[70px] text-center">Platform</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[125px]">Activity Presence</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[65px] text-center">Status</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[60px] text-center">Applied</th>
+                        <th className="py-3 px-3 whitespace-nowrap min-w-[95px] text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 text-xs">
+                    <tbody className="divide-y divide-gray-100 text-xs bg-white">
                       {filtered.map((user) => {
                         const cleanPhone = (user.phone || "").replace(/\D+/g, "");
                         const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
@@ -1257,13 +1257,13 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                           <tr
                             key={user.uuid}
                             onClick={() => setSelectedUser(user)}
-                            className="hover:bg-gray-50/90 cursor-pointer transition-colors"
+                            className="hover:bg-blue-50/40 cursor-pointer transition-colors"
                           >
                             {/* Candidate info */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <div className="flex items-center gap-3">
+                            <td className="py-2.5 px-3 whitespace-nowrap align-middle">
+                              <div className="flex items-center gap-2">
                                 <div className="relative shrink-0">
-                                  <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-xs">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-xs">
                                     {(user.name || "C")
                                       .split(" ")
                                       .map((n) => n[0])
@@ -1271,39 +1271,39 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                                       .slice(0, 2)}
                                   </div>
                                   {user.presence?.is_online && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                    <span className="absolute -bottom-0.5 -right-0.5 flex h-2 w-2">
                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 border border-white"></span>
                                     </span>
                                   )}
                                 </div>
-                                <div className="min-w-0 max-w-[170px]">
-                                  <p className="font-bold text-gray-900 truncate hover:text-blue-600">
+                                <div className="min-w-0 max-w-[140px]">
+                                  <p className="font-bold text-gray-900 truncate hover:text-blue-600 text-xs">
                                     {user.name}
                                   </p>
-                                  <p className="text-[11px] text-gray-400">
-                                    Joined {user.registeredAt} {user.dob && user.dob !== "—" ? `• DOB: ${user.dob}` : ""}
+                                  <p className="text-[10px] text-gray-400 truncate">
+                                    Joined {user.registeredAt}
                                   </p>
                                 </div>
                               </div>
                             </td>
 
                             {/* Contact */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <p className="font-medium text-gray-800 flex items-center gap-1">
+                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
+                              <p className="font-medium text-gray-800 flex items-center gap-1 text-xs">
                                 <Phone className="w-3 h-3 text-gray-400 shrink-0" />
                                 <span>{user.phone}</span>
                               </p>
                               {user.email && user.email !== "—" && (
-                                <p className="text-[11px] text-gray-400 truncate max-w-[140px]">
+                                <p className="text-[10px] text-gray-400 truncate max-w-[115px]" title={user.email}>
                                   {user.email}
                                 </p>
                               )}
                             </td>
 
                             {/* Location */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <p className="text-gray-700 flex items-center gap-1 truncate max-w-[150px]">
+                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
+                              <p className="text-gray-700 flex items-center gap-1 truncate max-w-[100px] text-xs" title={user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}>
                                 <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
                                 <span>
                                   {user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}
@@ -1312,48 +1312,48 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             </td>
 
                             {/* Role & Experience */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <p className="font-semibold text-gray-800 truncate max-w-[160px]">
+                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
+                              <p className="font-semibold text-gray-800 truncate max-w-[125px] text-xs" title={user.jobTitle || "Job Seeker"}>
                                 {user.jobTitle || "Job Seeker"}
                               </p>
-                              <p className="text-[11px] text-gray-500 truncate max-w-[160px]">
+                              <p className="text-[10px] text-gray-500 truncate max-w-[125px]" title={`${user.experience || "Fresher"} ${user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}`}>
                                 {user.experience || "Fresher"} {user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}
                               </p>
                             </td>
 
                             {/* Platform Badge */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
+                            <td className="py-2.5 px-2 whitespace-nowrap text-center align-middle">
                               {user.platform === "both" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                                   <RefreshCw className="w-2.5 h-2.5 text-emerald-600" /> Both
                                 </span>
                               ) : user.platform === "app" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                                   <Smartphone className="w-2.5 h-2.5 text-purple-600" /> App
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                                   <Globe className="w-2.5 h-2.5 text-blue-600" /> Web
                                 </span>
                               )}
                             </td>
 
                             {/* WhatsApp Style Activity Presence */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
+                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
                               {user.presence?.is_online ? (
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
                                   <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                   </span>
-                                  <span className="text-[11px] font-bold">
+                                  <span className="text-[10px] font-bold">
                                     {user.presence.status_text}
                                   </span>
                                 </div>
                               ) : (
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
                                   <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                  <span className="text-[11px] font-medium">
+                                  <span className="text-[10px] font-medium">
                                     {user.presence?.status_text || "Offline"}
                                   </span>
                                 </div>
@@ -1361,9 +1361,9 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             </td>
 
                             {/* Status */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
+                            <td className="py-2.5 px-2 whitespace-nowrap text-center align-middle">
                               <span
-                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold capitalize whitespace-nowrap ${
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold capitalize ${
                                   user.status === "active"
                                     ? "bg-green-50 text-green-700 border border-green-200"
                                     : "bg-gray-100 text-gray-500 border border-gray-200"
@@ -1374,15 +1374,18 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             </td>
 
                             {/* Applied Count */}
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap">
-                                {user.appliedCount ?? 0} applied
+                            <td className="py-2.5 px-2 whitespace-nowrap text-center align-middle">
+                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                                {user.appliedCount ?? 0}
                               </span>
                             </td>
 
-                            {/* Actions */}
-                            <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1.5">
+                            {/* Actions (Standard Row Cell, NO overlapping sticky) */}
+                            <td
+                              className="py-2.5 px-3 text-right whitespace-nowrap align-middle"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex items-center justify-end gap-1">
                                 {cleanPhone && (
                                   <>
                                     <a
@@ -1418,7 +1421,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
 
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="text-center py-16 text-gray-400">
+                          <td colSpan={9} className="text-center py-16 text-gray-400">
                             No candidates found matching the filters
                           </td>
                         </tr>

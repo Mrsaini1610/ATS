@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Kreait\Firebase\Factory;
 use Throwable;
 use App\Services\MailService;
+use App\Services\AuditLogService;
 
 class AuthController extends Controller
 {
@@ -307,6 +308,7 @@ class AuthController extends Controller
                             'device_id' => $deviceId,
                         ],
                         [
+                            'user_uuid'  => $user->uuid,
                             'token'      => $fcmToken,
                             'deleted_at' => null,
                         ]
@@ -329,6 +331,25 @@ class AuthController extends Controller
 
             // Load candidate relations
             $user->load(['educations', 'experiences', 'resumes', 'certificates']);
+
+            // Audit Trail Log for Mobile App Login / Registration
+            AuditLogService::log(
+                action: $isNewUser ? 'candidate_registered' : 'candidate_logged_in',
+                description: $isNewUser
+                    ? "Candidate {$user->full_name} ({$user->phone}) registered via Mobile App."
+                    : "Candidate {$user->full_name} ({$user->phone}) logged in via Mobile App.",
+                details: [
+                    'phone'               => $user->phone,
+                    'device_id'           => $deviceId,
+                    'is_profile_complete' => (bool) $user->isProfileComplete(),
+                    'platform'            => 'app',
+                ],
+                module: 'auth',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
 
             // Send welcome mail if candidate has email and profile complete
             if (!empty($user->email) && $user->isProfileComplete()) {
@@ -388,6 +409,7 @@ class AuthController extends Controller
                     'device_id' => $deviceId,
                 ],
                 [
+                    'user_uuid'  => $user->uuid,
                     'token'      => $request->input('fcm_token'),
                     'deleted_at' => null,
                 ]
@@ -416,6 +438,20 @@ class AuthController extends Controller
         $user = $request->user();
 
         if ($user) {
+            AuditLogService::log(
+                action: 'candidate_logged_out',
+                description: "Candidate {$user->full_name} ({$user->phone}) logged out from Mobile App.",
+                details: [
+                    'phone'    => $user->phone,
+                    'platform' => 'app',
+                ],
+                module: 'auth',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             $user->update([
                 'app_is_online'   => false,
                 'app_last_active' => now(),

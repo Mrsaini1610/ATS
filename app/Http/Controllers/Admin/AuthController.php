@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -89,6 +90,23 @@ class AuthController extends Controller
                 'last_web_login_at'      => now(),
             ]);
 
+            // Audit Trail Log for Admin Login
+            AuditLogService::log(
+                action: 'admin_logged_in',
+                description: "Admin {$admin->name} ({$admin->email}) logged in successfully.",
+                details: [
+                    'role'     => $admin->role,
+                    'email'    => $admin->email,
+                    'username' => $admin->username,
+                    'platform' => 'web',
+                ],
+                module: 'auth',
+                entity: $admin,
+                status: 'success',
+                actor: $admin,
+                request: $request
+            );
+
             // Sync candidate session ID if Candidate is already authenticated in this session
             if (Auth::guard('web')->check()) {
                 $currentCandidate = Auth::guard('web')->user();
@@ -128,6 +146,21 @@ class AuthController extends Controller
     {
         $admin = Auth::guard('admin')->user();
         if ($admin) {
+            AuditLogService::log(
+                action: 'admin_logged_out',
+                description: "Admin {$admin->name} ({$admin->email}) logged out.",
+                details: [
+                    'role'     => $admin->role,
+                    'email'    => $admin->email,
+                    'platform' => 'web',
+                ],
+                module: 'auth',
+                entity: $admin,
+                status: 'success',
+                actor: $admin,
+                request: $request
+            );
+
             $admin->update([
                 'current_web_session_id' => null,
             ]);

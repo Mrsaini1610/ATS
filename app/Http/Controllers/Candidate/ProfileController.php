@@ -16,6 +16,7 @@ use App\Models\UserEducation;
 use App\Models\UserExperience;
 use App\Models\UserCertificate;
 use App\Models\UserResume;
+use App\Services\AuditLogService;
 
 class ProfileController extends Controller
 {
@@ -128,6 +129,20 @@ class ProfileController extends Controller
 
         $candidate->update($updateFields);
 
+        AuditLogService::log(
+            action: 'candidate_profile_updated',
+            description: "Candidate {$candidate->full_name} ({$candidate->phone}) updated profile details.",
+            details: [
+                'fields_updated' => array_keys($updateFields),
+                'platform'       => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate,
+            request: $request
+        );
+
         return back()->with('success', 'Profile updated successfully.');
     }
 
@@ -148,6 +163,20 @@ class ProfileController extends Controller
             $path = $file->storeAs('uploads/avatars', $filename, 'public');
             $candidate->profile_picture = '/storage/' . $path;
             $candidate->save();
+
+            AuditLogService::log(
+                action: 'candidate_avatar_updated',
+                description: "Candidate {$candidate->full_name} updated profile photo.",
+                details: [
+                    'avatar_path' => $path,
+                    'platform'    => 'web',
+                ],
+                module: 'users',
+                entity: $candidate,
+                status: 'success',
+                actor: $candidate,
+                request: $request
+            );
         }
 
         return back()->with('success', 'Profile picture updated successfully.');
@@ -192,6 +221,21 @@ class ProfileController extends Controller
             UserEducation::create($data);
         }
 
+        AuditLogService::log(
+            action: 'candidate_education_saved',
+            description: "Candidate {$candidate->full_name} saved education: {$data['degree']} at {$data['institution']}.",
+            details: [
+                'degree'      => $data['degree'],
+                'institution' => $data['institution'],
+                'platform'    => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate,
+            request: $request
+        );
+
         return back()->with('success', 'Education details saved.');
     }
 
@@ -205,6 +249,19 @@ class ProfileController extends Controller
         UserEducation::where('id', $id)
             ->where('user_uuid', $candidate->uuid)
             ->update(['is_delete' => 1]);
+
+        AuditLogService::log(
+            action: 'candidate_education_deleted',
+            description: "Candidate {$candidate->full_name} removed education record #{$id}.",
+            details: [
+                'education_id' => $id,
+                'platform'     => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate
+        );
 
         return back()->with('success', 'Education record removed.');
     }
@@ -263,6 +320,21 @@ class ProfileController extends Controller
             UserExperience::create($data);
         }
 
+        AuditLogService::log(
+            action: 'candidate_experience_saved',
+            description: "Candidate {$candidate->full_name} saved work experience: {$data['designation']} at {$data['company_name']}.",
+            details: [
+                'designation'  => $data['designation'],
+                'company_name' => $data['company_name'],
+                'platform'     => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate,
+            request: $request
+        );
+
         return back()->with('success', 'Work experience saved.');
     }
 
@@ -276,6 +348,19 @@ class ProfileController extends Controller
         UserExperience::where('id', $id)
             ->where('user_uuid', $candidate->uuid)
             ->update(['is_delete' => 1]);
+
+        AuditLogService::log(
+            action: 'candidate_experience_deleted',
+            description: "Candidate {$candidate->full_name} removed experience record #{$id}.",
+            details: [
+                'experience_id' => $id,
+                'platform'      => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate
+        );
 
         return back()->with('success', 'Work experience removed.');
     }
@@ -367,12 +452,27 @@ class ProfileController extends Controller
         $filePath = 'storage/resumes/' . $finalFileName;
 
         $candidate->resumes()->update(['is_default' => false]);
-        $candidate->resumes()->create([
+        $resume = $candidate->resumes()->create([
             'title' => $originalName,
             'file_path' => $filePath,
             'file_type' => $extension,
             'is_default' => true,
         ]);
+
+        AuditLogService::log(
+            action: 'candidate_resume_uploaded',
+            description: "Candidate {$candidate->full_name} uploaded new resume: {$originalName}.",
+            details: [
+                'file_name' => $originalName,
+                'file_type' => $extension,
+                'platform'  => 'web',
+            ],
+            module: 'users',
+            entity: $candidate,
+            status: 'success',
+            actor: $candidate,
+            request: $request
+        );
 
         return back()->with('success', 'Resume uploaded successfully.');
     }

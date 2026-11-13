@@ -33,5 +33,21 @@ class AuditLog extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    protected $appends = [
+        'device_name',
+    ];
+
+    /**
+     * Get candidate / visitor human-readable device name.
+     */
+    public function getDeviceNameAttribute(): string
+    {
+        return \App\Services\AuditLogService::parseDeviceName(
+            $this->user_agent,
+            $this->details,
+            $this->platform
+        );
+    }
 }
 

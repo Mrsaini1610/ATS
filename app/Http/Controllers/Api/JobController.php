@@ -17,6 +17,7 @@ use Throwable;
 use App\Services\GeocodingService;
 use App\Services\PushNotificationService;
 use App\Services\MailService;
+use App\Services\AuditLogService;
 
 class JobController extends Controller
 {
@@ -24,6 +25,9 @@ class JobController extends Controller
     public function getHomeData(Request $request)
     {
         $user = $request->user();
+
+        // Track page visit in audit logs
+        AuditLogService::logPageView('Mobile App Home Feed', '/api/home', ['platform' => 'app']);
 
         // 1. Candidate Location Coordinates (from request or saved profile)
         $lat = $request->input('latitude') ?? $user?->app_latitude ?? $user?->latitude;
@@ -412,6 +416,14 @@ class JobController extends Controller
     {
         $user = $request->user();
         $tab  = $request->query('tab', 'recommended');
+
+        // Track jobs browsing in audit logs
+        AuditLogService::logPageView('Mobile App Job Feed (' . ucfirst($tab) . ')', '/api/jobs', [
+            'tab'      => $tab,
+            'search'   => $request->input('search'),
+            'category' => $request->input('category_id'),
+            'platform' => 'app',
+        ]);
 
         // 1. Resolve Candidate Location (App GPS coordinates or User DB coordinates)
         $lat = $request->input('latitude') ?? $request->input('lat');
@@ -826,6 +838,9 @@ class JobController extends Controller
             ], 404);
         }
 
+        // Track job view in audit logs
+        AuditLogService::logJobView($job, ['platform' => 'app']);
+
         $application = JobApplication::where(function ($q) use ($user) {
                 $q->where('candidate_uuid', $user->uuid)
                   ->orWhere('candidate_id', $user->id);
@@ -1076,6 +1091,25 @@ class JobController extends Controller
                 \Illuminate\Support\Facades\Log::warning('Failed sending application email/notifications: ' . $e->getMessage());
             }
 
+            // Audit Trail Log
+            AuditLogService::log(
+                action: 'job_application_submitted',
+                description: "Candidate {$user->full_name} ({$user->phone}) applied for '{$job->title}' at {$job->company} via Mobile App.",
+                details: [
+                    'job_id'         => $job->id,
+                    'job_uuid'       => $job->uuid,
+                    'job_title'      => $job->title,
+                    'company'        => $job->company,
+                    'application_id' => $application->id,
+                    'platform'       => 'app',
+                ],
+                module: 'applications',
+                entity: $application,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             $responseData = $application->toArray();
             $responseData['candidate_uuid'] = $user->uuid;
             $responseData['job_uuid']       = $job->uuid;
@@ -1123,6 +1157,19 @@ class JobController extends Controller
         if ($savedJob) {
             $savedJob->delete();
 
+            AuditLogService::log(
+                action: 'job_unsaved',
+                description: "Candidate {$user->full_name} removed bookmark for job '{$jobUuid}' via Mobile App.",
+                details: [
+                    'job_uuid' => $jobUuid,
+                    'platform' => 'app',
+                ],
+                module: 'jobs',
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             return response()->json([
                 'status'   => true,
                 'is_saved' => false,
@@ -1134,6 +1181,19 @@ class JobController extends Controller
             'user_uuid' => $user->uuid,
             'job_uuid'  => $jobUuid,
         ]);
+
+        AuditLogService::log(
+            action: 'job_saved',
+            description: "Candidate {$user->full_name} saved job '{$jobUuid}' via Mobile App.",
+            details: [
+                'job_uuid' => $jobUuid,
+                'platform' => 'app',
+            ],
+            module: 'jobs',
+            status: 'success',
+            actor: $user,
+            request: $request
+        );
 
         return response()->json([
             'status'   => true,

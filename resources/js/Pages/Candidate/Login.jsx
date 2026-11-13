@@ -778,7 +778,7 @@ export default function Login({ initialStep = "phone", candidate = null }) {
                             type="tel"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                            placeholder="e.g. 9876543210"
+                            placeholder="9876543210"
                             maxLength={10}
                             autoFocus
                             className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-xs sm:text-sm font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"

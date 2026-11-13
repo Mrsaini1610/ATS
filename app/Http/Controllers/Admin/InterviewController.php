@@ -9,6 +9,7 @@ use App\Models\JobPost;
 use App\Models\JobApplication;
 use App\Models\User;
 use App\Services\MailService;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -364,6 +365,23 @@ class InterviewController extends Controller
             ]);
         } catch (\Throwable $e) {}
 
+        AuditLogService::log(
+            action: 'interview_scheduled',
+            description: "Interview scheduled for candidate {$interview->candidate_name} ({$interview->job_title}) on {$validated['date']} at {$validated['time']}.",
+            details: [
+                'interview_id'   => $interview->id,
+                'candidate_name' => $interview->candidate_name,
+                'interviewer'    => $interview->interviewer_name,
+                'round'          => $interview->round_name,
+                'date'           => $validated['date'],
+                'time'           => $validated['time'],
+                'platform'       => 'web',
+            ],
+            module: 'interviews',
+            entity: $interview,
+            status: 'success'
+        );
+
         return redirect()->back()->with([
             'success'      => 'Interview scheduled! Email sent to candidate & interviewer, WhatsApp invite generated.',
             'whatsapp_url' => $waUrl,
@@ -376,6 +394,7 @@ class InterviewController extends Controller
             'status' => 'required|in:scheduled,done,no_show,rescheduled,cancelled',
         ]);
 
+        $oldStatus = $interview->status;
         $interview->update(['status' => $validated['status']]);
 
         // Dispatch interview status update to Super Admin and candidate
@@ -384,6 +403,20 @@ class InterviewController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Failed sending interview status update email/notifications: ' . $e->getMessage());
         }
+
+        AuditLogService::log(
+            action: 'interview_status_updated',
+            description: "Interview #{$interview->id} for {$interview->candidate_name} status updated from '{$oldStatus}' to '{$validated['status']}'.",
+            details: [
+                'interview_id' => $interview->id,
+                'old_status'   => $oldStatus,
+                'new_status'   => $validated['status'],
+                'platform'     => 'web',
+            ],
+            module: 'interviews',
+            entity: $interview,
+            status: 'success'
+        );
 
         return redirect()->back()->with('success', 'Interview status updated.');
     }

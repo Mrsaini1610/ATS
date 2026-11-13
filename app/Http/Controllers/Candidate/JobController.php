@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use App\Services\MailService;
+use App\Services\AuditLogService;
+use App\Services\PushNotificationService;
 use Inertia\Inertia;
 
 class JobController extends Controller
@@ -20,6 +22,14 @@ class JobController extends Controller
     public function index(Request $request)
     {
         JobPost::autoDeactivateExpiredPosts();
+
+        // Track page visit in audit logs
+        AuditLogService::logPageView('Job Listings & Search', '/jobs', [
+            'search'   => $request->input('search'),
+            'location' => $request->input('location'),
+            'category' => $request->input('category'),
+            'platform' => 'web',
+        ]);
 
         // 1. JobPost Query with active/approved status (excluding expired / is_deleted = 1)
         $query = JobPost::with(['category'])
@@ -312,6 +322,9 @@ class JobController extends Controller
             return redirect()->route('job.listings')->with('error', 'This job posting has expired or is no longer available.');
         }
 
+        // Track job view / application page opened
+        AuditLogService::logJobView($job, ['action_context' => 'apply_page_opened']);
+
         $user = Auth::guard('web')->user();
 
         if ($user) {
@@ -357,6 +370,15 @@ class JobController extends Controller
         $user = Auth::guard('web')->user();
         if (!$user) {
             return redirect()->route('login');
+        }
+
+        // Qualification Eligibility Check
+        $jobMinQual = $job->getMinimumQualification();
+        $userEdu = $user->getEducationLevel();
+        if ($userEdu['level'] < $jobMinQual['level']) {
+            return back()->withErrors([
+                'message' => "Aapki qualification ({$userEdu['label']}) is post ki minimum requirement ({$jobMinQual['label']}) se kam hai. Isliye aap apply nahi kar sakte."
+            ]);
         }
 
         $resumeUrl = null;
@@ -521,6 +543,30 @@ class JobController extends Controller
             \Illuminate\Support\Facades\Log::warning('Web Candidate application email/notifications error: ' . $e->getMessage());
         }
 
+        // Direct Push Notification to Candidate's Mobile Devices
+        try {
+            PushNotificationService::notifyApplicationSubmitted($application);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Web Candidate direct push notification error: ' . $e->getMessage());
+        }
+
+        // Audit Trail Log: Track what candidate applied for on Web
+        AuditLogService::log(
+            action: 'job_application_submitted',
+            description: "Candidate {$user->full_name} ({$user->phone}) applied for '{$job->title}' at {$job->company} on Website.",
+            details: [
+                'job_id'         => $job->id,
+                'job_uuid'       => $job->uuid,
+                'job_title'      => $job->title,
+                'company'        => $job->company,
+                'application_id' => $application->id,
+                'platform'       => 'web',
+            ],
+            module: 'applications',
+            entity: $application,
+            actor: $user
+        );
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -537,6 +583,9 @@ class JobController extends Controller
         if (!$user) {
             return redirect()->route('login');
         }
+
+        // Track page visit
+        AuditLogService::logPageView('My Applications Page', '/my-applications');
 
         $allApplications = JobApplication::where(function ($q) use ($user) {
             $q->where('candidate_id', $user->id)
@@ -592,6 +641,9 @@ class JobController extends Controller
         if (!$user) {
             return redirect()->route('login');
         }
+
+        // Track page visit
+        AuditLogService::logPageView('Saved Jobs Page', '/savedjobs');
 
         $appliedApplications = JobApplication::with('jobPost')->where('candidate_id', $user->id)->get();
         $appliedJobIds = [];
@@ -653,6 +705,9 @@ class JobController extends Controller
                     'company_image'        => $job->company_image,
                     'company_address'      => $job->company_address,
                     'location'             => $job->location,
+                    'latitude'             => $job->latitude,
+                    'longitude'            => $job->longitude,
+                    'min_qualification'    => $job->getMinimumQualification(),
                     'salary'               => $salaryText,
                     'salary_type'          => $job->salary_type,
                     'job_type'             => $job->job_type,
@@ -730,5 +785,17 @@ class JobController extends Controller
             ->whereIn('job_uuid', $targetUuids)
             ->delete();
         return back();
+    }
+
+    /**
+     * Async job view tracker for Candidate or Guest.
+     */
+    public function trackJobView(Request $request, $jobKey)
+    {
+        $job = JobPost::where('uuid', $jobKey)->first() ?: JobPost::find($jobKey);
+        if ($job) {
+            AuditLogService::logJobView($job);
+        }
+        return response()->json(['success' => true]);
     }
 }

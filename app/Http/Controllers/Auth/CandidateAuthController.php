@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Services\GeocodingService;
 use App\Services\MailService;
+use App\Services\AuditLogService;
 
 class CandidateAuthController extends Controller
 {
@@ -198,6 +199,26 @@ class CandidateAuthController extends Controller
             // Check if profile is complete
             $isProfileComplete = $user->isProfileComplete();
 
+            // Audit Trail Log for Candidate Login / Registration
+            AuditLogService::log(
+                action: $isNew ? 'candidate_registered' : 'candidate_logged_in',
+                description: $isNew
+                    ? "Candidate {$user->full_name} ({$user->phone}) registered on Web."
+                    : "Candidate {$user->full_name} ({$user->phone}) logged in on Web.",
+                details: [
+                    'phone'               => $user->phone,
+                    'city'                => $user->city,
+                    'area'                => $user->area,
+                    'is_profile_complete' => $isProfileComplete,
+                    'platform'            => 'web',
+                ],
+                module: 'auth',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             // Dynamic redirect URL
             $redirectUrl = route('home');
             if ($request->job_id) {
@@ -317,6 +338,26 @@ class CandidateAuthController extends Controller
             \Illuminate\Support\Facades\Log::warning('Candidate welcome email trigger error: ' . $e->getMessage());
         }
 
+        // Audit Trail Log for Candidate Onboarding
+        AuditLogService::log(
+            action: 'candidate_profile_completed',
+            description: "Candidate {$user->full_name} ({$user->phone}) completed profile details on Web.",
+            details: [
+                'full_name'  => $user->full_name,
+                'email'      => $user->email,
+                'city'       => $user->city,
+                'job_title'  => $user->job_title,
+                'education'  => $user->education,
+                'experience' => $user->total_experience_years,
+                'platform'   => 'web',
+            ],
+            module: 'users',
+            entity: $user,
+            status: 'success',
+            actor: $user,
+            request: $request
+        );
+
         // Destination redirect
         $redirectUrl = route('home');
         if ($request->job_id) {
@@ -355,6 +396,20 @@ class CandidateAuthController extends Controller
         $user = Auth::guard('web')->user();
 
         if ($user) {
+            AuditLogService::log(
+                action: 'candidate_logged_out',
+                description: "Candidate {$user->full_name} ({$user->phone}) logged out from Web.",
+                details: [
+                    'phone'    => $user->phone,
+                    'platform' => 'web',
+                ],
+                module: 'auth',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             $user->update([
                 'web_is_online'          => false,
                 'web_last_active'        => now(),

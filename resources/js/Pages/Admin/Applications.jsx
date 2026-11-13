@@ -980,6 +980,29 @@ export default function Applications({
   const [offerApp, setOfferApp] = useState(null);
   const [scheduleInterviewApp, setScheduleInterviewApp] = useState(null);
 
+  // Real-time live presence auto-refresh every 15s without losing scroll/state
+  useEffect(() => {
+    const timer = setInterval(() => {
+      router.reload({
+        only: ["applications"],
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Keep selectedApp updated when applications reload
+  useEffect(() => {
+    if (selectedApp) {
+      const refreshed = applications.find((a) => a.uuid === selectedApp.uuid);
+      if (refreshed) {
+        setSelectedApp(refreshed);
+      }
+    }
+  }, [applications]);
+
   const isTeamMember = currentUser?.role === "team_member";
 
   const updateStatus = (uuid, status) => {
@@ -1119,11 +1142,20 @@ export default function Applications({
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">
-              {isTeamMember ? "My Assigned Applications" : "Job Applications"}
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-extrabold text-gray-900">
+                {isTeamMember ? "My Assigned Applications" : "Job Applications"}
+              </h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span>Real-Time Sync</span>
+              </span>
+            </div>
             <p className="text-sm text-gray-500 mt-0.5">
-              {applications.length} total · {filtered.length} shown
+              {applications.length} total · {filtered.length} shown · Live Candidate Presence Active
             </p>
           </div>
         </div>
@@ -1266,16 +1298,26 @@ export default function Applications({
                         onClick={() => setSelectedApp(app)}
                       >
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-gray-900 leading-tight">{app.userName}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-gray-900 leading-tight text-sm">{app.userName}</p>
                             {app.presence?.is_online ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Online
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black shadow-2xs">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                                </span>
+                                <span>
+                                  {app.presence.web_is_online && app.presence.app_is_online
+                                    ? "Online (Web & App)"
+                                    : app.presence.app_is_online
+                                      ? "Online (App)"
+                                      : "Online (Web)"}
+                                </span>
                               </span>
                             ) : app.presence?.status_text && app.presence.status_text !== "Never active" ? (
-                              <span className="text-[10px] text-gray-400 font-medium">
-                                • {app.presence.status_text}
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                <span>{app.presence.status_text}</span>
                               </span>
                             ) : null}
                           </div>
@@ -1489,15 +1531,31 @@ export default function Applications({
                         </span>
                       )}
                       {selectedApp.presence?.is_online ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          {selectedApp.presence.status_text}
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black shadow-2xs">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                          </span>
+                          <span>{selectedApp.presence.status_text}</span>
                         </span>
                       ) : selectedApp.presence?.status_text && selectedApp.presence.status_text !== "Never active" ? (
-                        <span className="text-xs text-gray-500 font-medium">
-                          {selectedApp.presence.status_text}
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{selectedApp.presence.status_text}</span>
                         </span>
                       ) : null}
+                    </div>
+
+                    {/* Live Presence Breakdown for Web & App */}
+                    <div className="mt-2.5 pt-2 border-t border-blue-100/70 flex items-center gap-2 flex-wrap text-[11px] font-semibold">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${selectedApp.presence?.web_is_online ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-gray-100 text-gray-600"}`}>
+                        <Globe className="w-3 h-3" />
+                        <span>Web: {selectedApp.presence?.web_is_online ? "Active Now" : (selectedApp.presence?.web_last_seen || "Offline")}</span>
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${selectedApp.presence?.app_is_online ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-gray-100 text-gray-600"}`}>
+                        <Phone className="w-3 h-3" />
+                        <span>Mobile App: {selectedApp.presence?.app_is_online ? "Active Now" : (selectedApp.presence?.app_last_seen || "Offline")}</span>
+                      </span>
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-gray-600">

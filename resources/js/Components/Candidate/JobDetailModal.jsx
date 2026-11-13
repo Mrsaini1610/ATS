@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Link, router } from "@inertiajs/react";
 import {
@@ -24,7 +24,11 @@ import {
   HelpCircle,
   FileText,
   Loader2,
+  GraduationCap,
+  AlertCircle,
 } from "lucide-react";
+import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
+import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
 
 export default function JobDetailModal({
   job,
@@ -38,6 +42,40 @@ export default function JobDetailModal({
   const [applying, setApplying] = useState(false);
   const [applySuccess, setApplySuccess] = useState(false);
   const [applyError, setApplyError] = useState("");
+  const [eligibilityAlertOpen, setEligibilityAlertOpen] = useState(false);
+
+  const { getDistanceTo } = useUserCoords(user);
+  const distance = job ? getDistanceTo(job.latitude, job.longitude) : null;
+  const minQual = getJobMinQualification(job);
+  const eligibility = checkJobEligibility(job, user);
+
+  // Track job detail view in audit logs
+  useEffect(() => {
+    if (isOpen && job) {
+      const jobKey = job.uuid || job.id;
+      if (jobKey) {
+        fetch(`/jobs/${jobKey}/track-view`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
+          },
+        }).catch(() => {});
+      }
+    }
+  }, [isOpen, job?.id, job?.uuid]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen || !job) return null;
 
@@ -79,7 +117,7 @@ export default function JobDetailModal({
 
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
 
-  const handleApplyClick = async () => {
+  const handleApplyClick = () => {
     setApplyError("");
     if (!isLoggedIn) {
       if (onRequireLogin) {
@@ -88,50 +126,23 @@ export default function JobDetailModal({
       return;
     }
 
-    try {
-      setApplying(true);
-      const payload = {
-        fullName: user?.full_name || user?.name || "",
-        email: user?.email || "",
-        phone: user?.phone || "",
-        city: user?.city || "",
-        qualification: user?.qualification || user?.education || "",
-      };
-
-      const res = await axios.post(`/apply/${jobKey}`, payload, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (res.data?.success || res.status === 200) {
-        setApplySuccess(true);
-        job.is_applied = true;
-        if (onApplicationSuccess) {
-          onApplicationSuccess(job);
-        }
-      } else {
-        setApplyError(res.data?.message || "Failed to submit application.");
-      }
-    } catch (err) {
-      console.error(err);
-      const msg =
-        err.response?.data?.message ||
-        (err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat().join(", ")
-          : "An error occurred while submitting your application. Please try again.");
-      setApplyError(msg);
-    } finally {
-      setApplying(false);
+    if (eligibility.isRestricted) {
+      setEligibilityAlertOpen(true);
+      return;
     }
+
+    // Seamlessly navigate to the 4-step comprehensive job application form
+    router.visit(`/apply/${jobKey}`);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-5 overscroll-contain animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-100 relative my-auto animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden border border-gray-100 relative my-auto animate-in zoom-in-95 duration-200">
         {/* Header Bar */}
         <div className="p-5 sm:p-6 border-b border-gray-100 flex items-start justify-between gap-4 bg-slate-50/60 shrink-0">
           <div className="flex items-start gap-3.5 min-w-0">
@@ -171,9 +182,12 @@ export default function JobDetailModal({
                 {job.company || "Direct Employer"}
               </p>
               <div className="flex items-center gap-3 text-xs text-gray-500 mt-1.5 flex-wrap">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 font-medium">
                   <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                  {job.location || "Multiple Locations"}
+                  <span>{job.location || "Multiple Locations"}</span>
+                  {distance && (
+                    <span className="text-blue-600 font-bold">• {distance}</span>
+                  )}
                 </span>
                 <span className="flex items-center gap-1">
                   <Briefcase className="w-3.5 h-3.5 text-gray-400" />
@@ -189,18 +203,50 @@ export default function JobDetailModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-xl transition cursor-pointer shrink-0"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Top Actions: Apply / Applied / Ineligible, and Close */}
+          <div className="flex items-center gap-2 shrink-0">
+            {isAlreadyApplied ? (
+              <Link
+                href="/my-applications"
+                className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Applied</span>
+              </Link>
+            ) : eligibility.isRestricted ? (
+              <button
+                type="button"
+                onClick={() => setEligibilityAlertOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer whitespace-nowrap"
+                title="Minimum qualification requirement not met"
+              >
+                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                <span>Ineligible ({minQual.label})</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleApplyClick}
+                className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs hover:shadow cursor-pointer whitespace-nowrap"
+              >
+                <span>Apply Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-xl transition cursor-pointer shrink-0"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 divide-y divide-gray-100">
+        <div className="p-5 sm:p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-5 divide-y divide-gray-100">
           {/* Success Banner if just applied */}
           {applySuccess && (
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3 text-emerald-900">
@@ -226,6 +272,21 @@ export default function JobDetailModal({
           {applyError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700">
               {applyError}
+            </div>
+          )}
+
+          {/* Ineligible Warning Notice */}
+          {isLoggedIn && eligibility.isRestricted && (
+            <div className="pt-2">
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-900">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <h4 className="font-bold text-red-900">Eligibility Requirement Not Met</h4>
+                  <p className="text-red-700 mt-0.5 leading-relaxed">
+                    This job strictly requires minimum <strong>{minQual.label}</strong>. Your profile qualification is <strong>{eligibility.candidateQual || "Below Requirement"}</strong>. You cannot apply for this job.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -260,6 +321,21 @@ export default function JobDetailModal({
 
           {/* Key Job Specifications Grid */}
           <div className="pt-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* Minimum Educational Qualification */}
+            <div className={`p-3 rounded-xl border ${
+              eligibility.isRestricted
+                ? "bg-red-50/70 border-red-200"
+                : "bg-purple-50/70 border-purple-100"
+            }`}>
+              <span className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
+                <GraduationCap className={`w-3.5 h-3.5 ${eligibility.isRestricted ? "text-red-500" : "text-purple-600"}`} />
+                Min. Education
+              </span>
+              <p className="text-xs sm:text-sm font-bold text-gray-900 mt-1">
+                {minQual.label}
+              </p>
+            </div>
+
             {job.openings ? (
               <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                 <span className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
@@ -459,53 +535,23 @@ export default function JobDetailModal({
           </div>
         </div>
 
-        {/* Sticky Action Footer */}
-        <div className="p-4 sm:p-5 border-t border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 text-xs text-gray-500 w-full sm:w-auto">
-            <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>Direct recruiter hiring</span>
-          </div>
-
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-            <Link
-              href={`/apply/${jobKey}`}
-              className="px-4 py-2.5 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5"
-            >
-              <span>Full Form</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-
-            {isAlreadyApplied ? (
-              <Link
-                href="/my-applications"
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Applied • View Status</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleApplyClick}
-                disabled={applying}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {applying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Submitting...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Apply Now</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+        {/* Sleek bottom guarantee strip */}
+        <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-6 py-2.5 flex items-center justify-between text-xs text-gray-500">
+          <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            100% Free Application Guarantee
+          </span>
+          <span className="text-[11px] text-gray-400">Direct hiring partner</span>
         </div>
       </div>
+
+      {/* Qualification Ineligible Alert Modal */}
+      <EligibilityAlertModal
+        isOpen={eligibilityAlertOpen}
+        onClose={() => setEligibilityAlertOpen(false)}
+        job={job}
+        eligibility={eligibility}
+      />
     </div>
   );
 }

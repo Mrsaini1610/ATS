@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Services\MailService;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -133,6 +134,20 @@ class StaffController extends Controller
             Log::error("Staff creation mail error: " . $e->getMessage());
         }
 
+        AuditLogService::log(
+            action: 'staff_created',
+            description: "Staff member '{$staff->name}' ({$staff->email}) created with role {$role}.",
+            details: [
+                'staff_id' => $staff->id,
+                'role'     => $role,
+                'email'    => $staff->email,
+                'platform' => 'web',
+            ],
+            module: 'team',
+            entity: $staff,
+            status: 'success'
+        );
+
         return redirect()->back()->with('success', 'Staff member successfully created. Login credentials sent to ' . $staff->email);
     }
 
@@ -190,6 +205,19 @@ class StaffController extends Controller
 
         $admin->update($updateData);
 
+        AuditLogService::log(
+            action: 'staff_updated',
+            description: "Staff member '{$admin->name}' ({$admin->email}) details updated.",
+            details: [
+                'staff_id' => $admin->id,
+                'role'     => $role,
+                'platform' => 'web',
+            ],
+            module: 'team',
+            entity: $admin,
+            status: 'success'
+        );
+
         return redirect()->back()->with('success', 'Staff member successfully updated.');
     }
 
@@ -232,6 +260,19 @@ class StaffController extends Controller
             'status' => !$admin->status,
         ]);
 
+        AuditLogService::log(
+            action: 'staff_status_toggled',
+            description: "Staff member '{$admin->name}' status changed to " . ($admin->status ? 'Active' : 'Inactive'),
+            details: [
+                'staff_id' => $admin->id,
+                'status'   => $admin->status,
+                'platform' => 'web',
+            ],
+            module: 'team',
+            entity: $admin,
+            status: 'success'
+        );
+
         return back()->with('success', 'Staff status updated.');
     }
 
@@ -249,6 +290,19 @@ class StaffController extends Controller
         if ($admin->role === 'super_admin') {
             return back()->with('error', 'Super Admin cannot be deleted.');
         }
+
+        AuditLogService::log(
+            action: 'staff_deleted',
+            description: "Staff member '{$admin->name}' ({$admin->email}) deleted.",
+            details: [
+                'staff_id' => $admin->id,
+                'email'    => $admin->email,
+                'platform' => 'web',
+            ],
+            module: 'team',
+            entity: $admin,
+            status: 'success'
+        );
 
         $admin->delete();
 

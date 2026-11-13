@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, router, usePage, Head } from "@inertiajs/react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
+import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
 import {
   Bookmark,
   BookmarkCheck,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   Star,
   Shield,
+  ShieldCheck,
   Share2,
   IndianRupee,
   Calendar,
@@ -22,7 +24,11 @@ import {
   X,
   Check,
   Eye,
+  GraduationCap,
+  AlertCircle,
 } from "lucide-react";
+import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
+import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
 
 // Job Detail Panel Component (Shown on the same screen)
 function JobDetailPanel({
@@ -32,11 +38,18 @@ function JobDetailPanel({
   onUnsave,
   isApplied,
   isLoggedIn,
+  user,
   onLoginRequired,
   onShare,
   copied,
+  onIneligibleClick,
 }) {
   if (!job) return null;
+
+  const { getDistanceTo } = useUserCoords(user);
+  const distance = job ? getDistanceTo(job.latitude, job.longitude) : null;
+  const minQual = getJobMinQualification(job);
+  const eligibility = checkJobEligibility(job, user);
 
   const skillsList = Array.isArray(job.skills)
     ? job.skills
@@ -93,6 +106,36 @@ function JobDetailPanel({
           )}
         </button>
 
+        {/* Top Header Actions: Apply Now before Bookmark, Save/Unsave, Close */}
+        {isApplied ? (
+          <Link
+            href="/my-applications"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Applied</span>
+          </Link>
+        ) : eligibility.isRestricted ? (
+          <button
+            type="button"
+            onClick={() => onIneligibleClick && onIneligibleClick(job, eligibility)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer whitespace-nowrap"
+            title="Minimum qualification requirement not met"
+          >
+            <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+            <span>Ineligible ({minQual.label})</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => (isLoggedIn ? onApply(job.uuid || job.id) : onLoginRequired("apply"))}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs hover:shadow cursor-pointer whitespace-nowrap"
+          >
+            <span>Apply Now</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Highlighted Saved Button */}
         <button
           type="button"
@@ -144,9 +187,10 @@ function JobDetailPanel({
               {job.company}
             </p>
             <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2 text-xs text-gray-500 font-medium">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 font-medium">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                {job.location || "Multiple Locations"}
+                <span>{job.location || "Multiple Locations"}</span>
+                {distance && <span className="text-blue-600 font-bold">• {distance}</span>}
               </span>
               <span className="flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5 text-gray-400" />
@@ -167,6 +211,14 @@ function JobDetailPanel({
               🔥 Hot Opening
             </span>
           )}
+          <span className={`text-xs px-3 py-1 rounded-full font-semibold border flex items-center gap-1 ${
+            eligibility.isRestricted
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-purple-50 text-purple-700 border-purple-200"
+          }`}>
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Min. {minQual.label}</span>
+          </span>
           {job.openings && (
             <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold">
               {job.openings} Opening{job.openings > 1 ? "s" : ""}
@@ -181,6 +233,19 @@ function JobDetailPanel({
             </span>
           )}
         </div>
+
+        {/* Ineligible Warning Notice */}
+        {isLoggedIn && eligibility.isRestricted && (
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-800">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-red-900">Ineligible: Minimum {minQual.label} Required</p>
+              <p className="mt-0.5 text-red-700 text-[11px] leading-relaxed">
+                Your profile indicates <strong>{eligibility.candidateQual || "Below requirement"}</strong>. Employer requires candidates to have at least <strong>{minQual.label}</strong> to apply.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Salary Strip */}
         <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between">
@@ -383,31 +448,13 @@ function JobDetailPanel({
         )}
       </div>
 
-      {/* Sticky Bottom Apply Action Bar */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 sm:px-7 py-4 z-10 shadow-lg shrink-0">
-        {isApplied ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-bold flex-1 justify-center">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Application Submitted</span>
-            </div>
-            <Link
-              href="/my-applications"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs sm:text-sm font-semibold transition"
-            >
-              View Status
-            </Link>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => (isLoggedIn ? onApply(job.uuid || job.id) : onLoginRequired("apply"))}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm sm:text-base font-bold shadow-md shadow-blue-500/20 hover:shadow-lg transition cursor-pointer"
-          >
-            <span>Apply Now</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        )}
+      {/* Sleek bottom guarantee strip */}
+      <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-7 py-2.5 flex items-center justify-between text-xs text-gray-500">
+        <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          100% Free Application Guarantee
+        </span>
+        <span className="text-[11px] text-gray-400">Direct hiring partner</span>
       </div>
     </div>
   );
@@ -446,6 +493,9 @@ export default function SavedJobs({
   const [loginGateAction, setLoginGateAction] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [ineligibleModal, setIneligibleModal] = useState({ isOpen: false, job: null, eligibility: null });
+
+  const { getDistanceTo } = useUserCoords(auth?.user);
 
   // Sync state if props change
   useEffect(() => {
@@ -496,7 +546,14 @@ export default function SavedJobs({
   };
 
   // Handle Apply
-  const handleApply = (jobKey) => {
+  const handleApply = (jobKey, job) => {
+    if (job) {
+      const eligibility = checkJobEligibility(job, auth?.user);
+      if (isLoggedIn && eligibility.isRestricted) {
+        setIneligibleModal({ isOpen: true, job, eligibility });
+        return;
+      }
+    }
     router.visit(`/apply/${jobKey}`);
   };
 
@@ -562,38 +619,17 @@ export default function SavedJobs({
         </div>
       )}
 
-      {/* Login Gate Modal */}
-      {loginGateAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs px-4">
-          <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center shadow-2xl">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3">
-              <Shield className="w-6 h-6" />
-            </div>
-            <h3 className="font-bold text-gray-900 text-base mb-1.5">
-              Login Required
-            </h3>
-            <p className="text-xs text-gray-500 mb-6">
-              Please sign in to {loginGateAction}.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setLoginGateAction(null)}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => router.visit("/login")}
-                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition"
-              >
-                Sign In
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Candidate Phone & OTP Login Modal */}
+      <CandidateLoginModal
+        isOpen={Boolean(loginGateAction)}
+        onClose={() => setLoginGateAction(null)}
+        onSuccess={() => {
+          setLoginGateAction(null);
+          router.reload();
+        }}
+        jobTitle={selectedJob?.title || ""}
+        jobKey={selectedJob?.uuid || selectedJob?.id || ""}
+      />
 
       {/* Wide container so 4 cards fit naturally on desktop */}
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -643,6 +679,9 @@ export default function SavedJobs({
                   const isJobApplied = checkIsApplied(job);
                   const skillsList = Array.isArray(job.skills) ? job.skills : [];
                   const isCurrentSelected = selectedJob?.uuid === job.uuid || selectedJob?.id === job.id;
+                  const minQual = getJobMinQualification(job);
+                  const distance = getDistanceTo(job.latitude, job.longitude);
+                  const eligibility = checkJobEligibility(job, auth?.user);
 
                   return (
                     <div
@@ -651,14 +690,16 @@ export default function SavedJobs({
                       className={`bg-white rounded-2xl border p-4 sm:p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-xs relative ${
                         isCurrentSelected
                           ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
-                          : "border-gray-200/90"
+                          : eligibility.isRestricted
+                            ? "border-red-100 hover:border-red-300"
+                            : "border-gray-200/90"
                       }`}
                     >
                   <div>
-                    {/* Header: Avatar + Title + Applied Badge + Unsave Button */}
-                    <div className="flex items-start justify-between gap-2.5 mb-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs sm:text-sm font-extrabold shrink-0 overflow-hidden shadow-xs">
+                    {/* Header: Avatar + Company Name on left, Applied / Unsave on right */}
+                    <div className="flex items-center justify-between gap-2.5 mb-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs sm:text-sm font-extrabold shrink-0 overflow-hidden shadow-xs">
                           {job.company_image ? (
                             <img
                               src={job.company_image}
@@ -670,21 +711,18 @@ export default function SavedJobs({
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-sm sm:text-base text-gray-900 group-hover:text-blue-600 transition truncate leading-snug">
-                            {job.title}
-                          </h3>
-                          <p className="text-xs font-semibold text-blue-600 truncate mt-0.5">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate max-w-[170px]">
                             {job.company}
                           </p>
                         </div>
                       </div>
 
-                      {/* Highlighted Saved Bookmark Button + Applied Badge */}
+                      {/* Right: Applied Badge + Unsave Button */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isJobApplied && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>Applied</span>
                           </span>
                         )}
@@ -694,103 +732,140 @@ export default function SavedJobs({
                             e.stopPropagation();
                             handleUnsave(jobKey);
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 hover:bg-red-50 border border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 shadow-2xs group/save"
+                          className="inline-flex items-center gap-1.5 p-1.5 bg-blue-50 hover:bg-red-50 border border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 shadow-2xs group/save"
                           title="Saved (Click to remove)"
                         >
                           <BookmarkCheck className="w-4 h-4 fill-blue-600 group-hover/save:hidden" />
                           <BookmarkX className="w-4 h-4 hidden group-hover/save:block text-red-600" />
-                          <span className="group-hover/save:hidden"></span>
-                          <span className="hidden group-hover/save:inline"></span>
                         </button>
                       </div>
                     </div>
 
-                    {/* Location & Salary */}
-                    <div className="space-y-1 mb-2.5 text-xs text-gray-600">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="truncate">{job.location || "Multiple Locations"}</span>
-                      </div>
-                      <div className="flex items-center gap-1 font-bold text-emerald-700 text-sm">
+                    {/* Post Name / Job Title - FULL WIDTH, NEVER SQUEEZED */}
+                    <h3 className="font-extrabold text-sm sm:text-base text-gray-900 group-hover:text-blue-600 transition leading-snug line-clamp-2 mb-2">
+                      {job.title}
+                    </h3>
+
+                    {/* Salary & Details Strip (Set Prominently right below title) */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
+                      <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
                         {(!job.salary || !job.salary.includes("₹")) && (
                           <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         )}
-                        <span>{job.salary || "Competitive"}</span>
+                        <span>{job.salary || "Competitive Salary"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
+                        <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.job_type || job.type || "Full Time"}</span>
+                        <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.experience || job.exp || "Fresher"}</span>
                       </div>
                     </div>
 
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-1 mb-2.5">
-                      {job.hot && (
-                        <span className="text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
-                          🔥 Hot
+                    {/* Qualifications & Requirements Box - Shown Outside on Card */}
+                    <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
+                      {/* Qualification Row */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                          <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Qualification:</span>
                         </span>
-                      )}
-                      <span className="text-[10px] font-medium bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                        {job.job_type || job.type || "Full Time"}
-                      </span>
-                      <span className="text-[10px] font-medium bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                        {job.experience || job.exp || "Fresher"}
-                      </span>
-                      {isJobApplied && (
-                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Applied
+                        <span
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                            isLoggedIn && eligibility.isRestricted
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : "bg-purple-50 text-purple-700 border-purple-200"
+                          }`}
+                        >
+                          {isLoggedIn && eligibility.isRestricted ? (
+                            <>
+                              <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
+                              <span>Min. {minQual.label} (Ineligible)</span>
+                            </>
+                          ) : (
+                            <span>Min. {minQual.label}</span>
+                          )}
                         </span>
+                      </div>
+
+                      {/* Requirements / Skills Row */}
+                      {skillsList.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
+                            Requirements:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {skillsList.slice(0, 3).map((s, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md truncate max-w-[130px]"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                            {skillsList.length > 3 && (
+                              <span className="text-[10px] font-semibold text-gray-400 self-center">
+                                +{skillsList.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-
-                    {/* Skills Preview */}
-                    {skillsList.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {skillsList.slice(0, 2).map((s, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium truncate max-w-[120px]"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                        {skillsList.length > 2 && (
-                          <span className="text-[10px] text-gray-400 self-center">
-                            +{skillsList.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Card Footer Actions */}
-                  <div className="pt-2.5 border-t border-gray-100 flex items-center gap-2 mt-auto">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedJob(job)}
-                      className="flex-1 inline-flex items-center justify-center gap-1 py-2 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>View Details</span>
-                    </button>
+                  {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
+                  <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
+                    {/* Location & Distance */}
+                    <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
+                      {distance && (
+                        <span className="text-blue-600 font-bold shrink-0 bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
+                          • {distance}
+                        </span>
+                      )}
+                    </div>
 
-                    {isJobApplied ? (
-                      <Link
-                        href="/my-applications"
-                        onClick={(e) => e.stopPropagation()}
-                        className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Track Status</span>
-                      </Link>
-                    ) : (
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApply(jobKey);
-                        }}
-                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
+                        onClick={() => setSelectedJob(job)}
+                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                        title="View Details"
                       >
-                        Apply Now
+                        <Eye className="w-3.5 h-3.5" />
                       </button>
-                    )}
+
+                      {isJobApplied ? (
+                        <Link
+                          href="/my-applications"
+                          onClick={(e) => e.stopPropagation()}
+                          className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Track</span>
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isLoggedIn && eligibility.isRestricted) {
+                              setIneligibleModal({ isOpen: true, job, eligibility });
+                              return;
+                            }
+                            handleApply(jobKey, job);
+                          }}
+                          className={`py-1.5 px-3 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap ${
+                            isLoggedIn && eligibility.isRestricted
+                              ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                              : "bg-blue-600 hover:bg-blue-700 text-white"
+                          }`}
+                        >
+                          {isLoggedIn && eligibility.isRestricted ? "Ineligible" : "Apply"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -804,19 +879,29 @@ export default function SavedJobs({
             <JobDetailPanel
               job={selectedJob}
               onClose={() => setSelectedJob(null)}
-              onApply={handleApply}
+              onApply={(key) => handleApply(key, selectedJob)}
               onUnsave={handleUnsave}
               isApplied={checkIsApplied(selectedJob)}
               isLoggedIn={isLoggedIn}
+              user={auth?.user}
               onLoginRequired={(action) => setLoginGateAction(action)}
               onShare={handleShare}
               copied={copiedId === (selectedJob.uuid || selectedJob.id)}
+              onIneligibleClick={(j, e) => setIneligibleModal({ isOpen: true, job: j, eligibility: e })}
             />
           </div>
         )}
       </div>
     )}
       </div>
+
+      {/* Qualification Ineligible Alert Modal */}
+      <EligibilityAlertModal
+        isOpen={ineligibleModal.isOpen}
+        onClose={() => setIneligibleModal({ isOpen: false, job: null, eligibility: null })}
+        job={ineligibleModal.job}
+        eligibility={ineligibleModal.eligibility}
+      />
     </HomepageLayout>
   );
 }

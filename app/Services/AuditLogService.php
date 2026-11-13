@@ -49,12 +49,18 @@ class AuditLogService
             }
 
             // Determine platform (web or app)
-            $platform = 'web';
-            if ($req) {
+            $platform = $details['platform'] ?? 'web';
+            if (!isset($details['platform']) && $req) {
                 $platformHeader = strtolower($req->header('X-Platform', ''));
                 if ($platformHeader === 'app' || $req->is('api/*')) {
                     $platform = 'app';
                 }
+            }
+
+            // Capture human-readable device name for candidate & visitor activity
+            if (empty($details['device_name']) && $req) {
+                $customHeader = $req->header('X-Device-Name') ?: $req->header('X-Device-Model');
+                $details['device_name'] = $customHeader ?: self::parseDeviceName($req->userAgent(), $details, $platform);
             }
 
             $audit = AuditLog::create([
@@ -170,8 +176,8 @@ class AuditLogService
                 return [
                     'type'  => 'candidate',
                     'id'    => $actor->id,
-                    'name'  => $actor->name ?: $actor->full_name ?: 'Candidate',
-                    'email' => $actor->email,
+                    'name'  => $actor->full_name ?: $actor->name ?: 'Candidate',
+                    'email' => $actor->email ?: $actor->phone,
                 ];
             }
         }
@@ -191,8 +197,44 @@ class AuditLogService
             return [
                 'type'  => 'candidate',
                 'id'    => $user->id,
-                'name'  => $user->name ?: $user->full_name ?: 'Candidate',
-                'email' => $user->email,
+                'name'  => $user->full_name ?: $user->name ?: 'Candidate',
+                'email' => $user->email ?: $user->phone,
+            ];
+        }
+
+        if (Auth::guard('sanctum')->check()) {
+            $user = Auth::guard('sanctum')->user();
+            if ($user instanceof \App\Models\User) {
+                return [
+                    'type'  => 'candidate',
+                    'id'    => $user->id,
+                    'name'  => $user->full_name ?: $user->name ?: 'Candidate',
+                    'email' => $user->email ?: $user->phone,
+                ];
+            }
+        }
+
+        if (function_exists('request') && request() && request()->user()) {
+            $user = request()->user();
+            if ($user instanceof \App\Models\User) {
+                return [
+                    'type'  => 'candidate',
+                    'id'    => $user->id,
+                    'name'  => $user->full_name ?: $user->name ?: 'Candidate',
+                    'email' => $user->email ?: $user->phone,
+                ];
+            }
+        }
+
+        // Check if there is an unauthenticated HTTP request (Guest Visitor)
+        $req = function_exists('request') ? request() : null;
+        if ($req && !app()->runningInConsole()) {
+            $ip = $req->ip() ?: 'Unknown IP';
+            return [
+                'type'  => 'guest',
+                'id'    => null,
+                'name'  => "Guest ({$ip})",
+                'email' => null,
             ];
         }
 
@@ -202,6 +244,150 @@ class AuditLogService
             'name'  => 'System Automator',
             'email' => null,
         ];
+    }
+
+    /**
+     * Record a page visit ("kha kha visit kiya") for candidate or guest visitor.
+     */
+    public static function logPageView(string $pageTitle, ?string $url = null, array $extra = []): ?AuditLog
+    {
+        try {
+            $req = function_exists('request') ? request() : null;
+            if (!$req || app()->runningInConsole()) {
+                return null;
+            }
+
+            $path = $req->path();
+            if (str_starts_with($path, 'build/') || str_starts_with($path, 'storage/') || str_starts_with($path, '_') || str_starts_with($path, 'admin/')) {
+                return null;
+            }
+
+            $actorData = self::resolveActor();
+
+            // Only track page views for Candidates and Guests. Ignore Admin and Staff casual browsing.
+            if (in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff', 'system'])) {
+                return null;
+            }
+
+            $ip = $req->ip() ?: '127.0.0.1';
+            $pageUrl = $url ?: $req->fullUrl();
+
+            // Detect platform (Web or Mobile App)
+            $platform = 'web';
+            $platformHeader = strtolower($req->header('X-Platform', ''));
+            if ($platformHeader === 'app' || $req->is('api/*')) {
+                $platform = 'app';
+            }
+
+            // Anti-spam throttling: Do not flood duplicate page visits within 45 seconds from same user/IP & URL
+            $cacheKey = 'audit_page_view_' . md5(($actorData['id'] ?? $ip) . '_' . $path);
+            if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                return null;
+            }
+            \Illuminate\Support\Facades\Cache::put($cacheKey, 1, now()->addSeconds(45));
+
+            $platformTag = $platform === 'app' ? 'Mobile App' : 'Website';
+            $actorLabel = $actorData['type'] === 'guest'
+                ? "Guest Visitor ({$ip})"
+                : ($actorData['type'] === 'candidate' ? "Candidate {$actorData['name']}" : $actorData['name']);
+
+            $description = "{$actorLabel} visited {$pageTitle} on {$platformTag}";
+
+            $details = array_merge([
+                'page'       => $pageTitle,
+                'path'       => '/' . ltrim($path, '/'),
+                'url'        => $pageUrl,
+                'platform'   => $platform,
+                'ip'         => $ip,
+                'user_agent' => substr($req->userAgent() ?? '', 0, 500),
+            ], $extra);
+
+            return self::log(
+                action: 'page_view',
+                description: $description,
+                details: $details,
+                module: 'navigation',
+                entity: null,
+                status: 'success',
+                actor: null,
+                request: $req
+            );
+        } catch (Throwable $e) {
+            Log::warning("AuditLogService::logPageView failed: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Record a job post detail view ("kya dekha") for candidate or guest.
+     */
+    public static function logJobView(JobPost $job, array $extra = []): ?AuditLog
+    {
+        try {
+            $req = function_exists('request') ? request() : null;
+            $actorData = self::resolveActor();
+
+            // Only track job detail views for Candidates and Guests. Ignore Admin and Staff internal viewing.
+            if (in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff', 'system'])) {
+                return null;
+            }
+
+            $ip = $req ? $req->ip() : '127.0.0.1';
+
+            // Detect platform
+            $platform = 'web';
+            if ($req) {
+                $platformHeader = strtolower($req->header('X-Platform', ''));
+                if ($platformHeader === 'app' || $req->is('api/*')) {
+                    $platform = 'app';
+                }
+            }
+
+            // Anti-spam throttling: 45 seconds per actor & job
+            $cacheKey = 'audit_job_view_' . md5(($actorData['id'] ?? $ip) . '_' . $job->id);
+            if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                return null;
+            }
+            \Illuminate\Support\Facades\Cache::put($cacheKey, 1, now()->addSeconds(45));
+
+            $platformTag = $platform === 'app' ? 'Mobile App' : 'Website';
+            $actorLabel = $actorData['type'] === 'guest'
+                ? "Guest Visitor ({$ip})"
+                : ($actorData['type'] === 'candidate' ? "Candidate {$actorData['name']}" : $actorData['name']);
+
+            $salary = $job->formatted_salary ?: ($job->min_salary ? "₹" . number_format($job->min_salary) . ($job->max_salary ? " - ₹" . number_format($job->max_salary) : "") : 'Not disclosed');
+            $location = $job->location ?: 'Jaipur';
+
+            $description = "{$actorLabel} viewed job opening '{$job->title}' at {$job->company} on {$platformTag}";
+
+            $details = array_merge([
+                'job_id'         => $job->id,
+                'job_uuid'       => $job->uuid,
+                'title'          => $job->title,
+                'company'        => $job->company,
+                'location'       => $location,
+                'salary'         => $salary,
+                'qualifications' => $job->qualifications,
+                'experience'     => $job->experience ?: ($job->min_experience ? "{$job->min_experience}-{$job->max_experience} yrs" : 'Any'),
+                'platform'       => $platform,
+                'ip'             => $ip,
+                'user_agent'     => $req ? substr($req->userAgent() ?? '', 0, 500) : '',
+            ], $extra);
+
+            return self::log(
+                action: 'job_view',
+                description: $description,
+                details: $details,
+                module: 'jobs',
+                entity: $job,
+                status: 'success',
+                actor: null,
+                request: $req
+            );
+        } catch (Throwable $e) {
+            Log::warning("AuditLogService::logJobView failed: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -458,6 +644,103 @@ class AuditLogService
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
         return round($bytes, $precision) . ' ' . $units[$pow];
+    }
+
+    /**
+     * Parse human-friendly Device Name from user-agent, request headers, or details payload.
+     */
+    public static function parseDeviceName(?string $userAgent, $details = [], ?string $platform = 'web'): string
+    {
+        // 1. Check details array first
+        if (is_array($details)) {
+            if (!empty($details['device_name'])) return (string) $details['device_name'];
+            if (!empty($details['device'])) return (string) $details['device'];
+            if (!empty($details['device_model'])) return (string) $details['device_model'];
+        }
+
+        $ua = $userAgent ?? '';
+        if (empty($ua)) {
+            return $platform === 'app' ? 'Mobile App Device' : 'Web Browser';
+        }
+
+        // 2. Apple iOS / iPadOS
+        if (preg_match('/iPhone(?:\s*OS\s*([0-9_]+))?/i', $ua, $m)) {
+            $ver = isset($m[1]) ? ' (iOS ' . str_replace('_', '.', $m[1]) . ')' : ' (iOS)';
+            return 'iPhone' . $ver;
+        }
+
+        if (preg_match('/iPad/i', $ua)) {
+            return 'Apple iPad';
+        }
+
+        // 3. Android Hardware Brands & Generic
+        if (stripos($ua, 'Android') !== false) {
+            $ver = '';
+            if (preg_match('/Android\s*([0-9.]+)/i', $ua, $m)) {
+                $ver = ' ' . $m[1];
+            }
+
+            if (preg_match('/(SM-[A-Z0-9]+|GT-[A-Z0-9]+)/i', $ua, $m)) {
+                return 'Samsung ' . strtoupper($m[1]);
+            }
+            if (stripos($ua, 'Samsung') !== false) {
+                return 'Samsung Galaxy' . ($ver ? " (v{$ver})" : '');
+            }
+            if (preg_match('/Pixel\s*[0-9a-zA-Z\s]+/i', $ua, $m)) {
+                return 'Google ' . trim($m[0]);
+            }
+            if (preg_match('/(OnePlus[A-Z0-9\s_-]*|IN20[0-9]{2}|GM19[0-9]{2})/i', $ua)) {
+                return 'OnePlus Phone';
+            }
+            if (preg_match('/(Redmi[A-Za-z0-9\s_-]*|POCO[A-Za-z0-9\s_-]*|Xiaomi)/i', $ua)) {
+                return 'Xiaomi / Redmi';
+            }
+            if (preg_match('/(vivo[A-Za-z0-9\s_-]*|V2[0-9]{3}|iQOO)/i', $ua)) {
+                return 'Vivo / iQOO';
+            }
+            if (preg_match('/(Realme[A-Za-z0-9\s_-]*|RMX[0-9]+)/i', $ua)) {
+                return 'Realme Phone';
+            }
+            if (preg_match('/(OPPO[A-Za-z0-9\s_-]*|CPH[0-9]+)/i', $ua)) {
+                return 'OPPO Phone';
+            }
+
+            return 'Android Mobile' . ($ver ? " (v{$ver})" : '');
+        }
+
+        // 4. Desktop OS
+        if (stripos($ua, 'Macintosh') !== false || stripos($ua, 'Mac OS X') !== false) {
+            if (stripos($ua, 'Chrome') !== false) return 'MacBook (Chrome)';
+            if (stripos($ua, 'Safari') !== false) return 'MacBook (Safari)';
+            if (stripos($ua, 'Firefox') !== false) return 'MacBook (Firefox)';
+            return 'MacBook / macOS';
+        }
+
+        if (stripos($ua, 'Windows NT') !== false) {
+            $win = 'PC';
+            if (stripos($ua, 'Windows NT 10.0') !== false) $win = 'Win 10/11';
+            elseif (stripos($ua, 'Windows NT 6.3') !== false) $win = 'Win 8.1';
+            elseif (stripos($ua, 'Windows NT 6.1') !== false) $win = 'Win 7';
+
+            if (stripos($ua, 'Edg') !== false) return "Windows {$win} (Edge)";
+            if (stripos($ua, 'Chrome') !== false) return "Windows {$win} (Chrome)";
+            if (stripos($ua, 'Firefox') !== false) return "Windows {$win} (Firefox)";
+            return "Windows {$win}";
+        }
+
+        if (stripos($ua, 'Linux') !== false) {
+            return 'Linux Desktop';
+        }
+
+        if (stripos($ua, 'curl') !== false) {
+            return 'Curl / API Client';
+        }
+
+        if (stripos($ua, 'Dart') !== false || stripos($ua, 'Flutter') !== false) {
+            return 'Flutter App';
+        }
+
+        return $platform === 'app' ? 'Mobile App' : 'Web Browser';
     }
 }
 

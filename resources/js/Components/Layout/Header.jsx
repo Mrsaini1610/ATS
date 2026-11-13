@@ -179,6 +179,17 @@ export default function Header() {
     }
   }, [GOOGLE_MAPS_API_KEY, locationModalOpen]);
 
+  // Lock body scroll when location modal is open
+  useEffect(() => {
+    if (locationModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [locationModalOpen]);
+
   // Fallback search when Google Places is blocked or unconfigured
   const searchAreasFallback = async (query) => {
     setLoadingGoogle(true);
@@ -327,10 +338,10 @@ export default function Header() {
         const locResult = await fetchLocationFromCoords(latitude, longitude);
 
         if (locResult && locResult.city) {
-          applyAndSaveLocation(locResult.city, locResult.area);
+          applyAndSaveLocation(locResult.city, locResult.area, latitude, longitude);
           setGeoDetectedData(locResult);
         } else if (isUserInitiated) {
-          setLocationError("Could not determine area name from GPS coordinates. Please select below.");
+          applyAndSaveLocation("Current Location", "", latitude, longitude);
         }
       } catch (err) {
         console.error("Location error:", err);
@@ -382,7 +393,14 @@ export default function Header() {
         console.error(e);
       }
     }
-  }, []);
+
+    const userLat = user?.latitude || user?.web_latitude;
+    const userLng = user?.longitude || user?.web_longitude;
+    if (userLat && userLng && !localStorage.getItem("ats_user_lat")) {
+      localStorage.setItem("ats_user_lat", String(userLat));
+      localStorage.setItem("ats_user_lng", String(userLng));
+    }
+  }, [user]);
 
   // Open modal
   const handleOpenModal = () => {
@@ -396,14 +414,28 @@ export default function Header() {
   };
 
   // Universal Apply & Save location
-  const applyAndSaveLocation = (cityName, areaName) => {
+  const applyAndSaveLocation = (cityName, areaName, lat = null, lng = null) => {
     const cityToSave = cityName || "Jaipur";
     const areaToSave = areaName || "Select Area";
 
     setSelectedCityName(cityToSave);
     setSelectedAreaName(areaToSave);
 
-    const locData = { city: cityToSave, area: areaToSave === "Select Area" ? "" : areaToSave };
+    const savedLat = lat != null ? lat : localStorage.getItem("ats_user_lat");
+    const savedLng = lng != null ? lng : localStorage.getItem("ats_user_lng");
+
+    const locData = {
+      city: cityToSave,
+      area: areaToSave === "Select Area" ? "" : areaToSave,
+      latitude: savedLat ? parseFloat(savedLat) : null,
+      longitude: savedLng ? parseFloat(savedLng) : null,
+    };
+
+    if (lat != null && lng != null) {
+      localStorage.setItem("ats_user_lat", String(lat));
+      localStorage.setItem("ats_user_lng", String(lng));
+    }
+
     localStorage.setItem("user_selected_location", JSON.stringify(locData));
     localStorage.setItem("ats_candidate_city", cityToSave);
     if (locData.area) {
@@ -752,11 +784,11 @@ export default function Header() {
       {/* LOCATION POPUP MODAL (RENDERED VIA PORTAL DIRECTLY ON DOCUMENT.BODY: NEVER HIDDEN UNDER MAIN PAGE) */}
       {mounted && locationModalOpen && createPortal(
         <div
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overscroll-contain"
           onClick={() => setLocationModalOpen(false)}
         >
           <div
-            className="relative bg-white w-full max-w-lg my-auto rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[92vh] flex flex-col z-10 animate-in zoom-in-95 duration-150"
+            className="relative bg-white w-full max-w-lg my-auto rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[85vh] flex flex-col z-10 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -777,7 +809,7 @@ export default function Header() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 space-y-4 overflow-y-auto">
+            <div className="p-5 space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
               {/* 1. GPS Auto-Detect Button */}
               <button
                 type="button"
@@ -935,7 +967,7 @@ export default function Header() {
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                       Popular Areas in {activeCityTab}
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto p-1 overscroll-contain">
                       {(POPULAR_LOCALITIES_BY_CITY[activeCityTab] || []).map((locality) => (
                         <button
                           key={locality}

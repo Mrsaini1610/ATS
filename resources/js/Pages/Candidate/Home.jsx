@@ -12,6 +12,8 @@ import TestimonialsSection from "@/Components/Home/TestimonialsSection";
 import CTASection from "@/Components/Home/CTASection";
 import JobDetailModal from "@/Components/Candidate/JobDetailModal";
 import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
+import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
+import { checkJobEligibility } from "@/Utils/jobHelpers";
 import { usePage, Head, router } from "@inertiajs/react";
 
 export default function Homepage() {
@@ -30,8 +32,11 @@ export default function Homepage() {
 
   const [selectedJob, setSelectedJob] = useState(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [pendingJobForApply, setPendingJobForApply] = useState(null);
   const [activeUser, setActiveUser] = useState(auth?.user || null);
+  const [ineligibleModal, setIneligibleModal] = useState({ isOpen: false, job: null, eligibility: null });
 
+  const currentUser = activeUser || auth?.user || candidateProfile;
   const userIsLoggedIn = isLoggedIn || Boolean(auth?.user) || Boolean(activeUser);
 
   // Ensure job posts are strictly displayed in descending order (newest first)
@@ -42,14 +47,50 @@ export default function Homepage() {
     setSelectedJob(job);
   };
 
+  const handleIneligible = (job, eligibility) => {
+    setIneligibleModal({ isOpen: true, job, eligibility });
+  };
+
+  const handleApplyJob = (job) => {
+    const jobKey = job.uuid || job.id;
+    if (userIsLoggedIn) {
+      const eligibility = checkJobEligibility(job, currentUser);
+      if (eligibility.isRestricted) {
+        setIneligibleModal({ isOpen: true, job, eligibility });
+        return;
+      }
+      router.visit(`/apply/${jobKey}`);
+    } else {
+      setPendingJobForApply(job);
+      setLoginModalOpen(true);
+    }
+  };
+
   const handleRequireLogin = (job) => {
-    // Open login modal without closing or resetting the selected job
+    // Open login modal and keep track of job for immediate redirect to /apply/{id} after login
+    setPendingJobForApply(job);
     setLoginModalOpen(true);
   };
 
   const handleLoginSuccess = (user) => {
     setActiveUser(user);
-    setLoginModalOpen(false);
+    const targetJob = pendingJobForApply || selectedJob;
+    if (targetJob) {
+      const eligibility = checkJobEligibility(targetJob, user);
+      if (eligibility.isRestricted) {
+        setLoginModalOpen(false);
+        setPendingJobForApply(null);
+        setIneligibleModal({ isOpen: true, job: targetJob, eligibility });
+        return;
+      }
+      const jobKey = targetJob.uuid || targetJob.id;
+      setLoginModalOpen(false);
+      setSelectedJob(null);
+      setPendingJobForApply(null);
+      router.visit(`/apply/${jobKey}`);
+    } else {
+      setLoginModalOpen(false);
+    }
   };
 
   return (
@@ -81,15 +122,21 @@ export default function Homepage() {
           <RecommendedJobsSection
             recommendedJobs={sortedRecommendedJobs}
             isLoggedIn={userIsLoggedIn}
-            candidateProfile={candidateProfile}
+            candidateProfile={currentUser}
             onSelectJob={handleSelectJob}
+            onApplyJob={handleApplyJob}
+            onIneligible={handleIneligible}
           />
         )}
 
         {/* 2. Recent Jobs Openings */}
         <RecentJobsSection
           recentJobs={sortedRecentJobs}
+          isLoggedIn={userIsLoggedIn}
+          candidateProfile={currentUser}
           onSelectJob={handleSelectJob}
+          onApplyJob={handleApplyJob}
+          onIneligible={handleIneligible}
         />
 
         {/* 3. Browse by Category */}
@@ -127,9 +174,21 @@ export default function Homepage() {
       {/* Inline Candidate Phone & OTP Login Modal */}
       <CandidateLoginModal
         isOpen={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
+        onClose={() => {
+          setLoginModalOpen(false);
+          setPendingJobForApply(null);
+        }}
         onSuccess={handleLoginSuccess}
-        jobTitle={selectedJob?.title || ""}
+        jobTitle={pendingJobForApply?.title || selectedJob?.title || ""}
+        jobKey={pendingJobForApply ? (pendingJobForApply.uuid || pendingJobForApply.id) : (selectedJob ? (selectedJob.uuid || selectedJob.id) : "")}
+      />
+
+      {/* Qualification Ineligible Alert Modal */}
+      <EligibilityAlertModal
+        isOpen={ineligibleModal.isOpen}
+        onClose={() => setIneligibleModal({ isOpen: false, job: null, eligibility: null })}
+        job={ineligibleModal.job}
+        eligibility={ineligibleModal.eligibility}
       />
     </HomepageLayout>
   );

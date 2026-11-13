@@ -96,6 +96,81 @@ class JobPost extends Model
         'resubmitted_at'        => 'datetime',
     ];
 
+    protected $appends = [
+        'min_qualification',
+    ];
+
+    /**
+     * Deduce minimum qualification requirement
+     * Levels:
+     * 0: Any / Below 10th
+     * 1: 10th Pass
+     * 2: 12th Pass
+     * 3: Diploma / ITI
+     * 4: Graduate
+     * 5: Post Graduate
+     * 6: Doctorate / PhD
+     */
+    public function getMinimumQualification(): array
+    {
+        $quals = $this->qualifications;
+        if (is_string($quals)) {
+            $quals = json_decode($quals, true) ?: [$quals];
+        }
+        $text = implode(' ', (array) ($quals ?: []));
+        if (empty(trim($text))) {
+            $text = ($this->title ?? '') . ' ' . ($this->description ?? '');
+        }
+        $lower = strtolower($text);
+
+        // 1. Explicit 10th only
+        if (preg_match('/\b(10th\s*pass|10th\s*standard|matric|high\s*school)\b/i', $lower)
+            && !preg_match('/\b(12th|graduate|bachelor|degree|diploma|b\.tech|bca|mca|mba|master)\b/i', $lower)) {
+            return ['label' => '10th Pass', 'level' => 1];
+        }
+
+        // 2. "10th or 12th"
+        if (preg_match('/\b10th\s*(pass)?\s*(or|\/)\s*12th\b/i', $lower)) {
+            return ['label' => '10th Pass', 'level' => 1];
+        }
+
+        // 3. "12th Pass or Graduate" -> minimum is 12th Pass!
+        if (preg_match('/\b12th\s*(pass)?\s*(or|\/)\s*(graduate|bachelor|degree)\b/i', $lower)
+            || (preg_match('/\b(12th\s*pass|12th\s*standard|intermediate|senior\s*secondary|10\+2)\b/i', $lower)
+                && !preg_match('/\b(must\s*be\s*graduate|only\s*graduate|degree\s*mandatory)\b/i', $lower))) {
+            return ['label' => '12th Pass', 'level' => 2];
+        }
+
+        // 4. Diploma / ITI
+        if (preg_match('/\b(diploma|polytechnic|iti)\b/i', $lower)
+            && !preg_match('/\b(only\s*graduate|bachelor\s*mandatory|master\s*only)\b/i', $lower)) {
+            return ['label' => 'Diploma / ITI', 'level' => 3];
+        }
+
+        // 5. Graduate / Bachelor (e.g. B.Tech, BCA, B.Com, BBA, Bachelor, Degree, or "Bachelor or Master")
+        if (preg_match('/\b(graduate|bachelor|b\.tech|b\.e|bca|b\.com|b\.sc|bba|degree)\b/i', $lower)) {
+            return ['label' => 'Graduate', 'level' => 4];
+        }
+
+        // 6. Doctorate / PhD
+        if (preg_match('/\b(phd|doctorate)\b/i', $lower)
+            && !preg_match('/\b(bachelor|graduate|master|bs|ms)\b/i', $lower)) {
+            return ['label' => 'Doctorate / PhD', 'level' => 6];
+        }
+
+        // 7. Post Graduate / Master / MBA
+        if (preg_match('/\b(master|mba|m\.tech|mca|m\.com|m\.sc|post\s*graduate|pgdm)\b/i', $lower)) {
+            return ['label' => 'Post Graduate', 'level' => 5];
+        }
+
+        return ['label' => '10th / 12th / Any', 'level' => 1];
+    }
+
+    public function getMinQualificationAttribute(): array
+    {
+        return $this->getMinimumQualification();
+    }
+
     public function scopeActiveForCandidate($query)
     {
         return $query->whereIn('status', ['active', 'approved'])

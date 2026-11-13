@@ -60,9 +60,14 @@ class PushNotificationService
             Log::error('Failed to create in-app UserNotification: ' . $e->getMessage());
         }
 
-        // 2. Fetch all active device FCM tokens for this user
+        // 2. Fetch all active device FCM tokens for this user (supports both user_id and user_uuid)
         $fcmTokens = DB::table('fcm_tokens')
-            ->where('user_id', $user->id)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+                if (!empty($user->uuid)) {
+                    $q->orWhere('user_uuid', $user->uuid);
+                }
+            })
             ->whereNull('deleted_at')
             ->whereNotNull('token')
             ->get();

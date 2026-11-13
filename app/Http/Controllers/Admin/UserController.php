@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -184,6 +185,20 @@ class UserController extends Controller
             }
         }
 
+        AuditLogService::log(
+            action: 'candidate_created_by_admin',
+            description: "Admin registered candidate {$user->full_name} ({$user->phone}).",
+            details: [
+                'candidate_id' => $user->id,
+                'phone'        => $user->phone,
+                'city'         => $user->city,
+                'qualification'=> $user->education,
+            ],
+            module: 'users',
+            entity: $user,
+            status: 'success'
+        );
+
         return redirect()->back()->with('success', 'Candidate successfully registered.');
     }
 
@@ -194,6 +209,18 @@ class UserController extends Controller
     {
         $user->is_online = ! $user->is_online;
         $user->save();
+
+        AuditLogService::log(
+            action: 'candidate_status_toggled',
+            description: "Admin toggled status for candidate {$user->full_name} to " . ($user->is_online ? 'Active' : 'Inactive'),
+            details: [
+                'candidate_id' => $user->id,
+                'is_online'    => $user->is_online,
+            ],
+            module: 'users',
+            entity: $user,
+            status: 'success'
+        );
 
         return redirect()->back()->with('success', 'Candidate status update ho gaya.');
     }

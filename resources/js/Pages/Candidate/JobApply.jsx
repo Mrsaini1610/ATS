@@ -33,8 +33,11 @@ import {
   Plus,
   X,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
+import { checkJobEligibility } from "@/Utils/jobHelpers";
 import HomepageLayout from "@/Layouts/HomepageLayout";
+import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
 
 const steps = ["Personal Info", "Professional Experience", "Qualifications & Resume", "Review & Submit"];
 
@@ -194,6 +197,8 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
 
     return "Graduate / Bachelor's";
   };
+
+  const eligibility = checkJobEligibility(jobDataFromBackend, candidate);
 
   const [step, setStep] = useState(0);
   const [showForm, setShowForm] = useState(loggedIn);
@@ -453,6 +458,11 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
 
   const handleNext = (e) => {
     e.preventDefault();
+
+    if (eligibility.isRestricted) {
+      setErrors({ eligibility: eligibility.reason });
+      return;
+    }
 
     if (!validateStep(step)) {
       return;
@@ -796,6 +806,38 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
           {/* Application Form Wizard */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 shadow-sm">
+              {loggedIn && eligibility.isRestricted && (
+                <div className="mb-6 p-4 sm:p-5 bg-red-50 border border-red-200 rounded-3xl text-left shadow-xs">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm sm:text-base font-extrabold text-red-900">
+                        Ineligible to Apply for this Position
+                      </h3>
+                      <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                        Employer requires a minimum educational qualification of <strong>{eligibility.jobMinQual}</strong>. Your profile qualification is registered as <strong>{eligibility.candidateQual || "Below requirement"}</strong>. Candidates below this requirement cannot submit an application.
+                      </p>
+                      <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+                        <Link
+                          href="/job-search"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                        >
+                          Explore Other Jobs
+                        </Link>
+                        <Link
+                          href="/profile"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-xl text-xs font-bold transition"
+                        >
+                          Update Profile Education
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {showForm ? (
                 <>
                   <h2 className="text-lg font-bold text-gray-900 mb-0.5">Apply for {job.title}</h2>
@@ -1932,13 +1974,22 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
                     )}
                     <button
                       type="submit"
-                      disabled={isSubmitting}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition cursor-pointer"
+                      disabled={isSubmitting || eligibility.isRestricted}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition shadow-xs ${
+                        eligibility.isRestricted
+                          ? "bg-red-100 text-red-700 border border-red-300 cursor-not-allowed opacity-90"
+                          : "bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-md shadow-blue-600/20 cursor-pointer"
+                      }`}
                     >
                       {isSubmitting ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           <span>Submitting Application...</span>
+                        </>
+                      ) : eligibility.isRestricted ? (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                          <span>Ineligible: Minimum {eligibility.jobMinQual} Required</span>
                         </>
                       ) : step < 3 ? (
                         <>
@@ -1971,35 +2022,17 @@ export default function JobApply({ jobDataFromBackend, candidate, loggedIn }) {
         </div>
       </div>
 
-      {/* Login Popup Modal */}
-      {loginPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs px-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
-              <User className="w-7 h-7 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Login Required</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              Please sign in to your candidate account to apply for <strong>{job.title}</strong>.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setLoginPopup(false)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <Link
-                href={`/login?redirect=/apply/${job.uuid || job.id}`}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition cursor-pointer shadow-xs inline-flex items-center justify-center"
-              >
-                Sign In
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Candidate Phone & OTP Login Modal */}
+      <CandidateLoginModal
+        isOpen={loginPopup}
+        onClose={() => setLoginPopup(false)}
+        onSuccess={() => {
+          setLoginPopup(false);
+          router.reload();
+        }}
+        jobTitle={job?.title || ""}
+        jobKey={job?.uuid || job?.id || ""}
+      />
     </HomepageLayout>
   );
 }

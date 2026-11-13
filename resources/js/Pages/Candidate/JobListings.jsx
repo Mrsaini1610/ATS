@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Star,
   Shield,
+  ShieldCheck,
   ArrowRight,
   TrendingUp,
   Calendar,
@@ -28,34 +29,38 @@ import {
   ChevronDown,
   Building2,
   RotateCcw,
+  GraduationCap,
+  AlertCircle,
 } from "lucide-react";
+import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
+import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
 
 /* ── Login Gate Modal ── */
 function LoginGateModal({ action, onClose, onLogin }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs px-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center animate-in fade-in zoom-in-95 duration-150">
-        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
-          <Shield className="w-7 h-7 text-blue-600" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs px-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center border border-gray-100 animate-in zoom-in-95 duration-150">
+        <div className="w-13 h-13 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3.5 border border-blue-100 shadow-xs">
+          <Shield className="w-6 h-6" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 mb-2">Login Required</h3>
-        <p className="text-sm text-gray-500 mb-5">
-          Please sign in to your candidate account to <strong>{action}</strong>.
+        <h3 className="text-lg font-extrabold text-gray-900 tracking-tight">Candidate Sign In Required</h3>
+        <p className="text-xs text-gray-500 mt-1 mb-5 leading-relaxed">
+          Please verify your mobile number to <strong>{action}</strong>. Instant OTP login — 100% free.
         </p>
-        <div className="flex gap-3">
+        <div className="flex gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+            className="flex-1 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onLogin}
-            className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition cursor-pointer shadow-xs"
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition cursor-pointer shadow-md shadow-blue-600/25"
           >
-            Sign In
+            Continue with OTP
           </button>
         </div>
       </div>
@@ -68,13 +73,20 @@ function JobDetailPanel({
   job,
   onClose,
   isLoggedIn,
+  user,
   onLoginRequired,
   onSaveJob,
   isSaved,
   isApplied,
   getCountdown,
+  onIneligibleClick,
 }) {
   if (!job) return null;
+
+  const { getDistanceTo } = useUserCoords(user);
+  const distance = job ? getDistanceTo(job.latitude, job.longitude) : null;
+  const minQual = getJobMinQualification(job);
+  const eligibility = checkJobEligibility(job, user);
 
   const skillsList = Array.isArray(job.skills)
     ? job.skills
@@ -115,6 +127,23 @@ function JobDetailPanel({
     }
   }, [job?.uuid || job?.id]);
 
+  // Track job view in audit logs
+  useEffect(() => {
+    if (job) {
+      const jobKey = job.uuid || job.id;
+      if (jobKey) {
+        fetch(`/jobs/${jobKey}/track-view`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
+          },
+        }).catch(() => {});
+      }
+    }
+  }, [job?.uuid || job?.id]);
+
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden">
       {/* Top Header Bar */}
@@ -128,8 +157,48 @@ function JobDetailPanel({
           )}
         </div>
 
-        {/* Right: Save Bookmark and Close Button */}
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Right: Apply Button, Save Bookmark and Close Button */}
+        <div className="flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap justify-end">
+          {isApplied ? (
+            <Link
+              href="/my-applications"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Applied</span>
+            </Link>
+          ) : job.can_apply ? (
+            eligibility.isRestricted ? (
+              <button
+                type="button"
+                onClick={() => onIneligibleClick && onIneligibleClick(job, eligibility)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer whitespace-nowrap"
+                title="Minimum qualification requirement not met"
+              >
+                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                <span>Ineligible ({minQual.label})</span>
+              </button>
+            ) : (
+              <Link
+                href={isLoggedIn ? `/apply/${job.uuid || job.id}` : "#"}
+                onClick={(e) => {
+                  if (!isLoggedIn) {
+                    e.preventDefault();
+                    onLoginRequired("apply for this job");
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs hover:shadow cursor-pointer whitespace-nowrap"
+              >
+                <span>{job.application_status === "rejected" ? "Apply Again" : "Apply Now"}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )
+          ) : (
+            <span className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-semibold">
+              Closed
+            </span>
+          )}
+
           {/* Highlighted Save Bookmark */}
           <button
             type="button"
@@ -188,9 +257,10 @@ function JobDetailPanel({
             </h2>
             <p className="text-blue-600 text-sm font-semibold mt-0.5">{job.company}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 font-medium">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                {job.location || "Multiple"}
+                <span>{job.location || "Multiple"}</span>
+                {distance && <span className="text-blue-600 font-bold">• {distance}</span>}
               </span>
               <span className="flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5 text-gray-400" />
@@ -211,6 +281,14 @@ function JobDetailPanel({
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Already Applied
             </span>
           )}
+          <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold border ${
+            eligibility.isRestricted
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-purple-50 text-purple-700 border-purple-200"
+          }`}>
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Min. {minQual.label}</span>
+          </span>
           <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
             <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Verified Opening
           </span>
@@ -223,6 +301,19 @@ function JobDetailPanel({
             {job.experience || job.exp || "Any Experience"}
           </span>
         </div>
+
+        {/* Ineligible Warning Notice */}
+        {isLoggedIn && eligibility.isRestricted && (
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-800">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-red-900">Ineligible: Minimum {minQual.label} Required</p>
+              <p className="mt-0.5 text-red-700 text-[11px] leading-relaxed">
+                Your profile indicates <strong>{eligibility.candidateQual || "Below requirement"}</strong>. Employer requires candidates to have at least <strong>{minQual.label}</strong> to apply.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Salary Strip */}
         <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl px-4 py-3">
@@ -446,46 +537,13 @@ function JobDetailPanel({
         )}
       </div>
 
-      {/* Footer Bar: Apply Button */}
-      <div className="shrink-0 bg-white border-t border-gray-100 px-5 sm:px-7 py-3.5 z-10 shadow-md">
-        {isApplied ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs sm:text-sm font-bold flex-1 shadow-2xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Application Submitted ({job.application_status ? (job.application_status.charAt(0).toUpperCase() + job.application_status.slice(1)) : 'Applied'})</span>
-            </div>
-            <Link
-              href="/my-applications"
-              className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs whitespace-nowrap"
-            >
-              Track Status
-            </Link>
-          </div>
-        ) : job.can_apply ? (
-          <Link
-            href={isLoggedIn ? `/apply/${job.uuid || job.id}` : "#"}
-            onClick={(e) => {
-              if (!isLoggedIn) {
-                e.preventDefault();
-                onLoginRequired("apply for this job");
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-xs cursor-pointer"
-          >
-            <span>{job.application_status === "rejected" ? "Apply Again" : "Apply Now"}</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="w-full py-3 rounded-xl text-white text-xs sm:text-sm font-semibold cursor-not-allowed flex items-center justify-center gap-2 bg-gray-400"
-          >
-            {job.application_status === "rejected"
-              ? `Reapply in ${getCountdown ? getCountdown(job.reapply_at) : "a few weeks"}`
-              : "Application Closed"}
-          </button>
-        )}
+      {/* Sleek bottom guarantee strip */}
+      <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-7 py-2.5 flex items-center justify-between text-xs text-gray-500">
+        <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          100% Free Application Guarantee
+        </span>
+        <span className="text-[11px] text-gray-400">Direct hiring partner</span>
       </div>
     </div>
   );
@@ -758,32 +816,16 @@ export default function JobListings({
   const [candidateLoginOpen, setCandidateLoginOpen] = useState(false);
   const [savedJobs, setSavedJobs] = useState(initialSavedJobs);
   const [now, setNow] = useState(Date.now());
+  const [ineligibleModal, setIneligibleModal] = useState({ isOpen: false, job: null, eligibility: null });
   const categoryScrollRef = useRef(null);
+  const categoryButtonRefs = useRef({});
 
-  // Sort categories so that whichever category is currently selected is placed right in front (at index 0, immediately next to All Roles)
+  const { getDistanceTo } = useUserCoords(user);
+
+  // Preserve natural category order - do not reorder selected item to front
   const sortedCategories = useMemo(() => {
-    const list = categories.filter((cat) => (cat.count ?? cat.job_posts_count ?? 0) > 0);
-    if (!selectedCategory || selectedCategory === "all" || selectedCategory === "All") {
-      return list;
-    }
-    const catVal = String(selectedCategory).toLowerCase().trim();
-    const selectedIdx = list.findIndex((cat) => {
-      return (
-        (cat.uuid && String(cat.uuid).toLowerCase().trim() === catVal) ||
-        (cat.id && String(cat.id).toLowerCase().trim() === catVal) ||
-        String(cat.name).toLowerCase().trim() === catVal ||
-        String(cat.name).toLowerCase().trim().includes(catVal) ||
-        catVal.includes(String(cat.name).toLowerCase().trim())
-      );
-    });
-
-    if (selectedIdx > 0) {
-      const selectedItem = list[selectedIdx];
-      const rest = list.filter((_, idx) => idx !== selectedIdx);
-      return [selectedItem, ...rest];
-    }
-    return list;
-  }, [categories, selectedCategory]);
+    return categories.filter((cat) => (cat.count ?? cat.job_posts_count ?? 0) > 0);
+  }, [categories]);
 
   // Identify currently selected category object for clean badge rendering
   const selectedCategoryObj = useMemo(() => {
@@ -821,11 +863,24 @@ export default function JobListings({
     }
   }, []);
 
-  // When selected category changes, smoothly scroll the container to 0 so the selected category (now at index 0) is front and center
+  // When selected category changes, smoothly scroll the container to center the selected category without reordering
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (categoryScrollRef.current) {
+      if (!categoryScrollRef.current) return;
+      if (!selectedCategory || selectedCategory === "all" || selectedCategory === "All") {
         categoryScrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+      const catVal = String(selectedCategory).toLowerCase().trim();
+      const matchedKey = Object.keys(categoryButtonRefs.current).find(
+        (k) => k.toLowerCase() === catVal
+      );
+      const targetEl = matchedKey ? categoryButtonRefs.current[matchedKey] : null;
+      if (targetEl && categoryScrollRef.current) {
+        const container = categoryScrollRef.current;
+        const targetScroll =
+          targetEl.offsetLeft - container.offsetWidth / 2 + targetEl.offsetWidth / 2;
+        container.scrollTo({ left: Math.max(0, targetScroll), behavior: "smooth" });
       }
     }, 60);
     return () => clearTimeout(timer);
@@ -1091,53 +1146,51 @@ export default function JobListings({
             setCandidateLoginOpen(false);
           }}
           jobTitle={selectedJob?.title || ""}
+          jobKey={selectedJob?.uuid || selectedJob?.id || ""}
         />
 
-        <div className="w-full max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-          {/* Header Title Section */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold mb-2 shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span>Verified Direct Openings</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 tracking-tight">
+        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 space-y-2">
+          {/* Header Title Section - Sleek & Space-Efficient */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-base sm:text-lg font-black text-gray-900 tracking-tight flex items-center gap-1.5">
                 Find Jobs in{" "}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                   India
                 </span>
               </h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Explore {jobs.length}+ opportunities from top companies & direct recruiters
-              </p>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] sm:text-[11px] font-bold">
+                <Sparkles className="w-3 h-3 text-blue-600" />
+                <span>{jobs.length}+ Verified Openings</span>
+              </span>
             </div>
 
-            {/* Mobile Filter Toggle */}
+            {/* Mobile / Tablet Filter Toggle */}
             <button
               type="button"
               onClick={() => setShowMobileFilters(true)}
-              className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm font-bold text-gray-800 shadow-xs hover:bg-gray-50 transition cursor-pointer self-start sm:self-auto"
+              className={`${selectedJob ? "flex 2xl:hidden" : "lg:hidden flex"} items-center justify-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 shadow-2xs hover:bg-gray-50 transition cursor-pointer`}
             >
-              <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
               <span>Filters</span>
               {hasActiveFilters && (
-                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
               )}
             </button>
           </div>
 
-          {/* Full-Width Hero Search Bar */}
-          <div className="bg-white rounded-2xl border border-gray-200/90 p-2 sm:p-3 shadow-xs">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+          {/* Compact Hero Search Bar */}
+          <div className="bg-white rounded-xl border border-gray-200/90 p-1 sm:p-1.5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1 sm:gap-1.5">
               {/* Keyword Search */}
-              <div className="flex items-center gap-2.5 flex-1 px-3 py-2 bg-gray-50/70 rounded-xl border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all">
-                <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="flex items-center gap-2 flex-1 px-2.5 py-1 sm:py-1.5 bg-gray-50/70 rounded-lg border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all">
+                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Job title, skill, or company name..."
-                  className="w-full text-xs sm:text-sm text-gray-900 bg-transparent border-0 ring-0 focus:ring-0 placeholder-gray-400 outline-none"
+                  className="w-full text-xs text-gray-900 bg-transparent border-0 ring-0 focus:ring-0 placeholder-gray-400 outline-none"
                 />
                 {search && (
                   <button
@@ -1145,18 +1198,18 @@ export default function JobListings({
                     onClick={() => setSearch("")}
                     className="text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
               {/* Location Select */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/70 rounded-xl border border-transparent focus-within:border-blue-400 focus-within:bg-white md:w-52 transition-all">
-                <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="flex items-center gap-1 px-2.5 py-1 sm:py-1.5 bg-gray-50/70 rounded-lg border border-transparent focus-within:border-blue-400 focus-within:bg-white sm:w-40 md:w-44 transition-all">
+                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <select
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full text-xs sm:text-sm text-gray-700 bg-transparent border-0 ring-0 focus:ring-0 cursor-pointer outline-none font-medium"
+                  className="w-full text-xs text-gray-700 bg-transparent border-0 ring-0 focus:ring-0 cursor-pointer outline-none font-medium truncate"
                 >
                   <option value="all">All Locations</option>
                   {availableLocations.map((loc) => (
@@ -1168,12 +1221,12 @@ export default function JobListings({
               </div>
 
               {/* Category Select */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50/70 rounded-xl border border-transparent focus-within:border-blue-400 focus-within:bg-white md:w-56 transition-all">
-                <Briefcase className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="hidden md:flex items-center gap-1 px-2.5 py-1 sm:py-1.5 bg-gray-50/70 rounded-lg border border-transparent focus-within:border-blue-400 focus-within:bg-white sm:w-44 md:w-48 transition-all">
+                <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full text-xs sm:text-sm text-gray-700 bg-transparent border-0 ring-0 focus:ring-0 cursor-pointer outline-none font-medium"
+                  className="w-full text-xs text-gray-700 bg-transparent border-0 ring-0 focus:ring-0 cursor-pointer outline-none font-medium truncate"
                 >
                   <option value="all">All Categories</option>
                   {sortedCategories.map((cat) => (
@@ -1189,44 +1242,44 @@ export default function JobListings({
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-3 py-1 sm:py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shrink-0"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3 h-3" />
                   <span>Clear</span>
                 </button>
               ) : (
-                <div className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs shrink-0 select-none">
-                  <Search className="w-3.5 h-3.5" />
+                <div className="px-3.5 py-1 sm:py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-2xs shrink-0 select-none">
+                  <Search className="w-3 h-3" />
                   <span>Search</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Category Tabs Bar with Auto-Scroll & Controls */}
-          <div className="relative flex items-center gap-1.5 w-full">
+          {/* Quick Category Tabs Bar with Smooth Centering & Controls */}
+          <div className="relative flex items-center gap-1 w-full">
             {/* Scroll Left Button */}
             <button
               type="button"
               onClick={() => categoryScrollRef.current?.scrollBy({ left: -220, behavior: "smooth" })}
               aria-label="Scroll categories left"
-              className="hidden sm:flex shrink-0 p-1.5 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
+              className="hidden sm:flex shrink-0 p-1 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
 
             {/* Scrollable Tabs */}
             <div
               ref={categoryScrollRef}
-              className="flex gap-2 overflow-x-auto pb-1 scrollbar-none whitespace-nowrap scroll-smooth flex-1"
+              className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none whitespace-nowrap scroll-smooth flex-1"
             >
               <button
                 type="button"
                 data-selected={selectedCategory === "all" || selectedCategory === "All" ? "true" : "false"}
                 onClick={() => setSelectedCategory("all")}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border ${
                   selectedCategory === "all" || selectedCategory === "All"
-                    ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-200"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300"
                     : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                 }`}
               >
@@ -1244,12 +1297,19 @@ export default function JobListings({
                   return (
                     <button
                       key={catKey}
+                      ref={(el) => {
+                        if (el) {
+                          categoryButtonRefs.current[catKey] = el;
+                          if (cat.name) categoryButtonRefs.current[cat.name] = el;
+                          if (cat.uuid) categoryButtonRefs.current[cat.uuid] = el;
+                        }
+                      }}
                       type="button"
                       data-selected={isSelected ? "true" : "false"}
                       onClick={() => setSelectedCategory(isSelected ? "all" : catKey)}
-                      className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                      className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1 ${
                         isSelected
-                          ? "bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300 font-extrabold scale-[1.02]"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300 font-bold"
                           : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-gray-50"
                       }`}
                     >
@@ -1274,16 +1334,20 @@ export default function JobListings({
               type="button"
               onClick={() => categoryScrollRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
               aria-label="Scroll categories right"
-              className="hidden sm:flex shrink-0 p-1.5 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
+              className="hidden sm:flex shrink-0 p-1 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-full shadow-2xs transition cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Main 2-Column Portal Section */}
-          <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-            {/* Desktop Left Sidebar: Permanent Filters */}
-            <aside className="hidden lg:block w-56 xl:w-60 shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3.5 sm:p-4 shadow-2xs sticky top-20 max-h-[calc(100vh-6.25rem)] overflow-y-auto custom-scrollbar">
+          {/* Main Content Layout */}
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full">
+            {/* Desktop Left Sidebar: Permanent Filters (Collapses on laptop screens when a job is viewed to prevent horizontal squeezing) */}
+            <aside
+              className={`${
+                selectedJob ? "hidden 2xl:block 2xl:w-56" : "hidden lg:block w-52 xl:w-56"
+              } shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3 shadow-2xs sticky top-16 max-h-[calc(100vh-4.5rem)] overflow-y-auto custom-scrollbar transition-all duration-200`}
+            >
               <FilterSidebar
                 categories={sortedCategories}
                 selectedCategory={selectedCategory}
@@ -1306,16 +1370,16 @@ export default function JobListings({
             </aside>
 
             {/* Right Main Job Area */}
-            <main className="flex-1 min-w-0 w-full space-y-4">
-              {/* Results Status & Sorting Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-gray-200/80 shadow-2xs">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> open positions
+            <main className="flex-1 min-w-0 w-full space-y-2.5">
+              {/* Results Status & Sorting Bar - Compact */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200/80 shadow-2xs text-xs">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs text-gray-600">
+                    Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> positions
                   </p>
 
                   {selectedCategoryObj && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
                       <span>Category: {selectedCategoryObj.name}</span>
                       <button
                         type="button"
@@ -1329,7 +1393,7 @@ export default function JobListings({
                   )}
 
                   {selectedCompany !== "all" && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
                       <span>Company: {selectedCompany}</span>
                       <button
                         type="button"
@@ -1343,7 +1407,7 @@ export default function JobListings({
                   )}
 
                   {search.trim() !== "" && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
                       <span>Search: "{search}"</span>
                       <button
                         type="button"
@@ -1368,12 +1432,12 @@ export default function JobListings({
                 </div>
 
                 {/* Sort By Dropdown */}
-                <div className="flex items-center gap-2 ml-auto">
-                  <span className="text-xs text-gray-500 font-medium">Sort by:</span>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className="text-[11px] text-gray-500 font-medium">Sort:</span>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="text-xs font-semibold bg-gray-50 text-gray-800 border border-gray-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    className="text-xs font-semibold bg-gray-50 text-gray-800 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="latest">🕒 Latest Jobs</option>
                     <option value="popular">🔥 Most Popular / Applied</option>
@@ -1402,22 +1466,30 @@ export default function JobListings({
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                <div className="flex flex-col lg:flex-row gap-4 sm:gap-5 items-start">
                   {/* Left Column: Job Cards List with Independent Scroller when Details Open */}
                   <div
                     className={`w-full ${
                       selectedJob
-                        ? "lg:w-[48%] xl:w-1/2 lg:h-[calc(100vh-6.25rem)] lg:sticky lg:top-20 lg:overflow-y-auto custom-scrollbar pr-1.5"
+                        ? "lg:w-[42%] xl:w-[38%] 2xl:w-[36%] lg:h-[calc(100vh-5rem)] lg:sticky lg:top-16 lg:overflow-y-auto custom-scrollbar pr-1"
                         : "w-full"
                     } transition-all duration-300 ease-out`}
                   >
-                    <div className={selectedJob ? "space-y-3.5" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"}>
+                    <div className={selectedJob ? "space-y-3" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5"}>
                       {filteredJobs.map((job) => {
                         const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
                         const jobKey = job.uuid || job.id;
                         const isSaved = savedJobs.includes(job.uuid) || savedJobs.includes(job.id);
                         const applied = isJobApplied(job);
                         const isCurrentSelected = selectedJob?.uuid === job.uuid || selectedJob?.id === job.id;
+                        const minQual = getJobMinQualification(job);
+                        const distance = getDistanceTo(job.latitude, job.longitude);
+                        const eligibility = checkJobEligibility(job, user);
+                        const skillsList = Array.isArray(job.skills)
+                          ? job.skills
+                          : typeof job.skills === "string"
+                            ? (job.skills.includes(",") ? job.skills.split(",") : job.skills.split("\n")).map((s) => s.trim()).filter(Boolean)
+                            : [];
 
                         return (
                           <div
@@ -1426,14 +1498,16 @@ export default function JobListings({
                             className={`bg-white rounded-2xl border p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs ${
                               isCurrentSelected
                                 ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
-                                : "border-gray-200/90"
+                                : eligibility.isRestricted
+                                  ? "border-red-100/90 hover:border-red-300"
+                                  : "border-gray-200/90"
                             }`}
                           >
                         <div>
-                          {/* Card Header: Avatar + Title + Bookmark */}
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex items-start gap-3.5 min-w-0">
-                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-sm font-black shrink-0 overflow-hidden shadow-2xs">
+                          {/* Card Header: Avatar + Company Name on Left, Bookmark on Right */}
+                          <div className="flex items-center justify-between gap-2.5 mb-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden shadow-2xs">
                                 {job.company_image ? (
                                   <img
                                     src={job.company_image.startsWith('http://') || job.company_image.startsWith('https://') ? job.company_image : (job.company_image.startsWith('/') ? job.company_image : `/storage/${job.company_image}`)}
@@ -1448,95 +1522,146 @@ export default function JobListings({
                                 )}
                               </div>
 
-                              <div className="min-w-0 flex-1">
-                                <h3 className="font-bold text-base text-gray-900 group-hover:text-blue-600 transition-colors leading-snug">
-                                  {job.title}
-                                </h3>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-xs font-semibold text-blue-600 truncate">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-bold text-gray-800 truncate max-w-[170px]">
                                     {job.company}
                                   </span>
                                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                 </div>
+                                {job.created_at_human && (
+                                  <span className="text-[10px] text-gray-400 block">{job.created_at_human}</span>
+                                )}
                               </div>
                             </div>
 
-                            {/* Header Actions: Applied Badge + Highlighted Bookmark Button */}
-                            <div className="flex items-center gap-2 shrink-0">
+                            {/* Top Right: Applied Badge + Bookmark Button */}
+                            <div className="flex items-center gap-1.5 shrink-0">
                               {applied && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                   <span>Applied</span>
                                 </span>
                               )}
                               <button
                                 type="button"
                                 onClick={(e) => handleToggleSaveJob(e, job.uuid || job.id)}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 font-bold text-xs shadow-2xs ${isSaved
-                                  ? "bg-blue-50 hover:bg-red-50 border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 group/save"
-                                  : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 text-gray-500 hover:text-blue-600"
-                                  }`}
+                                className={`p-1.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 ${
+                                  isSaved
+                                    ? "bg-blue-50 text-blue-600 border-blue-200"
+                                    : "bg-white text-gray-400 border-gray-200 hover:text-blue-600 hover:border-blue-300"
+                                }`}
                                 title={isSaved ? "Saved (Click to remove)" : "Save Job"}
                               >
-                                {isSaved ? (
-                                  <>
-                                    <BookmarkCheck className="w-4 h-4 fill-blue-600 text-blue-600 group-hover/save:hidden" />
-                                    <BookmarkX className="w-4 h-4 hidden group-hover/save:block text-red-600" />
-                                    <span className="group-hover/save:hidden"></span>
-                                    <span className="hidden group-hover/save:inline"></span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Bookmark className="w-4 h-4" />
-                                    <span></span>
-                                  </>
-                                )}
+                                <Bookmark className={`w-4 h-4 ${isSaved ? "fill-blue-600 text-blue-600" : ""}`} />
                               </button>
                             </div>
                           </div>
 
-                          {/* Meta Tags Row */}
-                          <div className="flex flex-wrap items-center gap-2 mb-3.5 text-xs text-gray-600">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-100">
-                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                              <span>{job.location || "Multiple Locations"}</span>
-                            </span>
+                          {/* Post Name / Job Title - FULL WIDTH, NEVER SQUEEZED */}
+                          <h3 className="font-extrabold text-base text-gray-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2 mb-2">
+                            {job.title}
+                          </h3>
 
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-100">
-                              <Briefcase className="w-3.5 h-3.5 text-gray-400" />
-                              <span>{job.job_type || job.type || "Full Time"}</span>
-                            </span>
-
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-100">
-                              <Clock className="w-3.5 h-3.5 text-gray-400" />
-                              <span>{job.experience || job.exp || "Fresher / Any Exp"}</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Card Bottom: Salary & Action Buttons */}
-                        <div className="pt-3.5 border-t border-gray-100 mt-2 flex items-center justify-between gap-2">
-                          <div>
-                            <span className="text-[10px] text-gray-400 block font-medium">Offered Salary</span>
-                            <div className="text-sm font-extrabold text-emerald-700 flex items-center gap-0.5">
+                          {/* Salary & Job Details Strip (Set Prominently right below title) */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
+                            <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
                               {(!job.salary || !job.salary.includes("₹")) && (
                                 <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               )}
-                              <span>{job.salary || "Competitive"}</span>
+                              <span>{job.salary || "Competitive Salary"}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
+                              <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.job_type || job.type || "Full Time"}</span>
+                              <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.experience || job.exp || "Fresher"}</span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {applied && (
-                              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 shadow-2xs">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Applied</span>
+                          {/* Qualifications & Requirements Box - Shown Outside on Card */}
+                          <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
+                            {/* Qualification Row */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                                <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Qualification:</span>
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                  isLoggedIn && eligibility.isRestricted
+                                    ? "bg-red-50 text-red-700 border-red-200"
+                                    : "bg-purple-50 text-purple-700 border-purple-200"
+                                }`}
+                              >
+                                {isLoggedIn && eligibility.isRestricted ? (
+                                  <>
+                                    <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
+                                    <span>Min. {minQual.label} (Ineligible)</span>
+                                  </>
+                                ) : (
+                                  <span>Min. {minQual.label}</span>
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Requirements / Skills Row */}
+                            {skillsList.length > 0 && (
+                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
+                                  Requirements:
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                  {skillsList.slice(0, 3).map((skill, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md truncate max-w-[130px]"
+                                    >
+                                      {skill}
+                                    </span>
+                                  ))}
+                                  {skillsList.length > 3 && (
+                                    <span className="text-[10px] font-semibold text-gray-400 self-center">
+                                      +{skillsList.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
+                        <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
+                          {/* Location & Distance */}
+                          <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
+                            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
+                            {distance && (
+                              <span className="text-blue-600 font-bold shrink-0 bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
+                                • {distance}
                               </span>
                             )}
-                            <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
-                              <span>{isCurrentSelected ? "Viewing Details" : "Details"}</span>
-                              <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isCurrentSelected ? "translate-x-1 text-blue-700" : "group-hover:translate-x-0.5"}`} />
-                            </span>
+                          </div>
+
+                          {/* Right Action Button */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isLoggedIn && eligibility.isRestricted ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIneligibleModal({ isOpen: true, job, eligibility });
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-2xs transition cursor-pointer"
+                              >
+                                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                                <span>Ineligible</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
+                                <span>{isCurrentSelected ? "Viewing" : "Details"}</span>
+                                <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isCurrentSelected ? "translate-x-1 text-blue-700" : "group-hover:translate-x-0.5"}`} />
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1547,16 +1672,18 @@ export default function JobListings({
 
                   {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
                   {selectedJob && (
-                    <div className="hidden lg:flex w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-20 lg:h-[calc(100vh-6.25rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
+                    <div className="hidden lg:flex w-full lg:w-[58%] xl:w-[62%] 2xl:w-[64%] bg-white rounded-2xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-16 lg:h-[calc(100vh-5rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
                       <JobDetailPanel
                         job={selectedJob}
                         onClose={() => setSelectedJob(null)}
                         isLoggedIn={isLoggedIn}
+                        user={user}
                         onLoginRequired={(action) => setLoginGateAction(action)}
                         onSaveJob={(id) => handleToggleSaveJob(null, id)}
                         isSaved={savedJobs.includes(selectedJob.uuid) || savedJobs.includes(selectedJob.id)}
                         isApplied={isJobApplied(selectedJob)}
                         getCountdown={getCountdown}
+                        onIneligibleClick={(j, e) => setIneligibleModal({ isOpen: true, job: j, eligibility: e })}
                       />
                     </div>
                   )}
@@ -1630,14 +1757,24 @@ export default function JobListings({
               job={selectedJob}
               onClose={() => setSelectedJob(null)}
               isLoggedIn={isLoggedIn}
+              user={user}
               onLoginRequired={(action) => setLoginGateAction(action)}
               onSaveJob={(id) => handleToggleSaveJob(null, id)}
               isSaved={savedJobs.includes(selectedJob.uuid) || savedJobs.includes(selectedJob.id)}
               isApplied={isJobApplied(selectedJob)}
               getCountdown={getCountdown}
+              onIneligibleClick={(j, e) => setIneligibleModal({ isOpen: true, job: j, eligibility: e })}
             />
           </div>
         )}
+
+        {/* Qualification Ineligible Alert Modal */}
+        <EligibilityAlertModal
+          isOpen={ineligibleModal.isOpen}
+          onClose={() => setIneligibleModal({ isOpen: false, job: null, eligibility: null })}
+          job={ineligibleModal.job}
+          eligibility={ineligibleModal.eligibility}
+        />
       </HomepageLayout>
     </>
   );

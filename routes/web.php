@@ -76,6 +76,7 @@ Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->name('sitemap');
 
 Route::get('/apply/{job}', [JobController::class, 'apply'])->name('jobs.apply');
 Route::post('/apply/{job}', [JobController::class, 'submitApplication'])->name('jobs.apply.submit');
+Route::post('/jobs/{job}/track-view', [JobController::class, 'trackJobView'])->name('jobs.track-view');
 
 Route::get('/location/states', [LocationController::class, 'getState']);
 Route::get('/location/cities', [LocationController::class, 'getCitybyState']);

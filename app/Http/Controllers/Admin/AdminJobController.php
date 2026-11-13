@@ -336,6 +336,23 @@ class AdminJobController extends Controller
             \Illuminate\Support\Facades\Log::warning('Failed sending new job created email/notifications: ' . $e->getMessage());
         }
 
+        // Audit Trail Log
+        AuditLogService::log(
+            action: 'job_created',
+            description: "Admin {$user->name} created new job '{$job->title}' at {$job->company}.",
+            details: [
+                'job_id'   => $job->id,
+                'job_uuid' => $job->uuid,
+                'status'   => $job->status,
+                'company'  => $job->company,
+                'platform' => 'web',
+            ],
+            module: 'jobs',
+            entity: $job,
+            status: 'success',
+            actor: $user
+        );
+
         return redirect()->route('admin.jobs.index')->with('success', 'Job post successfully created.');
     }
 
@@ -480,6 +497,22 @@ class AdminJobController extends Controller
                 MailService::notifySuperAdmin("Job Assigned to Team Member", "Job '{$job->title}' assigned to team member ID {$adminId}.", ['job_id' => $job->id]);
             } catch (\Throwable $e) {}
         }
+
+        AuditLogService::log(
+            action: 'job_assigned',
+            description: $adminId
+                ? "Job '{$job->title}' assigned to team member " . ($admin?->name ?? "#{$adminId}")
+                : "Assignment removed for job '{$job->title}'",
+            details: [
+                'job_id'      => $job->id,
+                'assigned_to' => $admin?->name ?? $adminId,
+                'platform'    => 'web',
+            ],
+            module: 'jobs',
+            entity: $job,
+            status: 'success',
+            actor: $user
+        );
 
         return redirect()->back()->with('success', $adminId ? 'Team member assigned successfully.' : 'Assignment removed.');
     }
