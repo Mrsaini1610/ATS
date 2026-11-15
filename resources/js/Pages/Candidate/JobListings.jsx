@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
 import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 
 /* ── Login Gate Modal ── */
 function LoginGateModal({ action, onClose, onLogin }) {
@@ -139,13 +140,13 @@ function JobDetailPanel({
             "X-Requested-With": "XMLHttpRequest",
             "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
           },
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
   }, [job?.uuid || job?.id]);
 
   return (
-    <div className="flex flex-col h-full w-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-white overflow-hidden relative">
       {/* Top Header Bar */}
       <div className="shrink-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between z-10">
         {/* Left: Category Tag */}
@@ -203,11 +204,10 @@ function JobDetailPanel({
           <button
             type="button"
             onClick={() => onSaveJob(job.uuid || job.id)}
-            className={`p-2 border rounded-xl transition-all duration-200 cursor-pointer shadow-2xs ${
-              isSaved
-                ? "bg-blue-50 hover:bg-red-50 border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 group/save"
-                : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 text-gray-500 hover:text-blue-600"
-            }`}
+            className={`p-2 border rounded-xl transition-all duration-200 cursor-pointer shadow-2xs ${isSaved
+              ? "bg-blue-50 hover:bg-red-50 border-blue-200 hover:border-red-200 text-blue-600 hover:text-red-600 group/save"
+              : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 text-gray-500 hover:text-blue-600"
+              }`}
             title={isSaved ? "Saved (Click to remove)" : "Save Job"}
           >
             {isSaved ? (
@@ -234,7 +234,7 @@ function JobDetailPanel({
       </div>
 
       {/* Main Content Area (Independent Scroller) */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar overscroll-contain px-5 sm:px-7 py-5 space-y-5">
+      <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar overscroll-contain px-5 sm:px-7 py-5 space-y-5">
         {/* Company + Title */}
         <div className="flex items-start gap-4">
           <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shrink-0 shadow-sm shadow-blue-500/10 overflow-hidden">
@@ -285,11 +285,10 @@ function JobDetailPanel({
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Already Applied
             </span>
           )}
-          <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold border ${
-            eligibility.isRestricted
-              ? "bg-red-50 text-red-700 border-red-200"
-              : "bg-purple-50 text-purple-700 border-purple-200"
-          }`}>
+          <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold border ${eligibility.isRestricted
+            ? "bg-red-50 text-red-700 border-red-200"
+            : "bg-purple-50 text-purple-700 border-purple-200"
+            }`}>
             <GraduationCap className="w-3.5 h-3.5" />
             <span>Min. {minQual.label}</span>
           </span>
@@ -541,13 +540,16 @@ function JobDetailPanel({
         )}
       </div>
 
+      {/* Floating Bottom-Center Scroll Indicator Button (Down Arrow -> Up Arrow) */}
+      <ViewScrollIndicator containerRef={contentRef} bottomOffsetClass="bottom-12" />
+
       {/* Sleek bottom guarantee strip */}
-      <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-7 py-2.5 flex items-center justify-between text-xs text-gray-500">
-        <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+      <div className="shrink-0 bg-[#f8fafc] border-t border-slate-200/90 px-5 sm:px-7 py-3 flex items-center justify-between text-xs text-slate-600 shadow-inner">
+        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           100% Free Application Guarantee
         </span>
-        <span className="text-[11px] text-gray-400">Direct hiring partner</span>
+        <span className="text-[11px] text-slate-500 font-medium">Direct hiring partner</span>
       </div>
     </div>
   );
@@ -831,7 +833,7 @@ export default function JobListings({
     if (newSort === "nearest") {
       if (!coords.latitude) {
         requestLocation(
-          () => {},
+          () => { },
           (err) => {
             console.warn("Location permission not granted for nearest sort:", err);
           }
@@ -1144,6 +1146,29 @@ export default function JobListings({
     }
   };
 
+  // Auto-scroll selected job card into view front & center, without altering array order
+  useEffect(() => {
+    if (selectedJob && typeof window !== "undefined") {
+      const jobKey = selectedJob.uuid || selectedJob.id;
+
+      requestAnimationFrame(() => {
+        const anchor = document.getElementById("jobs-results-anchor");
+        if (anchor && window.innerWidth >= 1024) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+
+      const timer = setTimeout(() => {
+        const cardEl = document.getElementById(`candidate-job-card-${jobKey}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 80);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedJob?.uuid || selectedJob?.id]);
+
   const handleItemClick = (job) => {
     const jobKey = job.uuid || job.id;
     const currentKey = selectedJob?.uuid || selectedJob?.id;
@@ -1151,23 +1176,13 @@ export default function JobListings({
       setSelectedJob(null);
     } else {
       setSelectedJob(job);
-      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-        requestAnimationFrame(() => {
-          const anchor = document.getElementById("jobs-results-anchor");
-          if (anchor) {
-            const rect = anchor.getBoundingClientRect();
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            window.scrollTo({ top: Math.max(0, scrollTop + rect.top - 72), behavior: "smooth" });
-          }
-        });
-      }
     }
   };
 
   return (
     <>
       <Head title="Find Jobs in India - ATS" />
-      <HomepageLayout>
+      <HomepageLayout hideFooter={Boolean(selectedJob)}>
         {/* Login Gate Modal */}
         {loginGateAction && (
           <LoginGateModal
@@ -1192,9 +1207,17 @@ export default function JobListings({
           jobKey={selectedJob?.uuid || selectedJob?.id || ""}
         />
 
-        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 space-y-2">
+        <div
+          className={`w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 py-2 flex flex-col ${selectedJob
+            ? "lg:h-[calc(100vh-4rem)] lg:max-h-[calc(100vh-4rem)] lg:overflow-hidden"
+            : "space-y-2"
+            }`}
+        >
           {/* Header Title Section - Sleek & Space-Efficient */}
-          <div className="flex items-center justify-between gap-2">
+          <div
+            className={`flex items-center justify-between gap-2 shrink-0 ${selectedJob ? "lg:hidden" : ""
+              }`}
+          >
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <h1 className="text-base sm:text-lg font-black text-gray-900 tracking-tight flex items-center gap-1.5">
                 Find Jobs in{" "}
@@ -1223,7 +1246,10 @@ export default function JobListings({
           </div>
 
           {/* Compact Hero Search Bar */}
-          <div className="bg-white rounded-xl border border-gray-200/90 p-1 sm:p-1.5 shadow-2xs">
+          <div
+            className={`bg-white rounded-xl border border-gray-200/90 p-1 sm:p-1.5 shadow-2xs shrink-0 ${selectedJob ? "mb-1" : ""
+              }`}
+          >
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1 sm:gap-1.5">
               {/* Keyword Search */}
               <div className="flex items-center gap-2 flex-1 px-2.5 py-1 sm:py-1.5 bg-gray-50/70 rounded-lg border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all">
@@ -1300,7 +1326,10 @@ export default function JobListings({
           </div>
 
           {/* Quick Category Tabs Bar with Smooth Centering & Controls */}
-          <div className="relative flex items-center gap-1 w-full">
+          <div
+            className={`relative flex items-center gap-1 w-full shrink-0 ${selectedJob ? "lg:hidden" : ""
+              }`}
+          >
             {/* Scroll Left Button */}
             <button
               type="button"
@@ -1320,56 +1349,53 @@ export default function JobListings({
                 type="button"
                 data-selected={selectedCategory === "all" || selectedCategory === "All" ? "true" : "false"}
                 onClick={() => setSelectedCategory("all")}
-                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border ${
-                  selectedCategory === "all" || selectedCategory === "All"
-                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                }`}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border ${selectedCategory === "all" || selectedCategory === "All"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                  }`}
               >
                 All Roles {jobs.length > 0 && `(${jobs.length})`}
               </button>
 
               {sortedCategories.map((cat) => {
-                  const catKey = cat.uuid || cat.name;
-                  const isSelected =
-                    (cat.uuid && String(selectedCategory).toLowerCase() === String(cat.uuid).toLowerCase()) ||
-                    (cat.id && String(selectedCategory).toLowerCase() === String(cat.id).toLowerCase()) ||
-                    String(selectedCategory).toLowerCase() === String(cat.name).toLowerCase();
-                  const count = cat.count ?? cat.job_posts_count ?? 0;
+                const catKey = cat.uuid || cat.name;
+                const isSelected =
+                  (cat.uuid && String(selectedCategory).toLowerCase() === String(cat.uuid).toLowerCase()) ||
+                  (cat.id && String(selectedCategory).toLowerCase() === String(cat.id).toLowerCase()) ||
+                  String(selectedCategory).toLowerCase() === String(cat.name).toLowerCase();
+                const count = cat.count ?? cat.job_posts_count ?? 0;
 
-                  return (
-                    <button
-                      key={catKey}
-                      ref={(el) => {
-                        if (el) {
-                          categoryButtonRefs.current[catKey] = el;
-                          if (cat.name) categoryButtonRefs.current[cat.name] = el;
-                          if (cat.uuid) categoryButtonRefs.current[cat.uuid] = el;
-                        }
-                      }}
-                      type="button"
-                      data-selected={isSelected ? "true" : "false"}
-                      onClick={() => setSelectedCategory(isSelected ? "all" : catKey)}
-                      className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1 ${
-                        isSelected
-                          ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300 font-bold"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                return (
+                  <button
+                    key={catKey}
+                    ref={(el) => {
+                      if (el) {
+                        categoryButtonRefs.current[catKey] = el;
+                        if (cat.name) categoryButtonRefs.current[cat.name] = el;
+                        if (cat.uuid) categoryButtonRefs.current[cat.uuid] = el;
+                      }
+                    }}
+                    type="button"
+                    data-selected={isSelected ? "true" : "false"}
+                    onClick={() => setSelectedCategory(isSelected ? "all" : catKey)}
+                    className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1 ${isSelected
+                      ? "bg-blue-600 text-white border-blue-600 shadow-2xs ring-1 ring-blue-300 font-bold"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-gray-50"
                       }`}
-                    >
-                      {cat.icon && <span>{cat.icon}</span>}
-                      <span>{cat.name}</span>
-                      {count > 0 && (
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                            isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                  >
+                    {cat.icon && <span>{cat.icon}</span>}
+                    <span>{cat.name}</span>
+                    {count > 0 && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                           }`}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Scroll Right Button */}
@@ -1384,12 +1410,17 @@ export default function JobListings({
           </div>
 
           {/* Main Content Layout */}
-          <div id="jobs-results-anchor" className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full">
+          <div
+            id="jobs-results-anchor"
+            className={`flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full ${selectedJob ? "flex-1 min-h-0 h-full overflow-hidden" : ""
+              }`}
+          >
             {/* Desktop Left Sidebar: Permanent Filters (Collapses on laptop screens when a job is viewed to prevent horizontal squeezing) */}
             <aside
-              className={`${
-                selectedJob ? "hidden 2xl:block 2xl:w-56" : "hidden lg:block w-52 xl:w-56"
-              } shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3 shadow-2xs sticky top-18 max-h-[calc(100vh-5.5rem)] overflow-y-auto custom-scrollbar transition-all duration-200`}
+              className={`${selectedJob
+                ? "hidden 2xl:block 2xl:w-52 h-full overflow-y-auto"
+                : "hidden lg:block w-52 xl:w-56 sticky top-18 max-h-[calc(100vh-5.5rem)] overflow-y-auto"
+                } shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3 shadow-2xs custom-scrollbar transition-all duration-200`}
             >
               <FilterSidebar
                 categories={sortedCategories}
@@ -1413,9 +1444,17 @@ export default function JobListings({
             </aside>
 
             {/* Right Main Job Area */}
-            <main className="flex-1 min-w-0 w-full space-y-2.5">
+            <main
+              className={`flex-1 min-w-0 w-full ${selectedJob
+                ? "flex flex-col h-full min-h-0 overflow-hidden"
+                : "space-y-2.5"
+                }`}
+            >
               {/* Results Status & Sorting Bar - Compact */}
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200/80 shadow-2xs text-xs">
+              <div
+                className={`flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200/80 shadow-2xs text-xs shrink-0 ${selectedJob ? "mb-1.5" : ""
+                  }`}
+              >
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <p className="text-xs text-gray-600">
                     Showing <span className="font-extrabold text-gray-900">{filteredJobs.length}</span> positions
@@ -1480,11 +1519,10 @@ export default function JobListings({
                   <button
                     type="button"
                     onClick={() => handleSortChange(sortBy === "nearest" ? "latest" : "nearest")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                      sortBy === "nearest"
-                        ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                        : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
-                    }`}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${sortBy === "nearest"
+                      ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                      }`}
                     title="Sort by nearest to your location (Pass wali jobs)"
                   >
                     <MapPin className={`w-3.5 h-3.5 ${sortBy === "nearest" ? "text-white" : "text-blue-600"}`} />
@@ -1527,14 +1565,16 @@ export default function JobListings({
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col lg:flex-row gap-4 sm:gap-5 items-start">
+                <div
+                  className={`flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full ${selectedJob ? "flex-1 min-h-0 h-full overflow-hidden" : ""
+                    }`}
+                >
                   {/* Left Column: Job Cards List with Independent Scroller when Details Open */}
                   <div
-                    className={`w-full ${
-                      selectedJob
-                        ? "lg:w-[42%] xl:w-[38%] 2xl:w-[36%] lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] lg:sticky lg:top-18 lg:overflow-y-auto custom-scrollbar pr-1"
-                        : "w-full"
-                    } transition-all duration-300 ease-out`}
+                    className={`w-full ${selectedJob
+                      ? "lg:w-[40%] xl:w-[38%] 2xl:w-[36%] h-full lg:overflow-y-auto custom-scrollbar pr-1.5"
+                      : "w-full"
+                      } transition-all duration-300 ease-out`}
                   >
                     <div className={selectedJob ? "space-y-3" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5"}>
                       {filteredJobs.map((job) => {
@@ -1555,185 +1595,183 @@ export default function JobListings({
                         return (
                           <div
                             key={jobKey}
+                            id={`candidate-job-card-${jobKey}`}
                             onClick={() => handleItemClick(job)}
-                            className={`bg-white rounded-2xl border p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs ${
-                              isCurrentSelected
-                                ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
-                                : eligibility.isRestricted
-                                  ? "border-red-100/90 hover:border-red-300"
-                                  : "border-gray-200/90"
-                            }`}
+                            className={`bg-white rounded-2xl border p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs overflow-hidden break-words min-w-0 ${isCurrentSelected
+                              ? "border-blue-600 ring-2 ring-blue-500/50 bg-blue-50/40 shadow-md shadow-blue-500/10"
+                              : eligibility.isRestricted
+                                ? "border-red-100/90 hover:border-red-300"
+                                : "border-gray-200/90"
+                              }`}
                           >
-                        <div>
-                          {/* Card Header: Avatar + Company Name on Left, Bookmark on Right */}
-                          <div className="flex items-center justify-between gap-2.5 mb-2.5">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden shadow-2xs">
-                                {job.company_image ? (
-                                  <img
-                                    src={job.company_image.startsWith('http://') || job.company_image.startsWith('https://') ? job.company_image : (job.company_image.startsWith('/') ? job.company_image : `/storage/${job.company_image}`)}
-                                    alt={job.company}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      e.target.style.display = "none";
-                                    }}
-                                  />
-                                ) : (
-                                  companyInitials
-                                )}
-                              </div>
+                            <div className="min-w-0">
+                              {/* Card Header: Avatar + Company Name on Left, Bookmark on Right */}
+                              <div className="flex items-center justify-between gap-2.5 mb-2.5">
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden shadow-2xs">
+                                    {job.company_image ? (
+                                      <img
+                                        src={job.company_image.startsWith('http://') || job.company_image.startsWith('https://') ? job.company_image : (job.company_image.startsWith('/') ? job.company_image : `/storage/${job.company_image}`)}
+                                        alt={job.company}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.target.style.display = "none";
+                                        }}
+                                      />
+                                    ) : (
+                                      companyInitials
+                                    )}
+                                  </div>
 
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs font-bold text-gray-800 truncate max-w-[170px]">
-                                    {job.company}
-                                  </span>
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <span className="text-xs font-bold text-gray-800 whitespace-normal break-words">
+                                        {job.company}
+                                      </span>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                    </div>
+                                    {job.created_at_human && (
+                                      <span className="text-[10px] text-gray-400 block truncate">{job.created_at_human}</span>
+                                    )}
+                                  </div>
                                 </div>
-                                {job.created_at_human && (
-                                  <span className="text-[10px] text-gray-400 block">{job.created_at_human}</span>
-                                )}
-                              </div>
-                            </div>
 
-                            {/* Top Right: Applied Badge + Bookmark Button */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {applied && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>Applied</span>
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleSaveJob(e, job.uuid || job.id)}
-                                className={`p-1.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 ${
-                                  isSaved
-                                    ? "bg-blue-50 text-blue-600 border-blue-200"
-                                    : "bg-white text-gray-400 border-gray-200 hover:text-blue-600 hover:border-blue-300"
-                                }`}
-                                title={isSaved ? "Saved (Click to remove)" : "Save Job"}
-                              >
-                                <Bookmark className={`w-4 h-4 ${isSaved ? "fill-blue-600 text-blue-600" : ""}`} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Post Name / Job Title - FULL WIDTH, NEVER SQUEEZED */}
-                          <h3 className="font-extrabold text-base text-gray-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2 mb-2">
-                            {job.title}
-                          </h3>
-
-                          {/* Salary & Job Details Strip (Set Prominently right below title) */}
-                          <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
-                            <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
-                              {(!job.salary || !job.salary.includes("₹")) && (
-                                <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              )}
-                              <span>{job.salary || "Competitive Salary"}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
-                              <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.job_type || job.type || "Full Time"}</span>
-                              <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.experience || job.exp || "Fresher"}</span>
-                            </div>
-                          </div>
-
-                          {/* Qualifications & Requirements Box - Shown Outside on Card */}
-                          <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
-                            {/* Qualification Row */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                                <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
-                                <span>Qualification:</span>
-                              </span>
-                              <span
-                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                                  isLoggedIn && eligibility.isRestricted
-                                    ? "bg-red-50 text-red-700 border-red-200"
-                                    : "bg-purple-50 text-purple-700 border-purple-200"
-                                }`}
-                              >
-                                {isLoggedIn && eligibility.isRestricted ? (
-                                  <>
-                                    <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
-                                    <span>Min. {minQual.label} (Ineligible)</span>
-                                  </>
-                                ) : (
-                                  <span>Min. {minQual.label}</span>
-                                )}
-                              </span>
-                            </div>
-
-                            {/* Requirements / Skills Row */}
-                            {skillsList.length > 0 && (
-                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
-                                  Requirements:
-                                </span>
-                                <div className="flex flex-wrap gap-1">
-                                  {skillsList.slice(0, 3).map((skill, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md truncate max-w-[130px]"
-                                    >
-                                      {skill}
-                                    </span>
-                                  ))}
-                                  {skillsList.length > 3 && (
-                                    <span className="text-[10px] font-semibold text-gray-400 self-center">
-                                      +{skillsList.length - 3}
+                                {/* Top Right: Applied Badge + Bookmark Button */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {applied && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                      <span>Applied</span>
                                     </span>
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleToggleSaveJob(e, job.uuid || job.id)}
+                                    className={`p-1.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 ${isSaved
+                                      ? "bg-blue-50 text-blue-600 border-blue-200"
+                                      : "bg-white text-gray-400 border-gray-200 hover:text-blue-600 hover:border-blue-300"
+                                      }`}
+                                    title={isSaved ? "Saved (Click to remove)" : "Save Job"}
+                                  >
+                                    <Bookmark className={`w-4 h-4 ${isSaved ? "fill-blue-600 text-blue-600" : ""}`} />
+                                  </button>
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        </div>
 
-                        {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
-                        <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
-                          {/* Location & Distance */}
-                          <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
-                            <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
-                            {distance && (
-                              <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
-                                • {distance}
-                              </span>
-                            )}
-                          </div>
+                              {/* Post Name / Job Title - FULL WIDTH, NEVER SQUEEZED */}
+                              <h3 className="font-extrabold text-base text-gray-900 group-hover:text-blue-600 transition-colors leading-snug whitespace-normal break-words mb-2">
+                                {job.title}
+                              </h3>
 
-                          {/* Right Action Button */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isLoggedIn && eligibility.isRestricted ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIneligibleModal({ isOpen: true, job, eligibility });
-                                }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-2xs transition cursor-pointer"
-                              >
-                                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-                                <span>Ineligible</span>
-                              </button>
-                            ) : (
-                              <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
-                                <span>{isCurrentSelected ? "Viewing" : "Details"}</span>
-                                <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isCurrentSelected ? "translate-x-1 text-blue-700" : "group-hover:translate-x-0.5"}`} />
-                              </span>
-                            )}
+                              {/* Salary & Job Details Strip (Set Prominently right below title) */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
+                                <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg break-words max-w-full">
+                                  {(!job.salary || !job.salary.includes("₹")) && (
+                                    <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  )}
+                                  <span className="break-words">{job.salary || "Competitive Salary"}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 flex-wrap">
+                                  <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.job_type || job.type || "Full Time"}</span>
+                                  <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.experience || job.exp || "Fresher"}</span>
+                                </div>
+                              </div>
+
+                              {/* Qualifications & Requirements Box - Shown Outside on Card */}
+                              <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 min-w-0">
+                                {/* Qualification Row */}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                                    <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                                    <span>Qualification:</span>
+                                  </span>
+                                  <span
+                                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 break-words max-w-full ${isLoggedIn && eligibility.isRestricted
+                                      ? "bg-red-50 text-red-700 border-red-200"
+                                      : "bg-purple-50 text-purple-700 border-purple-200"
+                                      }`}
+                                  >
+                                    {isLoggedIn && eligibility.isRestricted ? (
+                                      <>
+                                        <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
+                                        <span className="break-words">Min. {minQual.label} (Ineligible)</span>
+                                      </>
+                                    ) : (
+                                      <span className="break-words">Min. {minQual.label}</span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                {/* Requirements / Skills Row */}
+                                {skillsList.length > 0 && (
+                                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
+                                      Requirements:
+                                    </span>
+                                    <div className="flex flex-wrap gap-1 max-w-full">
+                                      {skillsList.slice(0, 3).map((skill, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md truncate max-w-[130px]"
+                                        >
+                                          {skill}
+                                        </span>
+                                      ))}
+                                      {skillsList.length > 3 && (
+                                        <span className="text-[10px] font-semibold text-gray-400 self-center">
+                                          +{skillsList.length - 3}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
+                            <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                              {/* Location & Distance */}
+                              <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
+                                <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
+                                {distance && (
+                                  <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px] whitespace-nowrap">
+                                    • {distance}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Right Action Button */}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {isLoggedIn && eligibility.isRestricted ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIneligibleModal({ isOpen: true, job, eligibility });
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 shadow-2xs transition cursor-pointer"
+                                  >
+                                    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                                    <span>Ineligible</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
+                                    <span>{isCurrentSelected ? "Viewing" : "Details"}</span>
+                                    <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isCurrentSelected ? "translate-x-1 text-blue-700" : "group-hover:translate-x-0.5"}`} />
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
                   {selectedJob && (
-                    <div className="hidden lg:flex w-full lg:w-[58%] xl:w-[62%] 2xl:w-[64%] bg-white rounded-2xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-18 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
+                    <div className="hidden lg:flex w-full lg:w-[60%] xl:w-[62%] 2xl:w-[64%] bg-white rounded-2xl border border-gray-200/90 shadow-xl overflow-hidden h-full min-h-0 flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
                       <JobDetailPanel
                         job={selectedJob}
                         onClose={() => setSelectedJob(null)}

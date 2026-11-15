@@ -274,12 +274,14 @@ class JobApplicationController extends Controller
         $application->reviewed_by = $isValidMember ? $adminId : null;
         $application->save();
 
-        // Dispatch Email, In-App Notification & Push Notification to Candidate + Super Admin Alert
-        try {
-            MailService::sendApplicationStatusChanged($application, $validated['status'], $application->admin_notes);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed sending application status email/notifications: ' . $e->getMessage());
-        }
+        // Dispatch Email, In-App Notification & Push Notification via defer() so Admin gets instant response
+        defer(function () use ($application, $validated) {
+            try {
+                MailService::sendApplicationStatusChanged($application, $validated['status'], $application->admin_notes);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending application status email/notifications: ' . $e->getMessage());
+            }
+        });
 
         // Audit Trail Log
         AuditLogService::log(
@@ -303,22 +305,25 @@ class JobApplicationController extends Controller
         $application->assigned_to_calling_team_at = now();
         $application->save();
 
-        // Notify assigned team member and Super Admin
-        try {
-            $assignee = Admin::find($validated['team_member_id']);
-            $jobTitle = $application->jobPost?->title ?: 'the job position';
-            MailService::notifyAdmin(
-                $validated['team_member_id'],
-                "Application Assigned: {$application->candidate_name}",
-                "You have been assigned to handle the application of {$application->candidate_name} for '{$jobTitle}'.",
-                ['application_id' => $application->id]
-            );
-            MailService::notifySuperAdmin(
-                "Application Assigned to Team Member",
-                "Application of {$application->candidate_name} for '{$jobTitle}' assigned to " . ($assignee?->name ?? "Member #{$validated['team_member_id']}"),
-                ['application_id' => $application->id, 'assigned_to' => $validated['team_member_id']]
-            );
-        } catch (\Throwable $e) {}
+        // Notify assigned team member and Super Admin via defer()
+        $assigneeId = $validated['team_member_id'];
+        defer(function () use ($application, $assigneeId) {
+            try {
+                $assignee = Admin::find($assigneeId);
+                $jobTitle = $application->jobPost?->title ?: 'the job position';
+                MailService::notifyAdmin(
+                    $assigneeId,
+                    "Application Assigned: {$application->candidate_name}",
+                    "You have been assigned to handle the application of {$application->candidate_name} for '{$jobTitle}'.",
+                    ['application_id' => $application->id]
+                );
+                MailService::notifySuperAdmin(
+                    "Application Assigned to Team Member",
+                    "Application of {$application->candidate_name} for '{$jobTitle}' assigned to " . ($assignee?->name ?? "Member #{$assigneeId}"),
+                    ['application_id' => $application->id, 'assigned_to' => $assigneeId]
+                );
+            } catch (\Throwable $e) {}
+        });
 
         AuditLogService::log(
             'application_assigned',

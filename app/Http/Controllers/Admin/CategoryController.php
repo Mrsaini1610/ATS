@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Subcategory;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -45,7 +46,7 @@ class CategoryController extends Controller
             'categories' => $categories,
         ]);
     }
-public function store(Request $request)
+    public function store(Request $request)
     {
         $validated = $request->validate([
             'name'   => 'required|string|max:255|unique:categories,name',
@@ -53,7 +54,7 @@ public function store(Request $request)
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
-        Category::create([
+        $category = Category::create([
             'uuid'   => (string) \Illuminate\Support\Str::uuid(),
             'name'   => $validated['name'],
             'slug'   => Str::slug($validated['name']),
@@ -61,32 +62,55 @@ public function store(Request $request)
             'status' => $validated['status'] ?? 'active',
         ]);
 
+        AuditLogService::log(
+            'category_created',
+            "Admin created new industry category '{$category->name}'.",
+            ['name' => $category->name, 'icon' => $category->icon, 'status' => $category->status],
+            'categories',
+            $category
+        );
+
         return redirect()->back()->with('success', 'Category successfully add ho gayi.');
     }
 
-public function storeSubcategory(Request $request, Category $category)
+    public function storeSubcategory(Request $request, Category $category)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
         ]);
 
-        $category->subcategories()->create([
-            'name' => $validated['name'],
-            'slug' => \Illuminate\Support\Str::slug($validated['name']),
+        $sub = $category->subcategories()->create([
+            'name'   => $validated['name'],
+            'slug'   => \Illuminate\Support\Str::slug($validated['name']),
             'status' => 'active',
         ]);
+
+        AuditLogService::log(
+            'subcategory_created',
+            "Admin added subcategory '{$sub->name}' under category '{$category->name}'.",
+            ['category' => $category->name, 'subcategory' => $sub->name],
+            'categories',
+            $category
+        );
 
         return back()->with('success', 'Subcategory successfully added.');
     }
 
     public function destroySubcategory($categoryUuid, $subUuid)
     {
-        // Agar categories/subcategories uuid se find karni hain:
         $category = \App\Models\Category::where('uuid', $categoryUuid)->firstOrFail();
         $subCategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
+        $subName = $subCategory->name;
         
-        /** @var Subcategory $subCategory */
         $subCategory->delete();
+
+        AuditLogService::log(
+            'subcategory_deleted',
+            "Admin deleted subcategory '{$subName}' from category '{$category->name}'.",
+            ['category' => $category->name, 'subcategory' => $subName],
+            'categories',
+            $category
+        );
 
         return back()->with('success', 'Subcategory deleted successfully.');
     }
@@ -98,12 +122,20 @@ public function storeSubcategory(Request $request, Category $category)
         ]);
 
         $category = Category::where('uuid', $categoryUuid)->firstOrFail();
-        /** @var Subcategory $subcategory */
         $subcategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
+        $oldName = $subcategory->name;
         $subcategory->update([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['name']),
         ]);
+
+        AuditLogService::log(
+            'subcategory_updated',
+            "Admin updated subcategory '{$oldName}' to '{$validated['name']}' in category '{$category->name}'.",
+            ['category' => $category->name, 'old_name' => $oldName, 'new_name' => $validated['name']],
+            'categories',
+            $category
+        );
 
         return back()->with('success', 'Subcategory updated successfully.');
     }
@@ -111,11 +143,19 @@ public function storeSubcategory(Request $request, Category $category)
     public function toggleStatusSubcategory($categoryUuid, $subUuid)
     {
         $category = Category::where('uuid', $categoryUuid)->firstOrFail();
-        /** @var Subcategory $subcategory */
         $subcategory = $category->subcategories()->where('uuid', $subUuid)->firstOrFail();
+        $newStatus = ($subcategory->status === 'active') ? 'inactive' : 'active';
         $subcategory->update([
-            'status' => ($subcategory->status === 'active') ? 'inactive' : 'active',
+            'status' => $newStatus,
         ]);
+
+        AuditLogService::log(
+            'subcategory_status_updated',
+            "Admin changed subcategory '{$subcategory->name}' status to {$newStatus}.",
+            ['category' => $category->name, 'subcategory' => $subcategory->name, 'status' => $newStatus],
+            'categories',
+            $category
+        );
 
         return back()->with('success', 'Subcategory status successfully updated.');
     }
@@ -128,6 +168,7 @@ public function storeSubcategory(Request $request, Category $category)
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
+        $oldName = $category->name;
         $category->update([
             'name'   => $validated['name'],
             'slug'   => Str::slug($validated['name']),
@@ -135,21 +176,46 @@ public function storeSubcategory(Request $request, Category $category)
             'status' => $validated['status'] ?? $category->status,
         ]);
 
+        AuditLogService::log(
+            'category_updated',
+            "Admin updated category '{$oldName}' to '{$category->name}'.",
+            ['old_name' => $oldName, 'new_name' => $category->name, 'status' => $category->status],
+            'categories',
+            $category
+        );
+
         return redirect()->back()->with('success', 'Category successfully update ho gayi.');
     }
 
     public function toggleStatus(Category $category)
     {
+        $newStatus = ($category->status === 'active') ? 'inactive' : 'active';
         $category->update([
-            'status' => ($category->status === 'active') ? 'inactive' : 'active',
+            'status' => $newStatus,
         ]);
+
+        AuditLogService::log(
+            'category_status_updated',
+            "Admin changed category '{$category->name}' status to {$newStatus}.",
+            ['status' => $newStatus],
+            'categories',
+            $category
+        );
 
         return redirect()->back()->with('success', 'Category status change ho gaya.');
     }
 
     public function destroy(Category $category)
     {
+        $catName = $category->name;
         $category->delete();
+
+        AuditLogService::log(
+            'category_deleted',
+            "Admin deleted category '{$catName}'.",
+            ['category' => $catName],
+            'categories'
+        );
 
         return redirect()->back()->with('success', 'Category delete ho gayi.');
     }

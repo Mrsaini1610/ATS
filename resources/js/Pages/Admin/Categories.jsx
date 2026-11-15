@@ -358,48 +358,56 @@ export default function Categories({ categories = [] }) {
 
         {/* Top Summary Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Categories</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
                 <Tags className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">{categories.length}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Top-level industries</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">{categories.length}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Top-level industries</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Subcategories</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">{totalSubcategories}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Specialized sub-tracks</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">{totalSubcategories}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Specialized sub-tracks</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Jobs Linked</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs">
                 <Briefcase className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">{totalJobs.toLocaleString()}</p>
-            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Live role mappings</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">{totalJobs.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Live role mappings</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Active Status</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs">
                 <Check className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">{activeCategoriesCount}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Enabled for candidates</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">{activeCategoriesCount}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Enabled for candidates</p>
+            </div>
           </div>
         </div>
 
@@ -479,7 +487,7 @@ export default function Categories({ categories = [] }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-black text-slate-900 text-base truncate group-hover:text-blue-600 transition-colors">
+                          <p className="font-black text-slate-900 text-base line-clamp-2 break-words group-hover:text-blue-600 transition-colors">
                             {cat.name}
                           </p>
                           <span

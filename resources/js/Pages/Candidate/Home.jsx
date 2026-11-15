@@ -39,8 +39,8 @@ export default function Homepage() {
   const currentUser = activeUser || auth?.user || candidateProfile;
   const userIsLoggedIn = isLoggedIn || Boolean(auth?.user) || Boolean(activeUser);
 
-  // Ensure job posts are strictly displayed in descending order (newest first)
-  const sortedRecentJobs = [...recentJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+  // Ensure job posts are strictly displayed in descending order (newest first, limited to top 6)
+  const sortedRecentJobs = [...recentJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0)).slice(0, 6);
   const sortedRecommendedJobs = [...recommendedJobs].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
 
   const handleSelectJob = (job) => {

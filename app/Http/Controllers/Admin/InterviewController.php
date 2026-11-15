@@ -330,15 +330,18 @@ class InterviewController extends Controller
             $app->save();
         }
 
-        // 1. Dispatch MailService (Candidate + Interviewer + Admin)
-        try {
-            MailService::sendInterviewScheduled($interview, array_merge($validated, [
-                'candidateEmail'   => $validated['candidateEmail'] ?? null,
-                'interviewAddress' => $venueOrMeeting,
-            ]));
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed sending interview scheduled email/notifications: ' . $e->getMessage());
-        }
+        // 1. Dispatch MailService (Candidate + Interviewer + Admin) via defer()
+        $interviewPayload = array_merge($validated, [
+            'candidateEmail'   => $validated['candidateEmail'] ?? null,
+            'interviewAddress' => $venueOrMeeting,
+        ]);
+        defer(function () use ($interview, $interviewPayload) {
+            try {
+                MailService::sendInterviewScheduled($interview, $interviewPayload);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending interview scheduled email/notifications: ' . $e->getMessage());
+            }
+        });
 
         // 2. Build WhatsApp invite message and log
         $cleanPhone = preg_replace('/\D/', '', $validated['candidatePhone']);
@@ -397,12 +400,14 @@ class InterviewController extends Controller
         $oldStatus = $interview->status;
         $interview->update(['status' => $validated['status']]);
 
-        // Dispatch interview status update to Super Admin and candidate
-        try {
-            MailService::sendInterviewStatusUpdated($interview, $validated['status']);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed sending interview status update email/notifications: ' . $e->getMessage());
-        }
+        // Dispatch interview status update to Super Admin and candidate via defer()
+        defer(function () use ($interview, $validated) {
+            try {
+                MailService::sendInterviewStatusUpdated($interview, $validated['status']);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending interview status update email/notifications: ' . $e->getMessage());
+            }
+        });
 
         AuditLogService::log(
             action: 'interview_status_updated',

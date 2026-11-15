@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 import { Head, usePage, router } from "@inertiajs/react";
 import {
   Search,
@@ -975,6 +976,22 @@ export default function Applications({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedApp, setSelectedApp] = useState(null);
+  const appDetailContentRef = useRef(null);
+
+  // Auto-scroll detail panel smoothly into view when application is selected so view is 100% visible
+  useEffect(() => {
+    if (selectedApp && typeof window !== "undefined") {
+      if (appDetailContentRef.current) {
+        appDetailContentRef.current.scrollTop = 0;
+      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById("admin-application-detail-panel");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+  }, [selectedApp?.uuid || selectedApp?.id]);
   const [remark, setRemark] = useState("");
   const [assigningApp, setAssigningApp] = useState(null);
   const [offerApp, setOfferApp] = useState(null);
@@ -1263,26 +1280,26 @@ export default function Applications({
           >
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[640px]">
                   {filtered.length > 0 && (
-                    <thead className="bg-gray-50/75 border-b border-gray-100">
+                    <thead className="bg-slate-100 border-b border-gray-200">
                       <tr>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[170px]">
                           Candidate
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[160px]">
                           Job Applied
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap min-w-[90px]">
                           Status
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap min-w-[90px]">
                           Applied
                         </th>
-                        <th className={`text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap ${selectedApp ? "hidden xl:table-cell" : ""}`}>
+                        <th className={`text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap min-w-[110px] ${selectedApp ? "hidden xl:table-cell" : ""}`}>
                           Assigned Staff
                         </th>
-                        <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[120px]">
                           {/* Actions */}
                         </th>
                       </tr>
@@ -1297,9 +1314,9 @@ export default function Applications({
                         }`}
                         onClick={() => setSelectedApp(app)}
                       >
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 !whitespace-normal break-words">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-gray-900 leading-tight text-sm">{app.userName}</p>
+                            <p className="font-bold text-gray-900 leading-tight text-sm whitespace-normal break-words max-w-[200px]">{app.userName}</p>
                             {app.presence?.is_online ? (
                               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black shadow-2xs">
                                 <span className="relative flex h-2 w-2">
@@ -1324,7 +1341,7 @@ export default function Applications({
                           <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 flex-wrap">
                             <span className="flex items-center gap-1 text-gray-500">
                               <Phone className="w-3 h-3 text-gray-400 shrink-0" />
-                              {app.userPhone}
+                              <span className="whitespace-nowrap">{app.userPhone}</span>
                             </span>
                             {app.userCity && (
                               <span className="text-gray-400">
@@ -1350,9 +1367,9 @@ export default function Applications({
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 !whitespace-normal break-words">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-gray-800 leading-tight">
+                            <p className="font-semibold text-gray-800 leading-tight whitespace-normal break-words max-w-[240px]">
                               {app.jobTitle}
                             </p>
                             {app.isJobClosed && (
@@ -1361,14 +1378,14 @@ export default function Applications({
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">{app.company}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 whitespace-normal break-words max-w-[240px]">{app.company}</p>
                           {app.currentTitle && (
-                            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">
+                            <p className="text-[11px] text-indigo-600 font-medium mt-0.5 whitespace-normal break-words max-w-[240px]">
                               Role: {app.currentTitle}
                             </p>
                           )}
                           {selectedApp && app.assignedToName && (
-                            <p className="text-[10px] text-blue-600 xl:hidden mt-0.5 font-medium">
+                            <p className="text-[10px] text-blue-600 xl:hidden mt-0.5 font-medium whitespace-normal break-words max-w-[200px]">
                               Staff: {app.assignedToName}
                             </p>
                           )}
@@ -1465,7 +1482,7 @@ export default function Applications({
           {selectedApp && (
             <div
               id="admin-application-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out relative"
             >
               {/* Header with High-Contrast Navy/Blue Gradient */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
@@ -1506,7 +1523,7 @@ export default function Applications({
               </div>
 
               {/* Independent Scrollable Content Area */}
-              <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+              <div ref={appDetailContentRef} className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
                 {/* Hero Candidate Profile Card */}
                 <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-purple-50/50 border border-blue-100">
                   <div className="relative shrink-0">
@@ -2100,6 +2117,9 @@ export default function Applications({
                   </button>
                 </div>
               </div>
+
+              {/* Floating Bottom-Center Scroll Indicator Button */}
+              <ViewScrollIndicator containerRef={appDetailContentRef} bottomOffsetClass="bottom-6 sm:bottom-8" />
             </div>
           )}
         </div>

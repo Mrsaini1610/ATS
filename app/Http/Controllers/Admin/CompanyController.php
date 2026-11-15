@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use App\Services\GeocodingService;
 use Inertia\Inertia;
@@ -67,6 +68,25 @@ public function index()
 
 public function store(Request $request, GeocodingService $geocodingService)
 {
+    // Sanitize string 'null' or empty string values from numeric and optional fields
+    $lat = $request->input('latitude');
+    if ($lat === 'null' || $lat === '' || !is_numeric($lat)) {
+        $request->merge(['latitude' => null]);
+    }
+    $lng = $request->input('longitude');
+    if ($lng === 'null' || $lng === '' || !is_numeric($lng)) {
+        $request->merge(['longitude' => null]);
+    }
+    if ($request->input('website') === 'null' || $request->input('website') === '') {
+        $request->merge(['website' => null]);
+    }
+    if ($request->input('location') === 'null' || $request->input('location') === '') {
+        $request->merge(['location' => null]);
+    }
+    if ($request->input('company_size') === 'null' || $request->input('company_size') === '') {
+        $request->merge(['company_size' => '1 - 10 employees']);
+    }
+
     $validated = $request->validate([
         'name'         => 'required|string|max:255',
         'website'      => 'nullable|string|max:255',
@@ -74,7 +94,7 @@ public function store(Request $request, GeocodingService $geocodingService)
         'address'      => 'required|string|max:2000',
         'latitude'     => 'nullable|numeric|between:-90,90',
         'longitude'    => 'nullable|numeric|between:-180,180',
-        'company_size' => 'nullable|string|max:255', // <-- Validation added
+        'company_size' => 'nullable|string|max:255',
         'description'  => 'nullable|string',
         'status'       => 'required|string',
         'logo'         => 'nullable',
@@ -87,11 +107,11 @@ public function store(Request $request, GeocodingService $geocodingService)
     }
     if ($request->hasFile('logo')) {
         $logoPath = $request->file('logo')->store('company-logos', 'public');
-    } else {
+    } elseif ($request->filled('logo') && is_string($request->input('logo')) && $request->input('logo') !== '[object File]') {
         $logoPath = $request->input('logo');
     }
 
-    Company::create([
+    $company = Company::create([
         'name'         => $validated['name'],
         'slug'         => \Illuminate\Support\Str::slug($validated['name']),
         'website'      => $validated['website'] ?? null,
@@ -99,11 +119,19 @@ public function store(Request $request, GeocodingService $geocodingService)
         'address'      => $validated['address'],
         'latitude'     => $validated['latitude'] ?? $coordinates['latitude'] ?? null,
         'longitude'    => $validated['longitude'] ?? $coordinates['longitude'] ?? null,
-        'company_size' => $validated['company_size'] ?? null, // <-- Saved here
+        'company_size' => $validated['company_size'] ?? '1 - 10 employees',
         'description'  => $validated['description'] ?? null,
         'status'       => $validated['status'] ?? 'active',
         'logo'         => $logoPath,
     ]);
+
+    AuditLogService::log(
+        'company_created',
+        "Admin created new employer company '{$company->name}'.",
+        ['name' => $company->name, 'location' => $company->location, 'website' => $company->website, 'size' => $company->company_size],
+        'companies',
+        $company
+    );
 
     return redirect()->route('admin.companies.index')->with('success', 'Company successfully created.');
 }
@@ -112,6 +140,25 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
 {
     $company = Company::where('uuid', $uuid)->firstOrFail();
 
+    // Sanitize string 'null' or empty string values from numeric and optional fields
+    $lat = $request->input('latitude');
+    if ($lat === 'null' || $lat === '' || !is_numeric($lat)) {
+        $request->merge(['latitude' => null]);
+    }
+    $lng = $request->input('longitude');
+    if ($lng === 'null' || $lng === '' || !is_numeric($lng)) {
+        $request->merge(['longitude' => null]);
+    }
+    if ($request->input('website') === 'null' || $request->input('website') === '') {
+        $request->merge(['website' => null]);
+    }
+    if ($request->input('location') === 'null' || $request->input('location') === '') {
+        $request->merge(['location' => null]);
+    }
+    if ($request->input('company_size') === 'null' || $request->input('company_size') === '') {
+        $request->merge(['company_size' => '1 - 10 employees']);
+    }
+
     $validated = $request->validate([
         'name'         => 'required|string|max:255',
         'website'      => 'nullable|string|max:255',
@@ -119,7 +166,7 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
         'address'      => 'required|string|max:2000',
         'latitude'     => 'nullable|numeric|between:-90,90',
         'longitude'    => 'nullable|numeric|between:-180,180',
-        'company_size' => 'nullable|string|max:255', // <-- Validation added
+        'company_size' => 'nullable|string|max:255',
         'description'  => 'nullable|string',
         'status'       => 'required|string',
         'logo'         => 'nullable',
@@ -132,10 +179,11 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
     }
     if ($request->hasFile('logo')) {
         $logoPath = $request->file('logo')->store('company-logos', 'public');
-    } elseif ($request->filled('logo')) {
+    } elseif ($request->filled('logo') && is_string($request->input('logo')) && $request->input('logo') !== '[object File]') {
         $logoPath = $request->input('logo');
     }
 
+    $oldName = $company->name;
     $company->update([
         'name'         => $validated['name'],
         'slug'         => \Illuminate\Support\Str::slug($validated['name']),
@@ -144,11 +192,19 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
         'address'      => $validated['address'],
         'latitude'     => $validated['latitude'] ?? $coordinates['latitude'] ?? null,
         'longitude'    => $validated['longitude'] ?? $coordinates['longitude'] ?? null,
-        'company_size' => $validated['company_size'] ?? null, // <-- Updated here
+        'company_size' => $validated['company_size'] ?? '1 - 10 employees',
         'description'  => $validated['description'] ?? null,
         'status'       => $validated['status'] ?? 'active',
         'logo'         => $logoPath,
     ]);
+
+    AuditLogService::log(
+        'company_updated',
+        "Admin updated employer company '{$oldName}'.",
+        ['old_name' => $oldName, 'new_name' => $company->name, 'location' => $company->location, 'status' => $company->status],
+        'companies',
+        $company
+    );
 
     return redirect()->route('admin.companies.index')->with('success', 'Company successfully updated.');
 }
@@ -161,6 +217,14 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
         $company->status = ($company->status === 'active') ? 'inactive' : 'active';
         $company->save();
 
+        AuditLogService::log(
+            'company_status_updated',
+            "Admin changed company '{$company->name}' status to {$company->status}.",
+            ['status' => $company->status],
+            'companies',
+            $company
+        );
+
         return redirect()->back()->with('success', 'Company status update ho gaya.');
     }
 
@@ -169,7 +233,15 @@ public function update(Request $request, $uuid, GeocodingService $geocodingServi
      */
     public function destroy(Company $company)
     {
+        $compName = $company->name;
         $company->delete();
+
+        AuditLogService::log(
+            'company_deleted',
+            "Admin deleted employer company '{$compName}'.",
+            ['name' => $compName],
+            'companies'
+        );
 
         return redirect()->back()->with('success', 'Company delete ho gayi.');
     }

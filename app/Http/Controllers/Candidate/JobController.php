@@ -535,20 +535,21 @@ class JobController extends Controller
             // Ignore user update error
         }
 
-        // Trigger MailService: sends confirmation email to candidate, in-app + push,
-        // and notifies Creator Admin, Assigned Team Member, and Super Admin via Email + In-App!
-        try {
-            MailService::sendJobApplied($application);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Web Candidate application email/notifications error: ' . $e->getMessage());
-        }
+        // Trigger MailService & Push Notifications via defer() so the user receives an INSTANT response (under 200ms)
+        // while heavy SMTP emails and Firebase calls execute in background after response is sent!
+        defer(function () use ($application) {
+            try {
+                MailService::sendJobApplied($application);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Web Candidate application email error: ' . $e->getMessage());
+            }
 
-        // Direct Push Notification to Candidate's Mobile Devices
-        try {
-            PushNotificationService::notifyApplicationSubmitted($application);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Web Candidate direct push notification error: ' . $e->getMessage());
-        }
+            try {
+                PushNotificationService::notifyApplicationSubmitted($application);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Web Candidate direct push notification error: ' . $e->getMessage());
+            }
+        });
 
         // Audit Trail Log: Track what candidate applied for on Web
         AuditLogService::log(
@@ -755,6 +756,16 @@ class JobController extends Controller
                 'user_uuid' => $user->uuid,
                 'job_uuid'  => $job->uuid,
             ]);
+
+            AuditLogService::log(
+                'job_saved',
+                "Candidate {$user->full_name} saved job '{$job->title}' at {$job->company}.",
+                ['job_id' => $job->id, 'job_uuid' => $job->uuid, 'title' => $job->title, 'company' => $job->company, 'platform' => 'web'],
+                'jobs',
+                $job,
+                'success',
+                $user
+            );
         }
         return back();
     }
@@ -770,6 +781,19 @@ class JobController extends Controller
         SavedJob::where('user_uuid', $user->uuid)
             ->whereIn('job_uuid', $targetUuids)
             ->delete();
+
+        if ($job) {
+            AuditLogService::log(
+                'job_unsaved',
+                "Candidate {$user->full_name} removed bookmark for job '{$job->title}'.",
+                ['job_id' => $job->id, 'job_uuid' => $job->uuid, 'platform' => 'web'],
+                'jobs',
+                $job,
+                'success',
+                $user
+            );
+        }
+
         return back();
     }
 
@@ -784,6 +808,19 @@ class JobController extends Controller
         SavedJob::where('user_uuid', $user->uuid)
             ->whereIn('job_uuid', $targetUuids)
             ->delete();
+
+        if ($job) {
+            AuditLogService::log(
+                'job_unsaved',
+                "Candidate {$user->full_name} removed bookmark for job '{$job->title}'.",
+                ['job_id' => $job->id, 'job_uuid' => $job->uuid, 'platform' => 'web'],
+                'jobs',
+                $job,
+                'success',
+                $user
+            );
+        }
+
         return back();
     }
 

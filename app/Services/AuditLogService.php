@@ -258,16 +258,21 @@ class AuditLogService
             }
 
             $path = $req->path();
-            if (str_starts_with($path, 'build/') || str_starts_with($path, 'storage/') || str_starts_with($path, '_') || str_starts_with($path, 'admin/')) {
+            if (
+                str_starts_with($path, 'build/') ||
+                str_starts_with($path, 'storage/') ||
+                str_starts_with($path, '_') ||
+                str_contains($path, 'session-check') ||
+                str_contains($path, 'unread-count') ||
+                str_contains($path, 'set-offline') ||
+                str_contains($path, 'notifications-sync') ||
+                str_contains($path, 'live-presence') ||
+                $path === 'up'
+            ) {
                 return null;
             }
 
             $actorData = self::resolveActor();
-
-            // Only track page views for Candidates and Guests. Ignore Admin and Staff casual browsing.
-            if (in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff', 'system'])) {
-                return null;
-            }
 
             $ip = $req->ip() ?: '127.0.0.1';
             $pageUrl = $url ?: $req->fullUrl();
@@ -286,10 +291,13 @@ class AuditLogService
             }
             \Illuminate\Support\Facades\Cache::put($cacheKey, 1, now()->addSeconds(45));
 
-            $platformTag = $platform === 'app' ? 'Mobile App' : 'Website';
-            $actorLabel = $actorData['type'] === 'guest'
-                ? "Guest Visitor ({$ip})"
-                : ($actorData['type'] === 'candidate' ? "Candidate {$actorData['name']}" : $actorData['name']);
+            $platformTag = $platform === 'app' ? 'Mobile App' : (str_starts_with($path, 'admin') ? 'Admin Panel' : 'Website');
+            $actorLabel = match ($actorData['type']) {
+                'guest'       => "Guest Visitor ({$ip})",
+                'candidate'   => "Candidate {$actorData['name']}",
+                'super_admin', 'admin', 'team_member', 'staff' => "Admin {$actorData['name']}",
+                default       => $actorData['name'],
+            };
 
             $description = "{$actorLabel} visited {$pageTitle} on {$platformTag}";
 
@@ -327,11 +335,6 @@ class AuditLogService
             $req = function_exists('request') ? request() : null;
             $actorData = self::resolveActor();
 
-            // Only track job detail views for Candidates and Guests. Ignore Admin and Staff internal viewing.
-            if (in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff', 'system'])) {
-                return null;
-            }
-
             $ip = $req ? $req->ip() : '127.0.0.1';
 
             // Detect platform
@@ -351,9 +354,12 @@ class AuditLogService
             \Illuminate\Support\Facades\Cache::put($cacheKey, 1, now()->addSeconds(45));
 
             $platformTag = $platform === 'app' ? 'Mobile App' : 'Website';
-            $actorLabel = $actorData['type'] === 'guest'
-                ? "Guest Visitor ({$ip})"
-                : ($actorData['type'] === 'candidate' ? "Candidate {$actorData['name']}" : $actorData['name']);
+            $actorLabel = match ($actorData['type']) {
+                'guest'       => "Guest Visitor ({$ip})",
+                'candidate'   => "Candidate {$actorData['name']}",
+                'super_admin', 'admin', 'team_member', 'staff' => "Admin {$actorData['name']}",
+                default       => $actorData['name'],
+            };
 
             $salary = $job->formatted_salary ?: ($job->min_salary ? "₹" . number_format($job->min_salary) . ($job->max_salary ? " - ₹" . number_format($job->max_salary) : "") : 'Not disclosed');
             $location = $job->location ?: 'Jaipur';

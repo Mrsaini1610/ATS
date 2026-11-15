@@ -40,7 +40,7 @@ class HomeController extends Controller
         $recentJobsQuery = JobPost::with(['category'])
             ->activeForCandidate()
             ->orderByDesc('id')
-            ->take(12);
+            ->take(6);
 
         $recentJobs = $this->attachApplicationStatus($recentJobsQuery->get());
         $recentJobs = $this->formatJobsData($recentJobs);

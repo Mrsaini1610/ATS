@@ -1083,13 +1083,14 @@ class JobController extends Controller
                 // Ignore profile update error
             }
 
-            // Trigger MailService: sends confirmation email to candidate, in-app + push,
-            // and notifies Creator Admin, Assigned Team Member, and Super Admin via Email + In-App!
-            try {
-                MailService::sendJobApplied($application);
-            } catch (Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed sending application email/notifications: ' . $e->getMessage());
-            }
+            // Trigger MailService via defer() so Mobile API returns instant JSON response (under 100ms)
+            defer(function () use ($application) {
+                try {
+                    MailService::sendJobApplied($application);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed sending application email/notifications: ' . $e->getMessage());
+                }
+            });
 
             // Audit Trail Log
             AuditLogService::log(

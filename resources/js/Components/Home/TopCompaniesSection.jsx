@@ -37,9 +37,9 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
               <Link
                 key={comp.uuid || idx}
                 href={targetUrl}
-                className="bg-white rounded-2xl border border-gray-100 p-4 hover:border-purple-300 hover:shadow-md transition-all flex flex-col justify-between group"
+                className="bg-white rounded-2xl border border-gray-100 p-4 hover:border-purple-300 hover:shadow-md transition-all flex flex-col justify-between group overflow-hidden break-words min-w-0"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center font-black text-sm text-white overflow-hidden shadow-xs bg-gradient-to-br from-indigo-600 to-purple-700 group-hover:scale-105 transition-transform">
                     {hasImageLogo ? (
                       <img
@@ -59,20 +59,20 @@ export default function TopCompaniesSection({ topCompanies = [] }) {
                     )}
                   </div>
 
-                  <h3 className="font-bold text-sm sm:text-base text-gray-900 truncate group-hover:text-purple-600 transition-colors">
+                  <h3 className="font-bold text-sm sm:text-base text-gray-900 line-clamp-2 break-words leading-tight group-hover:text-purple-600 transition-colors">
                     {comp.name}
                   </h3>
-                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                  <p className="text-[11px] text-gray-500 line-clamp-1 break-words mt-0.5">
                     {comp.industry}
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 text-gray-500 text-[11px] truncate">
+                <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs gap-1.5 min-w-0">
+                  <span className="flex items-center gap-1 text-gray-500 text-[11px] min-w-0 flex-1 truncate">
                     <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                    {comp.location}
+                    <span className="truncate">{comp.location}</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-100 shrink-0">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-100 shrink-0 whitespace-nowrap">
                     {comp.jobs} {comp.jobs === 1 ? "Job" : "Jobs"}
                   </span>
                 </div>

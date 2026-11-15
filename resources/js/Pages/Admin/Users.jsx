@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 import { Head, usePage, useForm, router } from "@inertiajs/react";
 import {
   Search,
@@ -336,6 +337,46 @@ export default function Users({ users = [], categories = [], canViewAll = false,
   const [statusFilter, setStatusFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all"); // 'all' | 'web' | 'app' | 'both'
   const [selectedUser, setSelectedUser] = useState(null);
+  const userDetailContentRef = useRef(null);
+
+  // Auto-scroll detail panel smoothly into view when candidate is selected so view is 100% visible
+  useEffect(() => {
+    if (selectedUser && typeof window !== "undefined") {
+      if (userDetailContentRef.current) {
+        userDetailContentRef.current.scrollTop = 0;
+      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById("admin-user-detail-panel");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+  }, [selectedUser?.uuid || selectedUser?.id]);
+
+  // Real-time live candidates auto-refresh every 15s without losing scroll/state
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+      router.reload({
+        only: ["users"],
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Keep selectedUser updated when users reload
+  useEffect(() => {
+    if (selectedUser) {
+      const refreshed = users.find((u) => (u.uuid && u.uuid === selectedUser.uuid) || (u.id && u.id === selectedUser.id));
+      if (refreshed) {
+        setSelectedUser(refreshed);
+      }
+    }
+  }, [users]);
   const [addModal, setAddModal] = useState(false);
   const [viewFormat, setViewFormat] = useState("table"); // 'table' | 'cards'
 
@@ -905,7 +946,16 @@ export default function Users({ users = [], categories = [], canViewAll = false,
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Registered Candidates</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-extrabold text-gray-900">Registered Candidates</h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span>Real-Time Sync</span>
+              </span>
+            </div>
             <p className="text-sm text-gray-500 mt-0.5">
               {users.length} total candidates ({platformCounts.web} Web, {platformCounts.app} App, {platformCounts.both} Both)
             </p>
@@ -1093,14 +1143,14 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                     <div
                       key={user.uuid}
                       onClick={() => setSelectedUser(user)}
-                      className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all ${
+                      className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all overflow-hidden break-words min-w-0 ${
                         isSelected
                           ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 shadow-sm"
                           : "border-gray-200/90 hover:border-blue-300"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3 mb-2.5">
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="relative shrink-0">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-xs">
                               {(user.name || "C")
@@ -1116,17 +1166,17 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                               </span>
                             )}
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-extrabold text-slate-900 text-sm truncate hover:text-blue-600">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-extrabold text-slate-900 text-sm line-clamp-2 break-words leading-tight hover:text-blue-600">
                               {user.name}
                             </p>
                             {user.presence?.is_online ? (
-                              <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                              <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                {user.presence.status_text}
+                                <span className="line-clamp-1">{user.presence.status_text}</span>
                               </p>
                             ) : (
-                              <p className="text-[11px] text-slate-400 truncate">
+                              <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
                                 {user.presence?.status_text || `Joined ${user.registeredAt}`}
                               </p>
                             )}
@@ -1160,15 +1210,15 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                       </div>
 
                       {/* Role & Location Grid */}
-                      <div className="grid grid-cols-2 gap-2 text-xs mb-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 min-w-0">
                         <div className="min-w-0">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                             Role & Exp
                           </span>
-                          <p className="font-bold text-slate-800 text-xs truncate">
+                          <p className="font-bold text-slate-800 text-xs whitespace-normal break-words leading-snug">
                             {user.jobTitle || "Job Seeker"}
                           </p>
-                          <p className="text-[11px] text-slate-500 truncate">
+                          <p className="text-[11px] text-slate-500 whitespace-normal break-words leading-tight mt-0.5">
                             {user.experience || "Fresher"} {user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}
                           </p>
                         </div>
@@ -1176,9 +1226,9 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                             Location
                           </span>
-                          <p className="font-medium text-slate-700 text-xs truncate flex items-center gap-1 mt-0.5">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">
+                          <p className="font-medium text-slate-700 text-xs flex items-start gap-1 mt-0.5 whitespace-normal break-words leading-snug">
+                            <MapPin className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                            <span className="break-words">
                               {user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}
                             </span>
                           </p>
@@ -1231,18 +1281,18 @@ export default function Users({ users = [], categories = [], canViewAll = false,
               /* Full-width Data Table (when not inspecting and Table View is chosen) */
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden flex flex-col">
                 <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-14.5rem)] min-h-[360px] custom-scrollbar">
-                  <table className="w-full text-left border-collapse min-w-[860px]">
-                    <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-gray-200 text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                  <table className="w-full text-left border-collapse min-w-[1020px]">
+                    <thead className="sticky top-0 z-10 bg-slate-100 border-b border-gray-200 text-[10px] font-bold text-gray-600 uppercase tracking-wider">
                       <tr>
-                        <th className="py-3 px-3 whitespace-nowrap min-w-[135px]">Candidate</th>
-                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[115px]">Contact</th>
-                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[95px]">Location</th>
-                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[120px]">Role & Experience</th>
-                        <th className="py-3 px-2 whitespace-nowrap min-w-[70px] text-center">Platform</th>
-                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[125px]">Activity Presence</th>
-                        <th className="py-3 px-2 whitespace-nowrap min-w-[65px] text-center">Status</th>
-                        <th className="py-3 px-2 whitespace-nowrap min-w-[60px] text-center">Applied</th>
-                        <th className="py-3 px-3 whitespace-nowrap min-w-[95px] text-right">Actions</th>
+                        <th className="py-3 px-3 whitespace-nowrap min-w-[145px] bg-slate-100">Candidate</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[125px] bg-slate-100">Contact</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[110px] bg-slate-100">Location</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[145px] bg-slate-100">Role & Experience</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[80px] text-center bg-slate-100">Platform</th>
+                        <th className="py-3 px-2.5 whitespace-nowrap min-w-[135px] bg-slate-100">Activity Presence</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[75px] text-center bg-slate-100">Status</th>
+                        <th className="py-3 px-2 whitespace-nowrap min-w-[65px] text-center bg-slate-100">Applied</th>
+                        <th className="py-3 px-3 whitespace-nowrap min-w-[110px] text-right bg-slate-100">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs bg-white">
@@ -1260,7 +1310,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             className="hover:bg-blue-50/40 cursor-pointer transition-colors"
                           >
                             {/* Candidate info */}
-                            <td className="py-2.5 px-3 whitespace-nowrap align-middle">
+                            <td className="py-2.5 px-3 whitespace-normal align-middle">
                               <div className="flex items-center gap-2">
                                 <div className="relative shrink-0">
                                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-xs">
@@ -1277,11 +1327,11 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                                     </span>
                                   )}
                                 </div>
-                                <div className="min-w-0 max-w-[140px]">
-                                  <p className="font-bold text-gray-900 truncate hover:text-blue-600 text-xs">
+                                <div className="min-w-0 max-w-[170px]">
+                                  <p className="font-bold text-gray-900 whitespace-normal break-words hover:text-blue-600 text-xs leading-snug">
                                     {user.name}
                                   </p>
-                                  <p className="text-[10px] text-gray-400 truncate">
+                                  <p className="text-[10px] text-gray-400 truncate mt-0.5">
                                     Joined {user.registeredAt}
                                   </p>
                                 </div>
@@ -1289,22 +1339,22 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             </td>
 
                             {/* Contact */}
-                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
+                            <td className="py-2.5 px-2.5 whitespace-normal align-middle">
                               <p className="font-medium text-gray-800 flex items-center gap-1 text-xs">
                                 <Phone className="w-3 h-3 text-gray-400 shrink-0" />
-                                <span>{user.phone}</span>
+                                <span className="whitespace-nowrap">{user.phone}</span>
                               </p>
                               {user.email && user.email !== "—" && (
-                                <p className="text-[10px] text-gray-400 truncate max-w-[115px]" title={user.email}>
+                                <p className="text-[10px] text-gray-400 whitespace-normal break-words max-w-[140px] mt-0.5 leading-snug" title={user.email}>
                                   {user.email}
                                 </p>
                               )}
                             </td>
 
                             {/* Location */}
-                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
-                              <p className="text-gray-700 flex items-center gap-1 truncate max-w-[100px] text-xs" title={user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}>
-                                <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                            <td className="py-2.5 px-2.5 whitespace-normal align-middle">
+                              <p className="text-gray-700 flex items-start gap-1 whitespace-normal break-words max-w-[140px] text-xs leading-snug" title={user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}>
+                                <MapPin className="w-3 h-3 text-gray-400 shrink-0 mt-0.5" />
                                 <span>
                                   {user.area && user.area !== "—" ? `${user.area}, ${user.city}` : (user.city || "—")}
                                 </span>
@@ -1312,11 +1362,11 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                             </td>
 
                             {/* Role & Experience */}
-                            <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
-                              <p className="font-semibold text-gray-800 truncate max-w-[125px] text-xs" title={user.jobTitle || "Job Seeker"}>
+                            <td className="py-2.5 px-2.5 whitespace-normal align-middle">
+                              <p className="font-semibold text-gray-800 whitespace-normal break-words max-w-[170px] text-xs leading-snug" title={user.jobTitle || "Job Seeker"}>
                                 {user.jobTitle || "Job Seeker"}
                               </p>
-                              <p className="text-[10px] text-gray-500 truncate max-w-[125px]" title={`${user.experience || "Fresher"} ${user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}`}>
+                              <p className="text-[10px] text-gray-500 whitespace-normal break-words max-w-[170px] leading-snug mt-0.5" title={`${user.experience || "Fresher"} ${user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}`}>
                                 {user.experience || "Fresher"} {user.qualification && user.qualification !== "—" ? `• ${user.qualification}` : ""}
                               </p>
                             </td>
@@ -1437,7 +1487,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
           {selectedUser && (
             <div
               id="admin-user-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 shrink-0 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] shadow-2xl shadow-blue-950/20 z-20"
+              className="w-full lg:w-1/2 xl:w-5/12 shrink-0 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] shadow-2xl shadow-blue-950/20 z-20 relative"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-2">
@@ -1462,7 +1512,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
+              <div ref={userDetailContentRef} className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
                 <div className="text-center">
                   <div className="relative mx-auto w-16 h-16 mb-3">
                     <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-md shadow-blue-500/20">
@@ -1565,6 +1615,9 @@ export default function Users({ users = [], categories = [], canViewAll = false,
                   </button>
                 </div>
               )}
+
+              {/* Floating Bottom-Center Scroll Indicator Button */}
+              <ViewScrollIndicator containerRef={userDetailContentRef} bottomOffsetClass="bottom-18 sm:bottom-20" />
             </div>
           )}
         </div>

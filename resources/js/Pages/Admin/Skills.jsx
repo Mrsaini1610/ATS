@@ -245,54 +245,62 @@ export default function Skills({ skills = [] }) {
 
         {/* Top Summary Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Total Skills</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
                 <Zap className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">{skills.length}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Keywords in database</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">{skills.length}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Keywords in database</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Active Tags</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs">
                 <Check className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">
-              {skills.filter((s) => s.active).length}
-            </p>
-            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Available for mapping</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">
+                {skills.filter((s) => s.active).length}
+              </p>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Available for mapping</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">High Demand</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center shadow-xs">
                 <Flame className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">
-              {skills.filter((s) => s.demand === "high").length}
-            </p>
-            <p className="text-[11px] text-rose-600 font-semibold mt-0.5">High market priority</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">
+                {skills.filter((s) => s.demand === "high").length}
+              </p>
+              <p className="text-[11px] text-rose-600 font-semibold mt-1">High market priority</p>
+            </div>
           </div>
 
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="bg-white p-5 min-h-[125px] rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500">Categories</span>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900">
-              {new Set(skills.map((s) => s.category)).size}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Industry clusters</p>
+            <div>
+              <p className="text-2xl font-black text-slate-900">
+                {new Set(skills.map((s) => s.category)).size}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">Industry clusters</p>
+            </div>
           </div>
         </div>
 
@@ -340,11 +348,11 @@ export default function Skills({ skills = [] }) {
         </div>
 
         {/* Skills Cards Grid - Natural flex height, no overlapping */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
           {filtered.map((skill) => (
             <div
               key={skill.id}
-              className={`bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-blue-400 ${
+              className={`bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-blue-400 overflow-hidden break-words min-w-0 ${
                 !skill.active ? "opacity-65 bg-slate-50/70 border-slate-200" : "border-slate-200/90"
               }`}
             >

@@ -424,13 +424,13 @@ export default function MyApplications({
               return (
                 <div
                   key={app.id || app.uuid}
-                  className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl shadow-xs hover:shadow-md transition-all overflow-hidden"
+                  className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl shadow-xs hover:shadow-md transition-all overflow-hidden break-words min-w-0"
                 >
                   {/* Card Main Body */}
-                  <div className="p-5 sm:p-6">
+                  <div className="p-5 sm:p-6 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                       {/* Left: Company Logo & Details */}
-                      <div className="flex items-start gap-4 min-w-0">
+                      <div className="flex items-start gap-4 min-w-0 flex-1">
                         {job.company_image ? (
                           <img
                             src={job.company_image}
@@ -443,7 +443,7 @@ export default function MyApplications({
                           </div>
                         )}
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h2
                               onClick={() => {
@@ -452,7 +452,7 @@ export default function MyApplications({
                                   setModalTab("timeline");
                                 }
                               }}
-                              className={`text-base sm:text-lg font-bold text-gray-900 truncate ${
+                              className={`text-base sm:text-lg font-bold text-gray-900 whitespace-normal break-words leading-snug ${
                                 isJobClosed
                                   ? "cursor-default"
                                   : "hover:text-blue-600 transition cursor-pointer"
@@ -461,20 +461,20 @@ export default function MyApplications({
                               {job.title || "Job Application"}
                             </h2>
                             {job.job_type && (
-                              <span className="text-[11px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md">
+                              <span className="text-[11px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md whitespace-nowrap">
                                 {job.job_type}
                               </span>
                             )}
                           </div>
 
-                          <p className="text-xs sm:text-sm font-semibold text-gray-700 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                            <span>{job.company || "Hiring Company"}</span>
+                          <p className="text-xs sm:text-sm font-semibold text-gray-700 mt-0.5 flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="whitespace-normal break-words">{job.company || "Hiring Company"}</span>
                             {job.location && (
                               <>
                                 <span className="text-gray-300">•</span>
-                                <span className="text-gray-500 font-normal flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                                  {job.location}
+                                <span className="text-gray-500 font-normal flex items-center gap-1 whitespace-normal break-words">
+                                  <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                  <span>{job.location}</span>
                                 </span>
                               </>
                             )}

@@ -329,12 +329,14 @@ class AdminJobController extends Controller
             'created_by'           => auth('admin')->id(),
         ]);
 
-        // Send Email & Notifications to Super Admin, Creator Admin, Assigned Member, and Matching Candidates
-        try {
-            MailService::sendNewJobCreated($job);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed sending new job created email/notifications: ' . $e->getMessage());
-        }
+        // Send Email & Notifications to Super Admin, Creator Admin, Assigned Member, and Matching Candidates via defer()
+        defer(function () use ($job) {
+            try {
+                MailService::sendNewJobCreated($job);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending new job created email/notifications: ' . $e->getMessage());
+            }
+        });
 
         // Audit Trail Log
         AuditLogService::log(
@@ -391,33 +393,39 @@ class AdminJobController extends Controller
             $updateData['is_deleted'] = 0;
             $updateData['approved_at'] = now();
             $updateData['approved_by'] = auth('admin')->id();
-
-            // Trigger push notifications to matching candidates in the same city
-            try {
-                if (!empty($job->location)) {
-                    $candidates = User::whereNotNull('city')
-                        ->where('city', 'LIKE', '%' . $job->location . '%')
-                        ->take(25)
-                        ->get();
-
-                    foreach ($candidates as $cand) {
-                        PushNotificationService::notifyJobMatch($cand, $job);
-                    }
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed sending job match push notifications: ' . $e->getMessage());
-            }
         }
 
         $oldStatus = $job->status;
         $job->update($updateData);
 
-        // Notify Super Admin, Creator, and Assignee regarding status change
-        try {
-            MailService::sendJobStatusUpdated($job, $oldStatus, $validated['status'], $validated['remark'] ?? null);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed sending job status update email/notifications: ' . $e->getMessage());
-        }
+        // Defer heavy Push notifications & Emails so Admin gets an INSTANT response (under 150ms)
+        $location = $job->location;
+        defer(function () use ($job, $oldStatus, $validated, $location) {
+            // Trigger push notifications to matching candidates in the same city if activated
+            if ($validated['status'] === 'approved' || $validated['status'] === 'active') {
+                try {
+                    if (!empty($location)) {
+                        $candidates = User::whereNotNull('city')
+                            ->where('city', 'LIKE', '%' . $location . '%')
+                            ->take(25)
+                            ->get();
+
+                        foreach ($candidates as $cand) {
+                            PushNotificationService::notifyJobMatch($cand, $job);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed sending job match push notifications: ' . $e->getMessage());
+                }
+            }
+
+            // Notify Super Admin, Creator, and Assignee regarding status change
+            try {
+                MailService::sendJobStatusUpdated($job, $oldStatus, $validated['status'], $validated['remark'] ?? null);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed sending job status update email/notifications: ' . $e->getMessage());
+            }
+        });
 
         // Audit Trail Log
         AuditLogService::log(

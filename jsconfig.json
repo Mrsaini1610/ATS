@@ -4,6 +4,11 @@
     "paths": {
       "@/*": ["resources/js/*"]
     },
-    "ignoreDeprecations": "6.0"
-  }
+    "jsx": "react-jsx",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["resources/js/**/*"],
+  "exclude": ["node_modules", "public", "vendor"]
 }

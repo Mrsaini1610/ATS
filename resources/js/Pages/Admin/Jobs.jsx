@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 import { Head, usePage, Link, router } from "@inertiajs/react";
 import {
   CheckCircle2,
@@ -378,7 +379,7 @@ function NearbyDatabaseSection({ job, onClose, isInline = false }) {
           <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-purple-50/70 border-b border-purple-100 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                <tr className="bg-purple-50 border-b border-purple-200 text-[11px] font-bold text-gray-700 uppercase tracking-wider">
                   <th className="py-2.5 px-3">#</th>
                   <th className="py-2.5 px-3">Candidate</th>
                   <th className="py-2.5 px-3">Distance</th>
@@ -416,14 +417,16 @@ function NearbyDatabaseSection({ job, onClose, isInline = false }) {
                           📍 {c.distance_text}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">
-                        {c.area && c.area !== "—" ? `${c.area}, ${c.city}` : c.city}
+                      <td className="py-2.5 px-3 text-gray-700">
+                        <span className="whitespace-normal break-words max-w-[170px] block leading-snug">
+                          {c.area && c.area !== "—" ? `${c.area}, ${c.city}` : c.city}
+                        </span>
                       </td>
                       <td className="py-2.5 px-3">
                         <p className="font-semibold text-gray-800">{c.experience}</p>
                         {Array.isArray(c.skills) && c.skills.length > 0 && (
-                          <p className="text-[11px] text-gray-400 truncate max-w-[160px]">
-                            {c.skills.slice(0, 3).join(", ")}
+                          <p className="text-[11px] text-gray-500 whitespace-normal break-words max-w-[190px] mt-0.5 leading-snug" title={c.skills.join(", ")}>
+                            {c.skills.slice(0, 4).join(", ")}
                           </p>
                         )}
                       </td>
@@ -542,6 +545,7 @@ export default function Jobs({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedJob, setSelectedJob] = useState(null);
+  const detailContentRef = useRef(null);
   const [databaseModalJob, setDatabaseModalJob] = useState(null);
   const [expandedDbJobUuid, setExpandedDbJobUuid] = useState(null);
   const [remarkModal, setRemarkModal] = useState(null);
@@ -569,6 +573,20 @@ export default function Jobs({
     }
   }, [jobs]);
 
+  // Real-time live jobs auto-refresh every 15s without losing scroll/state
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+      router.reload({
+        only: ["jobs"],
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Handle Escape key to close in-page side view
   useEffect(() => {
     if (selectedJob) {
@@ -582,13 +600,25 @@ export default function Jobs({
     }
   }, [selectedJob]);
 
-  // Auto-scroll detail panel smoothly into view when job is selected
+  // Auto-scroll detail panel and selected job card smoothly into view front & center
   useEffect(() => {
-    if (selectedJob) {
-      const el = document.getElementById("admin-job-detail-panel");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (selectedJob && typeof window !== "undefined") {
+      if (detailContentRef.current) {
+        detailContentRef.current.scrollTop = 0;
       }
+      requestAnimationFrame(() => {
+        const el = document.getElementById("admin-job-detail-panel");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+      const timer = setTimeout(() => {
+        const cardEl = document.getElementById(`admin-job-card-${selectedJob.uuid}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
     }
   }, [selectedJob?.uuid]);
 
@@ -725,7 +755,16 @@ export default function Jobs({
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Job Posts</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-extrabold text-gray-900">Job Posts</h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span>Real-Time Sync</span>
+              </span>
+            </div>
             <p className="text-sm text-gray-500 mt-0.5">
               {jobs.length} total · {counts.pending || 0} pending review
             </p>
@@ -823,15 +862,16 @@ export default function Jobs({
             filtered.map((job) => (
               <div
                 key={job.uuid}
+                id={`admin-job-card-${job.uuid}`}
                 onClick={() => setSelectedJob(job)}
-                className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all ${
-                  selectedJob?.uuid === job.uuid ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" : "border-gray-100 hover:border-blue-200"
+                className={`bg-white border rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all overflow-hidden break-words min-w-0 ${
+                  selectedJob?.uuid === job.uuid ? "border-blue-600 ring-2 ring-blue-500/50 bg-blue-50/40 shadow-md shadow-blue-500/10" : "border-gray-100 hover:border-blue-200"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-start justify-between gap-3 mb-2 flex-wrap sm:flex-nowrap">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold text-gray-900">{job.title}</h3>
+                      <h3 className="font-bold text-gray-900 text-base leading-snug whitespace-normal break-words">{job.title}</h3>
                       {job.is_hot && <Flame className="w-3.5 h-3.5 text-orange-500" title="Hot Job" />}
                       <StatusBadge status={job.status} />
                       {(job.is_deleted || job.is_expired) && (
@@ -840,30 +880,30 @@ export default function Jobs({
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Briefcase className="w-3 h-3 text-gray-400" />
-                        {job.company}
+                    <div className="flex flex-wrap gap-2.5 sm:gap-3 text-xs text-gray-500 items-center">
+                      <span className="flex items-center gap-1 min-w-0">
+                        <Briefcase className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span className="whitespace-normal break-words max-w-[200px]">{job.company}</span>
                       </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        {job.location}
+                      <span className="flex items-center gap-1 min-w-0">
+                        <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span className="whitespace-normal break-words max-w-[200px]">{job.location}</span>
                       </span>
                       <Link
                         href={route("admin.applications.index", { job_id: job.id })}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold whitespace-nowrap"
                         title="Click to view applicants"
                       >
-                        <Users className="w-3 h-3 text-blue-500" />
+                        <Users className="w-3 h-3 text-blue-500 shrink-0" />
                         {job.applicants ?? 0} applicants
                       </Link>
-                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 whitespace-nowrap">
                         {job.salary}
                       </span>
                       <span className="font-medium text-gray-700">Posted by {job.posted_by || "System"}</span>
                       {job.work_mode && job.work_mode !== job.type && (
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{job.work_mode}</span>
+                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap">{job.work_mode}</span>
                       )}
                     </div>
                   </div>
@@ -997,7 +1037,7 @@ export default function Jobs({
           {selectedJob && (
             <div
               id="admin-job-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out relative"
             >
               {/* Header with High-Contrast Navy/Blue Gradient */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
@@ -1035,7 +1075,7 @@ export default function Jobs({
               </div>
 
               {/* Independent Scrollable Content Area */}
-              <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+              <div ref={detailContentRef} className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
                   <div className="flex flex-wrap gap-2">
                     <StatusBadge status={selectedJob.status} />
                     {(selectedJob.is_deleted || selectedJob.is_expired) && (
@@ -1449,6 +1489,9 @@ export default function Jobs({
                     </>
                   )}
                 </div>
+
+              {/* Floating Bottom-Center Scroll Indicator Button */}
+              <ViewScrollIndicator containerRef={detailContentRef} bottomOffsetClass="bottom-16" />
             </div>
           )}
         </div>

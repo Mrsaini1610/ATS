@@ -538,12 +538,12 @@ export default function JobDetailModal({
         </div>
 
         {/* Sleek bottom guarantee strip */}
-        <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-6 py-2.5 flex items-center justify-between text-xs text-gray-500">
-          <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+        <div className="shrink-0 bg-[#f8fafc] border-t border-slate-200/90 px-5 sm:px-6 py-3 flex items-center justify-between text-xs text-slate-600 shadow-inner">
+          <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             100% Free Application Guarantee
           </span>
-          <span className="text-[11px] text-gray-400">Direct hiring partner</span>
+          <span className="text-[11px] text-slate-500 font-medium">Direct hiring partner</span>
         </div>
       </div>
 

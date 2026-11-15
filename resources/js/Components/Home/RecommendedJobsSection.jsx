@@ -95,23 +95,23 @@ export default function RecommendedJobsSection({
               <div
                 key={job.id}
                 onClick={() => onSelectJob && onSelectJob(job)}
-                className={`bg-white rounded-2xl border p-5 hover:border-emerald-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative group cursor-pointer shadow-2xs ${
+                className={`bg-white rounded-2xl border p-5 hover:border-emerald-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative group cursor-pointer shadow-2xs overflow-hidden break-words min-w-0 ${
                   eligibility.isRestricted ? "border-red-100 hover:border-red-300" : "border-gray-100"
                 }`}
               >
-                <div>
+                <div className="min-w-0">
                   {/* Top Bar: Company Avatar & Match % */}
                   <div className="flex items-center justify-between gap-2.5 mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs">
                         {job.company ? job.company.substring(0, 2).toUpperCase() : "ATS"}
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-800 truncate max-w-[170px]">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-800 line-clamp-1 break-words">
                           {job.company || "Verified Hiring Partner"}
                         </p>
                         {job.created_at_human && (
-                          <span className="text-[10px] text-gray-400 block">
+                          <span className="text-[10px] text-gray-400 block truncate">
                             {job.created_at_human}
                           </span>
                         )}
@@ -127,23 +127,23 @@ export default function RecommendedJobsSection({
                   </div>
 
                   {/* Job Title - FULL WIDTH, NEVER SQUEEZED */}
-                  <h3 className="text-base font-extrabold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors leading-snug">
+                  <h3 className="text-base font-extrabold text-gray-900 mb-2 line-clamp-2 break-words group-hover:text-blue-600 transition-colors leading-snug">
                     {job.title}
                   </h3>
 
                   {/* Salary & Details Strip (Set Prominently right below title) */}
                   <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
-                    <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
-                      <span>{job.salary || "Competitive Salary"}</span>
+                    <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg break-words max-w-full">
+                      <span className="break-words">{job.salary || "Competitive Salary"}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
-                      <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.job_type || "Full Time"}</span>
-                      <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.experience || "Fresher"}</span>
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 flex-wrap">
+                      <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.job_type || "Full Time"}</span>
+                      <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.experience || "Fresher"}</span>
                     </div>
                   </div>
 
                   {/* Qualifications & Requirements Box - Shown Outside on Card */}
-                  <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
+                  <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 min-w-0">
                     {/* Qualification Row */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
@@ -151,7 +151,7 @@ export default function RecommendedJobsSection({
                         <span>Qualification:</span>
                       </span>
                       <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 break-words max-w-full ${
                           isLoggedIn && eligibility.isRestricted
                             ? "bg-red-50 text-red-700 border-red-200"
                             : "bg-purple-50 text-purple-700 border-purple-200"
@@ -160,10 +160,10 @@ export default function RecommendedJobsSection({
                         {isLoggedIn && eligibility.isRestricted ? (
                           <>
                             <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
-                            <span>Min. {minQual.label} (Ineligible)</span>
+                            <span className="break-words">Min. {minQual.label} (Ineligible)</span>
                           </>
                         ) : (
-                          <span>Min. {minQual.label}</span>
+                          <span className="break-words">Min. {minQual.label}</span>
                         )}
                       </span>
                     </div>
@@ -174,7 +174,7 @@ export default function RecommendedJobsSection({
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
                           Highlights:
                         </span>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 max-w-full">
                           {reasons.slice(0, 3).map((reason, idx) => (
                             <span
                               key={idx}
@@ -190,13 +190,13 @@ export default function RecommendedJobsSection({
                 </div>
 
                 {/* Bottom Row: Location & Distance ON LEFT (Where salary was) + Action Button ON RIGHT */}
-                <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
+                <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
                   {/* Location & Distance */}
                   <div className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0 flex-1">
                     <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                     <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
                     {distance && (
-                      <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
+                      <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px] whitespace-nowrap">
                         • {distance}
                       </span>
                     )}

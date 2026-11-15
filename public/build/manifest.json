@@ -210,6 +210,14 @@
       "_TextSVGImage-cI0a05-7.js"
     ]
   },
+  "_ViewScrollIndicator-CD0aLWbP.js": {
+    "file": "assets/ViewScrollIndicator-CD0aLWbP.js",
+    "name": "ViewScrollIndicator",
+    "imports": [
+      "_framework-CS4vr0rK.js",
+      "_lucide-icons-CkeE7fXE.js"
+    ]
+  },
   "_dialog-CUd_s4Ca.js": {
     "file": "assets/dialog-CUd_s4Ca.js",
     "name": "dialog",
@@ -399,13 +407,14 @@
     ]
   },
   "resources/js/Pages/Admin/Applications.jsx": {
-    "file": "assets/Applications-0SHPIfDV.js",
+    "file": "assets/Applications-Czw1wYU9.js",
     "name": "Applications",
     "src": "resources/js/Pages/Admin/Applications.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_framework-CS4vr0rK.js",
       "_Sidebar-BFSCLymI.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_lucide-icons-CkeE7fXE.js",
       "_Alerts-1TM07z8K.js",
       "_index-B-wmDUH4.js",
@@ -441,7 +450,7 @@
     ]
   },
   "resources/js/Pages/Admin/Categories.jsx": {
-    "file": "assets/Categories-B4MUlkix.js",
+    "file": "assets/Categories-DAk4f1Gv.js",
     "name": "Categories",
     "src": "resources/js/Pages/Admin/Categories.jsx",
     "isDynamicEntry": true,
@@ -457,13 +466,14 @@
     ]
   },
   "resources/js/Pages/Admin/Companies.jsx": {
-    "file": "assets/Companies-D1XMG8eL.js",
+    "file": "assets/Companies-CeIrHRYv.js",
     "name": "Companies",
     "src": "resources/js/Pages/Admin/Companies.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_framework-CS4vr0rK.js",
       "_Sidebar-BFSCLymI.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_LocationInput-BMmV1QYi.js",
       "_lucide-icons-CkeE7fXE.js",
       "_Alerts-1TM07z8K.js",
@@ -503,13 +513,14 @@
     ]
   },
   "resources/js/Pages/Admin/Interviews.jsx": {
-    "file": "assets/Interviews-BKMEhKZl.js",
+    "file": "assets/Interviews-BwK35_3c.js",
     "name": "Interviews",
     "src": "resources/js/Pages/Admin/Interviews.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_framework-CS4vr0rK.js",
       "_Sidebar-BFSCLymI.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_lucide-icons-CkeE7fXE.js",
       "_Alerts-1TM07z8K.js",
       "_index-B-wmDUH4.js",
@@ -518,13 +529,14 @@
     ]
   },
   "resources/js/Pages/Admin/Jobs.jsx": {
-    "file": "assets/Jobs-Dfhfz5xx.js",
+    "file": "assets/Jobs-CUOn2pYZ.js",
     "name": "Jobs",
     "src": "resources/js/Pages/Admin/Jobs.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_framework-CS4vr0rK.js",
       "_Sidebar-BFSCLymI.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_xlsx-3SA47z_C.js",
       "_lucide-icons-CkeE7fXE.js",
       "_Alerts-1TM07z8K.js",
@@ -534,7 +546,7 @@
     ]
   },
   "resources/js/Pages/Admin/Logs.jsx": {
-    "file": "assets/Logs-rmnxyyJX.js",
+    "file": "assets/Logs-BNC2rWJv.js",
     "name": "Logs",
     "src": "resources/js/Pages/Admin/Logs.jsx",
     "isDynamicEntry": true,
@@ -564,7 +576,7 @@
     ]
   },
   "resources/js/Pages/Admin/Skills.jsx": {
-    "file": "assets/Skills-2eBoMt_f.js",
+    "file": "assets/Skills-CAkA5GxX.js",
     "name": "Skills",
     "src": "resources/js/Pages/Admin/Skills.jsx",
     "isDynamicEntry": true,
@@ -611,13 +623,14 @@
     ]
   },
   "resources/js/Pages/Admin/Users.jsx": {
-    "file": "assets/Users-a41U9jh8.js",
+    "file": "assets/Users-DkbK4VXF.js",
     "name": "Users",
     "src": "resources/js/Pages/Admin/Users.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_framework-CS4vr0rK.js",
       "_Sidebar-BFSCLymI.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_xlsx-3SA47z_C.js",
       "_liveValidation-BvI2jjbD.js",
       "_lucide-icons-CkeE7fXE.js",
@@ -1061,7 +1074,7 @@
     ]
   },
   "resources/js/Pages/Candidate/Home.jsx": {
-    "file": "assets/Home-Y0XrP6A-.js",
+    "file": "assets/Home-BQ-k-Z-3.js",
     "name": "Home",
     "src": "resources/js/Pages/Candidate/Home.jsx",
     "isDynamicEntry": true,
@@ -1092,7 +1105,7 @@
     ]
   },
   "resources/js/Pages/Candidate/JobListings.jsx": {
-    "file": "assets/JobListings-B7i_9_8Y.js",
+    "file": "assets/JobListings-Czor608s.js",
     "name": "JobListings",
     "src": "resources/js/Pages/Candidate/JobListings.jsx",
     "isDynamicEntry": true,
@@ -1101,6 +1114,7 @@
       "_HomepageLayout-AXdBeNJj.js",
       "_CandidateLoginModal-Ch7S-iXK.js",
       "_EligibilityAlertModal-C_oJQhqw.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_lucide-icons-CkeE7fXE.js",
       "_RealtimeNotificationToast-D7vcEbpK.js",
       "_SingleSessionModal-C18X78R0.js",
@@ -1108,7 +1122,7 @@
     ]
   },
   "resources/js/Pages/Candidate/JobSearch.jsx": {
-    "file": "assets/JobSearch-B4KK2I6l.js",
+    "file": "assets/JobSearch-C2cFlQgR.js",
     "name": "JobSearch",
     "src": "resources/js/Pages/Candidate/JobSearch.jsx",
     "isDynamicEntry": true,
@@ -1121,7 +1135,8 @@
       "_SingleSessionModal-C18X78R0.js",
       "_CandidateLoginModal-Ch7S-iXK.js",
       "_firebase-D-wkFiXN.js",
-      "_EligibilityAlertModal-C_oJQhqw.js"
+      "_EligibilityAlertModal-C_oJQhqw.js",
+      "_ViewScrollIndicator-CD0aLWbP.js"
     ]
   },
   "resources/js/Pages/Candidate/Login.jsx": {
@@ -1166,7 +1181,7 @@
     ]
   },
   "resources/js/Pages/Candidate/MyApplications.jsx": {
-    "file": "assets/MyApplications-2eQMLTaW.js",
+    "file": "assets/MyApplications-DlXnVY1_.js",
     "name": "MyApplications",
     "src": "resources/js/Pages/Candidate/MyApplications.jsx",
     "isDynamicEntry": true,
@@ -1244,7 +1259,7 @@
     ]
   },
   "resources/js/Pages/Candidate/savedjobs.jsx": {
-    "file": "assets/savedjobs-Di4kBpfJ.js",
+    "file": "assets/savedjobs-BqTdCgwz.js",
     "name": "savedjobs",
     "src": "resources/js/Pages/Candidate/savedjobs.jsx",
     "isDynamicEntry": true,
@@ -1253,6 +1268,7 @@
       "_HomepageLayout-AXdBeNJj.js",
       "_CandidateLoginModal-Ch7S-iXK.js",
       "_EligibilityAlertModal-C_oJQhqw.js",
+      "_ViewScrollIndicator-CD0aLWbP.js",
       "_lucide-icons-CkeE7fXE.js",
       "_RealtimeNotificationToast-D7vcEbpK.js",
       "_SingleSessionModal-C18X78R0.js",
@@ -2240,7 +2256,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-DQF2Fgr0.js",
+    "file": "assets/app-8EdK9QuR.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -2353,7 +2369,7 @@
       "resources/js/Pages/Welcome.jsx"
     ],
     "css": [
-      "assets/app-D_fk7Mbs.css"
+      "assets/app-CusIRwGq.css"
     ]
   }
 }

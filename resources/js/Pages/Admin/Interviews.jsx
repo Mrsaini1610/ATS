@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 import { Head, usePage, useForm, router } from "@inertiajs/react";
 import {
   Plus,
@@ -48,6 +49,46 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
   const [dateFilter, setDateFilter] = useState("all"); // all | today | upcoming | past
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+  const interviewDetailContentRef = useRef(null);
+
+  // Auto-scroll detail panel smoothly into view when interview is selected so view is 100% visible
+  useEffect(() => {
+    if (selected && typeof window !== "undefined") {
+      if (interviewDetailContentRef.current) {
+        interviewDetailContentRef.current.scrollTop = 0;
+      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById("admin-interview-detail-panel");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+  }, [selected?.uuid || selected?.id]);
+
+  // Real-time live interviews auto-refresh every 15s without losing scroll/state
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+      router.reload({
+        only: ["interviews"],
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Keep selected interview updated when interviews reload
+  useEffect(() => {
+    if (selected) {
+      const refreshed = interviews.find((i) => (i.uuid && i.uuid === selected.uuid) || (i.id && i.id === selected.id));
+      if (refreshed) {
+        setSelected(refreshed);
+      }
+    }
+  }, [interviews]);
   const [scheduleModal, setScheduleModal] = useState(false);
   const [remarkText, setRemarkText] = useState("");
   const [copiedPhone, setCopiedPhone] = useState(false);
@@ -821,10 +862,19 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
-              <Calendar className="w-6 h-6 text-blue-600" />
-              Interview Management
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
+                <Calendar className="w-6 h-6 text-blue-600" />
+                Interview Management
+              </h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span>Real-Time Sync</span>
+              </span>
+            </div>
             <p className="text-sm text-gray-500 mt-1">
               Schedule, validate candidate phone numbers, assign interview panels, and track rounds
             </p>
@@ -1015,7 +1065,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                     setSelected(iv);
                     setRemarkText(iv.remark || "");
                   }}
-                  className={`bg-white border rounded-2xl p-4 sm:p-4.5 cursor-pointer hover:shadow-md transition-all relative overflow-hidden ${
+                  className={`bg-white border rounded-2xl p-4 sm:p-5 cursor-pointer hover:shadow-md transition-all relative overflow-hidden break-words min-w-0 ${
                     selected?.uuid === iv.uuid
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/15"
                       : "border-gray-200/80 hover:border-blue-300"
@@ -1040,8 +1090,8 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                     <div className="flex-1 min-w-0">
                       {/* Candidate Name & Status */}
                       <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <h4 className="font-bold text-gray-900 text-base truncate" title={iv.candidateName}>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <h4 className="font-bold text-gray-900 text-base leading-snug whitespace-normal break-words" title={iv.candidateName}>
                             {iv.candidateName}
                           </h4>
                           {isToday && (
@@ -1066,12 +1116,12 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                       <div className="text-xs text-gray-600 flex flex-wrap items-center gap-x-2 gap-y-1 font-medium mb-2.5 min-w-0">
                         <span className="inline-flex items-center gap-1.5 min-w-0">
                           <Briefcase className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate max-w-[200px] sm:max-w-none">{iv.jobTitle}</span>
+                          <span className="whitespace-normal break-words">{iv.jobTitle}</span>
                         </span>
                         <span className="text-gray-300 hidden sm:inline">•</span>
                         <span className="inline-flex items-center gap-1.5 min-w-0">
                           <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="text-gray-800 font-semibold truncate max-w-[200px] sm:max-w-none">{iv.company}</span>
+                          <span className="text-gray-800 font-semibold whitespace-normal break-words">{iv.company}</span>
                         </span>
                       </div>
 
@@ -1079,7 +1129,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2.5 bg-gray-50/80 border border-gray-100 rounded-xl p-2.5 text-xs min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-gray-400 font-medium shrink-0">Round:</span>
-                          <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 truncate">
+                          <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 whitespace-normal break-words">
                             {iv.round || "HR Screening"}
                           </span>
                         </div>
@@ -1087,7 +1137,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                         <div className="flex items-center gap-1.5 min-w-0">
                           <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                           <span className="text-gray-500 text-[11px] shrink-0">Interviewer:</span>
-                          <span className="font-bold text-gray-800 truncate" title={iv.interviewer || iv.scheduledBy || "Admin"}>
+                          <span className="font-bold text-gray-800 whitespace-normal break-words" title={iv.interviewer || iv.scheduledBy || "Admin"}>
                             {iv.interviewer || iv.scheduledBy || "Admin"}
                           </span>
                         </div>
@@ -1195,7 +1245,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
           {selected && (
             <div
               id="admin-interview-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out relative"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1224,7 +1274,7 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-4 pb-8 overscroll-contain [scrollbar-width:thin]">
+              <div ref={interviewDetailContentRef} className="overflow-y-auto flex-1 p-5 space-y-4 pb-8 overscroll-contain [scrollbar-width:thin]">
                 {/* Candidate Profile Header */}
                 <div className="flex items-center gap-3.5 bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100">
                   <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-base shadow-md shadow-blue-600/30 shrink-0">
@@ -1443,6 +1493,9 @@ export default function Interviews({ interviews = [], teamMembers = [], jobs = [
                   </div>
                 )}
               </div>
+
+              {/* Floating Bottom-Center Scroll Indicator Button */}
+              <ViewScrollIndicator containerRef={interviewDetailContentRef} bottomOffsetClass="bottom-6 sm:bottom-8" />
             </div>
           )}
         </div>

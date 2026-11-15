@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import SidebarLayout from "@/Components/Admin/Layout/Sidebar";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 import LocationInput from "@/Components/LocationInput";
 import { Head, usePage, useForm, router, Link } from "@inertiajs/react";
 import {
@@ -51,6 +52,22 @@ export default function Companies({ companies = [] }) {
   const [modal, setModal] = useState(null);
   const [deleteUuid, setDeleteUuid] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
+  const companyDetailContentRef = useRef(null);
+
+  // Auto-scroll detail panel smoothly into view when company is selected so view is 100% visible
+  useEffect(() => {
+    if (selectedCompany && typeof window !== "undefined") {
+      if (companyDetailContentRef.current) {
+        companyDetailContentRef.current.scrollTop = 0;
+      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById("admin-company-detail-panel");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+  }, [selectedCompany?.uuid || selectedCompany?.id]);
   const [logoType, setLogoType] = useState("initials");
 
   const { data, setData, post, processing, reset, errors, clearErrors, setError } = useForm({
@@ -58,8 +75,8 @@ export default function Companies({ companies = [] }) {
     website: "",
     location: "",
     address: "",
-    latitude: null,
-    longitude: null,
+    latitude: "",
+    longitude: "",
     company_size: "1 - 10 employees",
     logo: "",
     description: "",
@@ -104,8 +121,8 @@ export default function Companies({ companies = [] }) {
       website: "",
       location: "",
       address: "",
-      latitude: null,
-      longitude: null,
+      latitude: "",
+      longitude: "",
       company_size: "1 - 10 employees",
       logo: "",
       description: "",
@@ -129,8 +146,8 @@ export default function Companies({ companies = [] }) {
       website: comp.website || "",
       location: comp.location || "",
       address: comp.address || comp.location || "",
-      latitude: comp.latitude ? Number(comp.latitude) : null,
-      longitude: comp.longitude ? Number(comp.longitude) : null,
+      latitude: comp.latitude != null ? String(comp.latitude) : "",
+      longitude: comp.longitude != null ? String(comp.longitude) : "",
       company_size: comp.company_size || "1 - 10 employees",
       logo: comp.logo || "",
       description: comp.description || "",
@@ -218,9 +235,26 @@ export default function Companies({ companies = [] }) {
 
     if (hasErr) return;
 
+    const payload = {
+      name: data.name,
+      website: data.website || "",
+      location: data.location || "",
+      address: data.address,
+      latitude: data.latitude !== "" && data.latitude != null && !isNaN(data.latitude) ? Number(data.latitude) : "",
+      longitude: data.longitude !== "" && data.longitude != null && !isNaN(data.longitude) ? Number(data.longitude) : "",
+      company_size: data.company_size || "1 - 10 employees",
+      logo: data.logo,
+      description: data.description || "",
+      status: data.status || "active",
+    };
+
     if (modal.mode === "add") {
-      post(route("admin.companies.store"), {
+      router.post(route("admin.companies.store"), payload, {
         preserveScroll: true,
+        forceFormData: true,
+        onError: (errs) => {
+          Object.keys(errs || {}).forEach((k) => setError(k, errs[k]));
+        },
         onSuccess: () => closeModal(),
       });
     } else {
@@ -228,19 +262,14 @@ export default function Companies({ companies = [] }) {
         route("admin.companies.update", modal.uuid),
         {
           _method: "PUT",
-          name: data.name,
-          website: data.website,
-          location: data.location,
-          address: data.address,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          company_size: data.company_size,
-          logo: data.logo,
-          description: data.description,
-          status: data.status,
+          ...payload,
         },
         {
           preserveScroll: true,
+          forceFormData: true,
+          onError: (errs) => {
+            Object.keys(errs || {}).forEach((k) => setError(k, errs[k]));
+          },
           onSuccess: () => closeModal(),
         }
       );
@@ -309,162 +338,254 @@ export default function Companies({ companies = [] }) {
               {/* Scrollable Form Body */}
               <div className="overflow-y-auto p-4 sm:p-6 flex-1">
                 <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Company Name */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Company Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={data.name}
-                    onChange={handleNameChange}
-                    placeholder="e.g. Apex Global Tech"
-                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
-                      errors.name
-                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
-                        : "border-gray-200 focus:ring-blue-500"
-                    }`}
-                    autoFocus
-                  />
-                  {errors.name && (
-                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {errors.name}
+                {Object.keys(errors).length > 0 && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-rose-900">
+                      <AlertCircle className="w-4 h-4 text-rose-600" /> Validation Failed:
                     </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-rose-700 font-medium">
+                      {Object.entries(errors).map(([k, err]) => (
+                        <li key={k}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                  {/* Company Name */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      City / Location
+                      Company Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={data.location}
-                      onChange={(e) => setData("location", e.target.value)}
-                      placeholder="e.g. Jaipur, Rajasthan"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      value={data.name}
+                      onChange={handleNameChange}
+                      placeholder="e.g. Apex Global Tech"
+                      className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${errors.name
+                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
+                        : "border-gray-200 focus:ring-blue-500"
+                        }`}
+                      autoFocus
                     />
+                    {errors.name && (
+                      <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> {errors.name}
+                      </p>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Company Size <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={data.company_size}
-                      onChange={handleCompanySizeChange}
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="1 - 10 employees">1 - 10 employees</option>
-                      <option value="11 - 50 employees">11 - 50 employees</option>
-                      <option value="51 - 200 employees">51 - 200 employees</option>
-                      <option value="201 - 500 employees">201 - 500 employees</option>
-                      <option value="500+ employees">500+ employees</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Company Address with GPS auto-coordinates */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Company Address <span className="text-red-500">*</span>
-                  </label>
-                  <LocationInput
-                    value={data.address}
-                    onChange={(addr, lat, lng) => {
-                      setData((prev) => ({
-                        ...prev,
-                        address: addr,
-                        ...(lat !== null && { latitude: lat }),
-                        ...(lng !== null && { longitude: lng }),
-                      }));
-                      const err = validateAddress(addr);
-                      if (err) setError("address", err);
-                      else clearErrors("address");
-                    }}
-                    placeholder="Enter street, landmark, area, city..."
-                    hasError={Boolean(errors.address)}
-                  />
-                  {errors.address && (
-                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {errors.address}
-                    </p>
-                  )}
-
-                  {/* Auto-filled Coordinates Display */}
-                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                        Coordinates (Latitude & Longitude)
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        {data.latitude && data.longitude
-                          ? "Auto-filled and will save to database"
-                          : "Type address above to auto-detect"}
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        City / Location
+                      </label>
+                      <input
+                        type="text"
+                        value={data.location}
+                        onChange={(e) => setData("location", e.target.value)}
+                        placeholder="e.g. Jaipur, Rajasthan"
+                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
                     </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Latitude
-                        </label>
-                        <input
-                          type="text"
-                          value={data.latitude ?? ""}
-                          onChange={(e) =>
-                            setData("latitude", e.target.value ? Number(e.target.value) : null)
-                          }
-                          placeholder="e.g. 26.8530"
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Longitude
-                        </label>
-                        <input
-                          type="text"
-                          value={data.longitude ?? ""}
-                          onChange={(e) =>
-                            setData("longitude", e.target.value ? Number(e.target.value) : null)
-                          }
-                          placeholder="e.g. 75.8047"
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Company Size <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={data.company_size}
+                        onChange={handleCompanySizeChange}
+                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="1 - 10 employees">1 - 10 employees</option>
+                        <option value="11 - 50 employees">11 - 50 employees</option>
+                        <option value="51 - 200 employees">51 - 200 employees</option>
+                        <option value="201 - 500 employees">201 - 500 employees</option>
+                        <option value="500+ employees">500+ employees</option>
+                      </select>
                     </div>
                   </div>
-                </div>
 
-                {/* Logo Format and Input */}
-                <div className="grid grid-cols-2 gap-3">
+                  {/* Company Address with GPS auto-coordinates */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Logo Format *
+                      Company Address <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={logoType}
-                      onChange={(e) => {
-                        const type = e.target.value;
-                        setLogoType(type);
-                        if (type === "initials") {
-                          setData("logo", (data.name || "").slice(0, 2).toUpperCase());
-                        } else {
-                          setData("logo", "");
-                        }
+                    <LocationInput
+                      value={data.address}
+                      onChange={(addr, lat, lng) => {
+                        setData((prev) => ({
+                          ...prev,
+                          address: addr,
+                          ...(lat !== null && { latitude: lat }),
+                          ...(lng !== null && { longitude: lng }),
+                        }));
+                        const err = validateAddress(addr);
+                        if (err) setError("address", err);
+                        else clearErrors("address");
                       }}
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                    >
-                      <option value="initials">Two Letter (Initials)</option>
-                      <option value="image">Select Image (File)</option>
-                    </select>
+                      placeholder="Enter street, landmark, area, city..."
+                      hasError={Boolean(errors.address)}
+                    />
+                    {errors.address && (
+                      <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> {errors.address}
+                      </p>
+                    )}
+
+                    {/* Auto-filled Coordinates Display */}
+                    <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                          Coordinates (Latitude & Longitude)
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {data.latitude && data.longitude
+                            ? "Auto-filled and will save to database"
+                            : "Type address above to auto-detect"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Latitude
+                          </label>
+                          <input
+                            type="text"
+                            value={data.latitude ?? ""}
+                            onChange={(e) =>
+                              setData("latitude", e.target.value)
+                            }
+                            placeholder="e.g. 26.8530"
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          {errors.latitude && (
+                            <p className="text-[10px] text-red-500 mt-0.5">{errors.latitude}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Longitude
+                          </label>
+                          <input
+                            type="text"
+                            value={data.longitude ?? ""}
+                            onChange={(e) =>
+                              setData("longitude", e.target.value)
+                            }
+                            placeholder="e.g. 75.8047"
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-mono text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          {errors.longitude && (
+                            <p className="text-[10px] text-red-500 mt-0.5">{errors.longitude}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Logo Format and Input */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Logo Format *
+                      </label>
+                      <select
+                        value={logoType}
+                        onChange={(e) => {
+                          const type = e.target.value;
+                          setLogoType(type);
+                          if (type === "initials") {
+                            setData("logo", (data.name || "").slice(0, 2).toUpperCase());
+                          } else {
+                            setData("logo", "");
+                          }
+                        }}
+                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                      >
+                        <option value="initials">Two Letter (Initials)</option>
+                        <option value="image">Select Image (File)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        {logoType === "initials" ? "Initials (2 Letters)" : "Choose Image File"}
+                      </label>
+                      {logoType === "initials" ? (
+                        <input
+                          type="text"
+                          value={typeof data.logo === "string" ? data.logo : ""}
+                          onChange={(e) =>
+                            setData("logo", e.target.value.toUpperCase().slice(0, 2))
+                          }
+                          maxLength={2}
+                          placeholder="AG"
+                          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold uppercase"
+                        />
+                      ) : (
+                        <div className="space-y-1.5">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              if (file.size > 10 * 1024 * 1024) {
+                                setError("logo", "Image size must be less than 10MB.");
+                                return;
+                              }
+                              clearErrors("logo");
+                              setData("logo", file);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white outline-none file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                          />
+                          {data.logo instanceof File && (
+                            <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Selected: {data.logo.name} ({(data.logo.size / 1024).toFixed(0)} KB)
+                            </p>
+                          )}
+                          {typeof data.logo === "string" && data.logo && (data.logo.startsWith("http") || data.logo.includes("/")) && (
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              Current Image: <span className="font-mono text-[10px] text-slate-700">{data.logo.slice(-25)}</span>
+                            </p>
+                          )}
+                          {errors.logo && (
+                            <p className="text-xs text-red-500 mt-0.5 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" /> {errors.logo}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Website URL */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      {logoType === "initials" ? "Initials (2 Letters)" : "Choose Image File"}
+                      Website URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.website}
+                      onChange={handleWebsiteChange}
+                      placeholder="https://company.com"
+                      className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${errors.website
+                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
+                        : "border-gray-200 focus:ring-blue-500"
+                        }`}
+                    />
+                    {errors.website && (
+                      <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> {errors.website}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Description / About
                     </label>
                     {logoType === "initials" ? (
                       <input
@@ -478,90 +599,76 @@ export default function Companies({ companies = [] }) {
                         className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold uppercase"
                       />
                     ) : (
-                      <div className="relative flex items-center">
+                      <div className="space-y-1.5">
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => setData("logo", e.target.files[0])}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            if (file.size > 10 * 1024 * 1024) {
+                              setError("logo", "Image size must be less than 10MB.");
+                              return;
+                            }
+                            clearErrors("logo");
+                            setData("logo", file);
+                          }}
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white outline-none file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                         />
+                        {data.logo instanceof File && (
+                          <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Selected: {data.logo.name} ({(data.logo.size / 1024).toFixed(0)} KB)
+                          </p>
+                        )}
+                        {typeof data.logo === "string" && data.logo && (data.logo.startsWith("http") || data.logo.includes("/")) && (
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Current Image: <span className="font-mono text-[10px] text-slate-700">{data.logo.slice(-25)}</span>
+                          </p>
+                        )}
+                        {errors.logo && (
+                          <p className="text-xs text-red-500 mt-0.5 font-medium flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> {errors.logo}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Website URL */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Website URL (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={data.website}
-                    onChange={handleWebsiteChange}
-                    placeholder="https://company.com"
-                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition focus:ring-2 ${
-                      errors.website
-                        ? "border-red-500 focus:ring-red-400 bg-red-50/20"
-                        : "border-gray-200 focus:ring-blue-500"
-                    }`}
-                  />
-                  {errors.website && (
-                    <p className="text-xs text-red-500 mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {errors.website}
-                    </p>
-                  )}
-                </div>
+                  {/* Listing Status */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Listing Status
+                    </label>
+                    <select
+                      value={data.status}
+                      onChange={(e) => setData("status", e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
 
-                {/* Description */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Description / About
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={data.description}
-                    onChange={(e) => setData("description", e.target.value)}
-                    placeholder="Brief description about company and business domain..."
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Listing Status */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Listing Status
-                  </label>
-                  <select
-                    value={data.status}
-                    onChange={(e) => setData("status", e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-3 pt-3 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={processing}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60 transition"
-                  >
-                    {processing ? "Saving..." : "Save Company"}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex gap-3 pt-3 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer font-medium transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={processing}
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-60 transition"
+                    >
+                      {processing ? "Saving..." : "Save Company"}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-        </div>
         )}
 
         {/* Delete Confirmation Modal */}
@@ -630,11 +737,10 @@ export default function Companies({ companies = [] }) {
         {/* Companies Grid */}
         <div className="flex flex-col lg:flex-row gap-5 items-start">
           <div
-            className={`transition-all duration-300 ease-out ${
-              selectedCompany
-                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3 overflow-y-auto h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] pr-2 [scrollbar-width:thin]"
-                : "w-full flex-1 flex flex-wrap gap-4"
-            }`}
+            className={`transition-all duration-300 ease-out ${selectedCompany
+              ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3 overflow-y-auto h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] pr-2 [scrollbar-width:thin]"
+              : "w-full flex-1 flex flex-wrap gap-4"
+              }`}
           >
             {filtered.map((company, idx) => {
               const randomColor = COLORS[idx % COLORS.length];
@@ -650,17 +756,15 @@ export default function Companies({ companies = [] }) {
                 <div
                   key={company.uuid}
                   onClick={() => setSelectedCompany(company)}
-                  className={`bg-white border rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
-                    selectedCompany
-                      ? "w-full ring-1 ring-blue-100"
-                      : "w-full sm:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]"
-                  } ${
-                    isSelected
+                  className={`bg-white border rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden break-words min-w-0 ${selectedCompany
+                    ? "w-full ring-1 ring-blue-100"
+                    : "w-full sm:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]"
+                    } ${isSelected
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 shadow-sm"
                       : "border-gray-200/90 hover:border-blue-300"
-                  }`}
+                    }`}
                 >
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-start gap-3 mb-3">
                       {isImageUrl ? (
                         <div className="w-11 h-11 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
@@ -691,13 +795,12 @@ export default function Companies({ companies = [] }) {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-extrabold text-gray-900 truncate hover:text-blue-600">{company.name}</p>
+                          <p className="font-extrabold text-gray-900 line-clamp-2 break-words leading-tight hover:text-blue-600">{company.name}</p>
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                              company.status === "active"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-gray-100 text-gray-500 border border-gray-200"
-                            }`}
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${company.status === "active"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-gray-100 text-gray-500 border border-gray-200"
+                              }`}
                           >
                             {company.status}
                           </span>
@@ -721,11 +824,11 @@ export default function Companies({ companies = [] }) {
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 mb-3 text-xs text-gray-600">
+                    <div className="space-y-1.5 mb-3 text-xs text-gray-600 min-w-0">
                       {company.location && (
-                        <p className="flex items-center gap-1.5 truncate">
-                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate">{company.location}</span>
+                        <p className="flex items-start gap-1.5 whitespace-normal break-words leading-tight">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words">{company.location}</span>
                         </p>
                       )}
                       {company.company_size && (
@@ -737,353 +840,357 @@ export default function Companies({ companies = [] }) {
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <Briefcase className="w-3 h-3 text-purple-600" />
-                      {company.jobs_count || 0} active openings
-                    </span>
+                    <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Briefcase className="w-3 h-3 text-purple-600" />
+                        {company.jobs_count || 0} active openings
+                      </span>
 
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      {can("status_companies") && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(company.uuid)}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                            company.status === "active"
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {can("status_companies") && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(company.uuid)}
+                            className={`text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${company.status === "active"
                               ? "text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200"
                               : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200"
-                          }`}
-                        >
-                          {company.status === "active" ? "Pause" : "Activate"}
-                        </button>
-                      )}
-                      {can("edit_companies") && (
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(company)}
-                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
-                          title="Edit"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {can("delete_companies") && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteUuid(company.uuid)}
-                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer transition"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                              }`}
+                          >
+                            {company.status === "active" ? "Pause" : "Activate"}
+                          </button>
+                        )}
+                        {can("edit_companies") && (
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(company)}
+                            className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {can("delete_companies") && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteUuid(company.uuid)}
+                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
+                  );
             })}
 
-            {filtered.length === 0 && (
-              <div className="w-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
-                No companies found in database
-              </div>
-            )}
-          </div>
-
-          {/* Right side comprehensive Company Details & Jobs inspection panel */}
-          {selectedCompany && (
-            <div className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] lg:sticky lg:top-3 shadow-2xl shadow-blue-950/20 shrink-0 z-20">
-              {/* Distinct High-Contrast Inspection Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  {selectedCompany.logo &&
-                  (selectedCompany.logo.startsWith("http") ||
-                    selectedCompany.logo.includes(".") ||
-                    selectedCompany.logo.includes("/") ||
-                    selectedCompany.logo.startsWith("company-logos/")) ? (
-                    <div className="w-11 h-11 bg-white/10 border border-white/20 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 shadow-md">
-                      <img
-                        src={
-                          selectedCompany.logo.startsWith("http")
-                            ? selectedCompany.logo
-                            : `/storage/${selectedCompany.logo}`
-                        }
-                        alt={selectedCompany.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            parent.className =
-                              "w-11 h-11 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md";
-                            parent.innerText = (selectedCompany.name || "C").slice(0, 2).toUpperCase();
-                          }
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md border border-white/20">
-                      {selectedCompany.logo || (selectedCompany.name || "C").slice(0, 2).toUpperCase()}
+                  {filtered.length === 0 && (
+                    <div className="w-full text-center py-16 bg-white rounded-2xl border border-gray-100 text-gray-400">
+                      No companies found in database
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-white text-base truncate">{selectedCompany.name}</h3>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                          selectedCompany.status === "active"
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
-                        }`}
-                      >
-                        {selectedCompany.status}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-cyan-300 font-medium">Company Profile & Active Jobs</p>
-                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCompany(null)}
-                    className="text-xs font-semibold text-blue-200 hover:text-white px-2 py-1 bg-white/10 rounded-lg lg:hidden cursor-pointer"
+
+          {/* Right side comprehensive Company Details & Jobs inspection panel */ }
+              {
+                selectedCompany && (
+                  <div
+                    id="admin-company-detail-panel"
+                    className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] lg:sticky lg:top-3 shadow-2xl shadow-blue-950/20 shrink-0 z-20 relative"
                   >
-                    ← Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCompany(null)}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer transition shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Body with Clean Structured Sections */}
-              <div className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
-                {/* SECTION 1: Key Metadata Badges */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
-                      Company Size
-                    </span>
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-blue-600" />
-                      {selectedCompany.company_size || "11 - 50 employees"}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
-                      Live Job Posts
-                    </span>
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
-                      {selectedCompany.jobs_count || 0} Openings
-                    </span>
-                  </div>
-                </div>
-
-                {/* SECTION 2: Web & Online Presence */}
-                {selectedCompany.website && (
-                  <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">
-                        Official Website
-                      </span>
-                      <a
-                        href={
-                          selectedCompany.website.startsWith("http")
-                            ? selectedCompany.website
-                            : `https://${selectedCompany.website}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-blue-600 hover:underline truncate block"
-                      >
-                        {selectedCompany.website}
-                      </a>
+                    {/* Distinct High-Contrast Inspection Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {selectedCompany.logo &&
+                          (selectedCompany.logo.startsWith("http") ||
+                            selectedCompany.logo.includes(".") ||
+                            selectedCompany.logo.includes("/") ||
+                            selectedCompany.logo.startsWith("company-logos/")) ? (
+                          <div className="w-11 h-11 bg-white/10 border border-white/20 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 shadow-md">
+                            <img
+                              src={
+                                selectedCompany.logo.startsWith("http")
+                                  ? selectedCompany.logo
+                                  : `/storage/${selectedCompany.logo}`
+                              }
+                              alt={selectedCompany.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  parent.className =
+                                    "w-11 h-11 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md";
+                                  parent.innerText = (selectedCompany.name || "C").slice(0, 2).toUpperCase();
+                                }
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-md border border-white/20">
+                            {selectedCompany.logo || (selectedCompany.name || "C").slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-extrabold text-white text-base truncate">{selectedCompany.name}</h3>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${selectedCompany.status === "active"
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
+                                }`}
+                            >
+                              {selectedCompany.status}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-cyan-300 font-medium">Company Profile & Active Jobs</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCompany(null)}
+                          className="text-xs font-semibold text-blue-200 hover:text-white px-2 py-1 bg-white/10 rounded-lg lg:hidden cursor-pointer"
+                        >
+                          ← Back
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCompany(null)}
+                          className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl cursor-pointer transition shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <a
-                      href={
-                        selectedCompany.website.startsWith("http")
-                          ? selectedCompany.website
-                          : `https://${selectedCompany.website}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 bg-blue-600 text-white rounded-xl shadow-sm hover:bg-blue-700 transition shrink-0"
-                      title="Visit Website"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                )}
 
-                {/* SECTION 3: Physical Address & Location */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-blue-600" />
-                      Office Address & Coordinates
-                    </span>
-                    {selectedCompany.location && (
-                      <span className="text-[11px] bg-slate-200/80 text-slate-700 font-bold px-2 py-0.5 rounded-md">
-                        {selectedCompany.location}
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                    {selectedCompany.address || "Address not provided"}
-                  </p>
-
-                  {/* GPS Coordinates & Google Maps Link */}
-                  <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    {selectedCompany.latitude && selectedCompany.longitude ? (
-                      <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
-                        <Compass className="w-3 h-3 text-emerald-600" />
-                        {Number(selectedCompany.latitude).toFixed(4)}, {Number(selectedCompany.longitude).toFixed(4)}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400">GPS not verified</span>
-                    )}
-
-                    <a
-                      href={
-                        selectedCompany.latitude && selectedCompany.longitude
-                          ? `https://www.google.com/maps/search/?api=1&query=${selectedCompany.latitude},${selectedCompany.longitude}`
-                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedCompany.address || selectedCompany.name)}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold transition"
-                    >
-                      <Navigation className="w-3 h-3" /> Open in Maps ↗
-                    </a>
-                  </div>
-                </div>
-
-                {/* SECTION 4: About / Description */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
-                  <span className="text-xs font-bold text-slate-800 block">About Company</span>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
-                    {selectedCompany.description ||
-                      "No detailed company description added yet. Edit the company to include background, industry domain, and perks."}
-                  </p>
-                </div>
-
-                {/* SECTION 5: Active Job Postings */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Briefcase className="w-4 h-4 text-blue-600" />
-                      Job Openings ({selectedCompany.jobs?.length || 0})
-                    </span>
-                    <Link
-                      href={route("admin.jobs.index")}
-                      className="text-[11px] text-blue-600 hover:underline font-bold"
-                    >
-                      All Jobs →
-                    </Link>
-                  </div>
-
-                  {selectedCompany.jobs && selectedCompany.jobs.length > 0 ? (
-                    selectedCompany.jobs.map((job) => (
-                      <div
-                        key={job.uuid}
-                        className="border border-slate-200 rounded-2xl p-3.5 bg-white hover:border-blue-300 transition shadow-xs space-y-1.5"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-bold text-gray-900 text-xs leading-tight">{job.title}</p>
-                          <span
-                            className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${
-                              job.status === "active"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {job.status}
+                    {/* Scrollable Body with Clean Structured Sections */}
+                    <div ref={companyDetailContentRef} className="overflow-y-auto flex-1 p-5 space-y-4 overscroll-contain [scrollbar-width:thin]">
+                      {/* SECTION 1: Key Metadata Badges */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
+                            Company Size
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-blue-600" />
+                            {selectedCompany.company_size || "11 - 50 employees"}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
-                          {job.openings && <span>{job.openings} Openings</span>}
-                          {job.job_type && (
-                            <>
-                              <span>•</span>
-                              <span className="capitalize">{job.job_type.replace("_", " ")}</span>
-                            </>
-                          )}
-                          {job.salary && (
-                            <>
-                              <span>•</span>
-                              <span className="font-bold text-slate-700">{job.salary}</span>
-                            </>
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
+                            Live Job Posts
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
+                            {selectedCompany.jobs_count || 0} Openings
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* SECTION 2: Web & Online Presence */}
+                      {selectedCompany.website && (
+                        <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">
+                              Official Website
+                            </span>
+                            <a
+                              href={
+                                selectedCompany.website.startsWith("http")
+                                  ? selectedCompany.website
+                                  : `https://${selectedCompany.website}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-blue-600 hover:underline truncate block"
+                            >
+                              {selectedCompany.website}
+                            </a>
+                          </div>
+                          <a
+                            href={
+                              selectedCompany.website.startsWith("http")
+                                ? selectedCompany.website
+                                : `https://${selectedCompany.website}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-blue-600 text-white rounded-xl shadow-sm hover:bg-blue-700 transition shrink-0"
+                            title="Visit Website"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      )}
+
+                      {/* SECTION 3: Physical Address & Location */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <MapPin className="w-4 h-4 text-blue-600" />
+                            Office Address & Coordinates
+                          </span>
+                          {selectedCompany.location && (
+                            <span className="text-[11px] bg-slate-200/80 text-slate-700 font-bold px-2 py-0.5 rounded-md">
+                              {selectedCompany.location}
+                            </span>
                           )}
                         </div>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400">{job.location || selectedCompany.location}</span>
+                        <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                          {selectedCompany.address || "Address not provided"}
+                        </p>
+
+                        {/* GPS Coordinates & Google Maps Link */}
+                        <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          {selectedCompany.latitude && selectedCompany.longitude ? (
+                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
+                              <Compass className="w-3 h-3 text-emerald-600" />
+                              {Number(selectedCompany.latitude).toFixed(4)}, {Number(selectedCompany.longitude).toFixed(4)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">GPS not verified</span>
+                          )}
+
+                          <a
+                            href={
+                              selectedCompany.latitude && selectedCompany.longitude
+                                ? `https://www.google.com/maps/search/?api=1&query=${selectedCompany.latitude},${selectedCompany.longitude}`
+                                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedCompany.address || selectedCompany.name)}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold transition"
+                          >
+                            <Navigation className="w-3 h-3" /> Open in Maps ↗
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* SECTION 4: About / Description */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                        <span className="text-xs font-bold text-slate-800 block">About Company</span>
+                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                          {selectedCompany.description ||
+                            "No detailed company description added yet. Edit the company to include background, industry domain, and perks."}
+                        </p>
+                      </div>
+
+                      {/* SECTION 5: Active Job Postings */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Briefcase className="w-4 h-4 text-blue-600" />
+                            Job Openings ({selectedCompany.jobs?.length || 0})
+                          </span>
                           <Link
                             href={route("admin.jobs.index")}
                             className="text-[11px] text-blue-600 hover:underline font-bold"
                           >
-                            View Applicants →
+                            All Jobs →
                           </Link>
                         </div>
+
+                        {selectedCompany.jobs && selectedCompany.jobs.length > 0 ? (
+                          selectedCompany.jobs.map((job) => (
+                            <div
+                              key={job.uuid}
+                              className="border border-slate-200 rounded-2xl p-3.5 bg-white hover:border-blue-300 transition shadow-xs space-y-1.5"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-bold text-gray-900 text-xs leading-tight">{job.title}</p>
+                                <span
+                                  className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${job.status === "active"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-600"
+                                    }`}
+                                >
+                                  {job.status}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                                {job.openings && <span>{job.openings} Openings</span>}
+                                {job.job_type && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="capitalize">{job.job_type.replace("_", " ")}</span>
+                                  </>
+                                )}
+                                {job.salary && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-bold text-slate-700">{job.salary}</span>
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400">{job.location || selectedCompany.location}</span>
+                                <Link
+                                  href={route("admin.jobs.index")}
+                                  className="text-[11px] text-blue-600 hover:underline font-bold"
+                                >
+                                  View Applicants →
+                                </Link>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                            <Briefcase className="w-6 h-6 mx-auto mb-1.5 opacity-40 text-slate-500" />
+                            <p className="text-xs font-medium">No active jobs posted under this company.</p>
+                            {can("create_jobs") && (
+                              <Link
+                                href={route("admin.jobs.index")}
+                                className="mt-2 inline-block text-[11px] font-bold text-blue-600 hover:underline"
+                              >
+                                + Post a Job for this Company
+                              </Link>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
-                      <Briefcase className="w-6 h-6 mx-auto mb-1.5 opacity-40 text-slate-500" />
-                      <p className="text-xs font-medium">No active jobs posted under this company.</p>
-                      {can("create_jobs") && (
-                        <Link
-                          href={route("admin.jobs.index")}
-                          className="mt-2 inline-block text-[11px] font-bold text-blue-600 hover:underline"
+                    </div>
+
+                    {/* Fixed Footer: Quick Administrative Actions */}
+                    <div className="p-4 border-t border-slate-200 bg-slate-50/90 backdrop-blur-xs flex items-center gap-2 shrink-0 z-10">
+                      {can("edit_companies") && (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(selectedCompany)}
+                          className="flex-1 py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                         >
-                          + Post a Job for this Company
-                        </Link>
+                          <Edit3 className="w-3.5 h-3.5" /> Edit Company
+                        </button>
+                      )}
+                      {can("status_companies") && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(selectedCompany.uuid)}
+                          className={`flex-1 py-2.5 px-3 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${selectedCompany.status === "active"
+                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {selectedCompany.status === "active" ? "Pause Hiring" : "Activate"}
+                        </button>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Fixed Footer: Quick Administrative Actions */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50/90 backdrop-blur-xs flex items-center gap-2 shrink-0 z-10">
-                {can("edit_companies") && (
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(selectedCompany)}
-                    className="flex-1 py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Edit Company
-                  </button>
-                )}
-                {can("status_companies") && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStatus(selectedCompany.uuid)}
-                    className={`flex-1 py-2.5 px-3 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
-                      selectedCompany.status === "active"
-                        ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
-                        : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
-                    }`}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    {selectedCompany.status === "active" ? "Pause Hiring" : "Activate"}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+                    {/* Floating Bottom-Center Scroll Indicator Button */}
+                    <ViewScrollIndicator containerRef={companyDetailContentRef} bottomOffsetClass="bottom-18 sm:bottom-20" />
+                  </div>
+                )
+              }
         </div>
-      </div>
-    </>
-  );
+        </div>
+      </>
+      );
 }
 
 Companies.layout = (page) => <SidebarLayout>{page}</SidebarLayout>;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, router, usePage, Head } from "@inertiajs/react";
 import HomepageLayout from "@/Layouts/HomepageLayout";
 import CandidateLoginModal from "@/Components/Candidate/CandidateLoginModal";
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
 import EligibilityAlertModal from "@/Components/Candidate/EligibilityAlertModal";
+import ViewScrollIndicator from "@/Components/Common/ViewScrollIndicator";
 
 // Job Detail Panel Component (Shown on the same screen)
 function JobDetailPanel({
@@ -82,9 +83,16 @@ function JobDetailPanel({
         : [];
 
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [job?.uuid || job?.id]);
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-3xl overflow-hidden">
+    <div className="flex flex-col h-full bg-white rounded-3xl overflow-hidden relative">
       {/* Top Header Actions (Clean toolbar with Share, Remove, Close) */}
       <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-end gap-2 z-10 shrink-0">
         {/* Share Button */}
@@ -162,7 +170,7 @@ function JobDetailPanel({
       </div>
 
       {/* Main Content Area (Independent Scroller) */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-5 sm:px-7 py-6 space-y-6">
+      <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 sm:px-7 py-6 space-y-6">
         {/* Company & Role Overview */}
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white font-extrabold text-base sm:text-lg shrink-0 shadow-md shadow-blue-500/15 overflow-hidden">
@@ -452,13 +460,16 @@ function JobDetailPanel({
         )}
       </div>
 
+      {/* Floating Bottom-Center Scroll Indicator Button (Down Arrow -> Up Arrow) */}
+      <ViewScrollIndicator containerRef={contentRef} bottomOffsetClass="bottom-12" />
+
       {/* Sleek bottom guarantee strip */}
-      <div className="shrink-0 bg-slate-50/80 border-t border-gray-100 px-5 sm:px-7 py-2.5 flex items-center justify-between text-xs text-gray-500">
-        <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+      <div className="shrink-0 bg-[#f8fafc] border-t border-slate-200/90 px-5 sm:px-7 py-3 flex items-center justify-between text-xs text-slate-600 shadow-inner">
+        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           100% Free Application Guarantee
         </span>
-        <span className="text-[11px] text-gray-400">Direct hiring partner</span>
+        <span className="text-[11px] text-slate-500 font-medium">Direct hiring partner</span>
       </div>
     </div>
   );
@@ -519,6 +530,39 @@ export default function SavedJobs({
       };
     }
   }, [selectedJob]);
+
+  // Auto-scroll selected job card into view front & center, without altering array order
+  useEffect(() => {
+    if (selectedJob && typeof window !== "undefined") {
+      const jobKey = selectedJob.uuid || selectedJob.id;
+
+      requestAnimationFrame(() => {
+        const anchor = document.getElementById("saved-jobs-results-anchor");
+        if (anchor && window.innerWidth >= 1024) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+
+      const timer = setTimeout(() => {
+        const cardEl = document.getElementById(`saved-job-card-${jobKey}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 80);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedJob?.uuid || selectedJob?.id]);
+
+  const handleSelectJob = (job) => {
+    const jobKey = job.uuid || job.id;
+    const currentKey = selectedJob?.uuid || selectedJob?.id;
+    if (currentKey === jobKey) {
+      setSelectedJob(null);
+    } else {
+      setSelectedJob(job);
+    }
+  };
 
   // Show temporary toast message
   const triggerToast = (msg) => {
@@ -612,7 +656,7 @@ export default function SavedJobs({
   }
 
   return (
-    <HomepageLayout>
+    <HomepageLayout hideFooter={Boolean(selectedJob)}>
       <Head title="Saved Jobs - ATS" />
 
       {/* Toast Notification */}
@@ -636,20 +680,26 @@ export default function SavedJobs({
       />
 
       {/* Wide container so 4 cards fit naturally on desktop */}
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div
+        className={`max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 ${
+          selectedJob
+            ? "py-2 sm:py-2.5 lg:h-[calc(100vh-4rem)] lg:max-h-[calc(100vh-4rem)] lg:overflow-hidden flex flex-col"
+            : "py-6 sm:py-8"
+        }`}
+      >
         {/* Page Top Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <Bookmark className="w-5 h-5 fill-blue-600" />
+        <div className={selectedJob ? "mb-2 shrink-0" : "mb-6"}>
+          <div className="flex items-center gap-2 mb-0.5">
+            <div className={`${selectedJob ? "p-1.5" : "p-2"} bg-blue-50 text-blue-600 rounded-xl`}>
+              <Bookmark className={`${selectedJob ? "w-4 h-4" : "w-5 h-5"} fill-blue-600`} />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            <h1 className={`${selectedJob ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"} font-extrabold text-gray-900 tracking-tight`}>
               Saved Jobs
             </h1>
+            <span className="text-xs text-gray-500 ml-2">
+              ({savedJobs.length} {savedJobs.length === 1 ? "job" : "jobs"})
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500">
-            {savedJobs.length} {savedJobs.length === 1 ? "job" : "jobs"} saved in your list
-          </p>
         </div>
 
         {/* Global Empty State */}
@@ -673,12 +723,17 @@ export default function SavedJobs({
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div
+            id="saved-jobs-results-anchor"
+            className={`flex flex-col lg:flex-row gap-4 sm:gap-6 items-start w-full ${
+              selectedJob ? "flex-1 min-h-0 h-full overflow-hidden" : ""
+            }`}
+          >
             {/* Left Column: Saved Job Cards */}
             <div
               className={`w-full ${
                 selectedJob
-                  ? "lg:w-[48%] xl:w-1/2 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] lg:sticky lg:top-18 lg:overflow-y-auto custom-scrollbar pr-1"
+                  ? "lg:w-[46%] xl:w-[42%] h-full lg:overflow-y-auto custom-scrollbar pr-1.5"
                   : "w-full"
               } transition-all duration-300 ease-out`}
             >
@@ -696,19 +751,20 @@ export default function SavedJobs({
                   return (
                     <div
                       key={jobKey}
-                      onClick={() => setSelectedJob(job)}
-                      className={`bg-white rounded-2xl border p-4 sm:p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-xs relative ${
+                      id={`saved-job-card-${jobKey}`}
+                      onClick={() => handleSelectJob(job)}
+                      className={`bg-white rounded-2xl border p-4 sm:p-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-xs relative overflow-hidden break-words min-w-0 ${
                         isCurrentSelected
-                          ? "border-blue-500 ring-2 ring-blue-500 bg-blue-50/20"
+                          ? "border-blue-600 ring-2 ring-blue-500/50 bg-blue-50/40 shadow-md shadow-blue-500/10"
                           : eligibility.isRestricted
                             ? "border-red-100 hover:border-red-300"
                             : "border-gray-200/90"
                       }`}
                     >
-                  <div>
+                  <div className="min-w-0">
                     {/* Header: Avatar + Company Name on left, Applied / Unsave on right */}
                     <div className="flex items-center justify-between gap-2.5 mb-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-xs sm:text-sm font-extrabold shrink-0 overflow-hidden shadow-xs">
                           {job.company_image ? (
                             <img
@@ -721,8 +777,8 @@ export default function SavedJobs({
                           )}
                         </div>
 
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-800 truncate max-w-[170px]">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-gray-800 whitespace-normal break-words">
                             {job.company}
                           </p>
                         </div>
@@ -752,26 +808,26 @@ export default function SavedJobs({
                     </div>
 
                     {/* Post Name / Job Title - FULL WIDTH, NEVER SQUEEZED */}
-                    <h3 className="font-extrabold text-sm sm:text-base text-gray-900 group-hover:text-blue-600 transition leading-snug line-clamp-2 mb-2">
+                    <h3 className="font-extrabold text-sm sm:text-base text-gray-900 group-hover:text-blue-600 transition leading-snug whitespace-normal break-words mb-2">
                       {job.title}
                     </h3>
 
                     {/* Salary & Details Strip (Set Prominently right below title) */}
                     <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
-                      <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                      <div className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg break-words max-w-full">
                         {(!job.salary || !job.salary.includes("₹")) && (
                           <IndianRupee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         )}
-                        <span>{job.salary || "Competitive Salary"}</span>
+                        <span className="break-words">{job.salary || "Competitive Salary"}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.job_type || job.type || "Full Time"}</span>
-                        <span className="px-2 py-0.5 bg-gray-100 rounded-md">{job.experience || job.exp || "Fresher"}</span>
+                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 flex-wrap">
+                        <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.job_type || job.type || "Full Time"}</span>
+                        <span className="px-2 py-0.5 bg-gray-100 rounded-md whitespace-nowrap">{job.experience || job.exp || "Fresher"}</span>
                       </div>
                     </div>
 
                     {/* Qualifications & Requirements Box - Shown Outside on Card */}
-                    <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
+                    <div className="space-y-1.5 mb-3 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 min-w-0">
                       {/* Qualification Row */}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
@@ -779,7 +835,7 @@ export default function SavedJobs({
                           <span>Qualification:</span>
                         </span>
                         <span
-                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 break-words max-w-full ${
                             isLoggedIn && eligibility.isRestricted
                               ? "bg-red-50 text-red-700 border-red-200"
                               : "bg-purple-50 text-purple-700 border-purple-200"
@@ -788,10 +844,10 @@ export default function SavedJobs({
                           {isLoggedIn && eligibility.isRestricted ? (
                             <>
                               <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
-                              <span>Min. {minQual.label} (Ineligible)</span>
+                              <span className="break-words">Min. {minQual.label} (Ineligible)</span>
                             </>
                           ) : (
-                            <span>Min. {minQual.label}</span>
+                            <span className="break-words">Min. {minQual.label}</span>
                           )}
                         </span>
                       </div>
@@ -802,7 +858,7 @@ export default function SavedJobs({
                           <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">
                             Requirements:
                           </span>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1 max-w-full">
                             {skillsList.slice(0, 3).map((s, idx) => (
                               <span
                                 key={idx}
@@ -823,13 +879,13 @@ export default function SavedJobs({
                   </div>
 
                   {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
-                  <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
+                  <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
                     {/* Location & Distance */}
                     <div className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0 flex-1">
                       <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
                       {distance && (
-                        <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
+                        <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px] whitespace-nowrap">
                           • {distance}
                         </span>
                       )}
@@ -885,7 +941,7 @@ export default function SavedJobs({
 
         {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
         {selectedJob && (
-          <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-18 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
+          <div className="hidden lg:flex w-full lg:w-[54%] xl:w-[58%] bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden h-full min-h-0 flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
             <JobDetailPanel
               job={selectedJob}
               onClose={() => setSelectedJob(null)}
@@ -904,6 +960,25 @@ export default function SavedJobs({
       </div>
     )}
       </div>
+
+      {/* Mobile Job Details Full-Screen Sheet */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-white animate-in slide-in-from-bottom duration-300">
+          <JobDetailPanel
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+            onApply={(key) => handleApply(key, selectedJob)}
+            onUnsave={handleUnsave}
+            isApplied={checkIsApplied(selectedJob)}
+            isLoggedIn={isLoggedIn}
+            user={auth?.user}
+            onLoginRequired={(action) => setLoginGateAction(action)}
+            onShare={handleShare}
+            copied={copiedId === (selectedJob.uuid || selectedJob.id)}
+            onIneligibleClick={(j, e) => setIneligibleModal({ isOpen: true, job: j, eligibility: e })}
+          />
+        </div>
+      )}
 
       {/* Qualification Ineligible Alert Modal */}
       <EligibilityAlertModal
