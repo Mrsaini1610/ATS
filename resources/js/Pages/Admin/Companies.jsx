@@ -632,7 +632,7 @@ export default function Companies({ companies = [] }) {
           <div
             className={`transition-all duration-300 ease-out ${
               selectedCompany
-                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3 overflow-y-auto h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] pr-2 [scrollbar-width:thin]"
+                ? "w-full lg:w-1/2 xl:w-7/12 flex flex-col gap-3 overflow-y-auto h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] pr-2 [scrollbar-width:thin]"
                 : "w-full flex-1 flex flex-wrap gap-4"
             }`}
           >
@@ -792,7 +792,7 @@ export default function Companies({ companies = [] }) {
 
           {/* Right side comprehensive Company Details & Jobs inspection panel */}
           {selectedCompany && (
-            <div className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] lg:sticky lg:top-4 shadow-2xl shadow-blue-950/20 shrink-0 z-20">
+            <div className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] lg:sticky lg:top-3 shadow-2xl shadow-blue-950/20 shrink-0 z-20">
               {/* Distinct High-Contrast Inspection Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-3 min-w-0">

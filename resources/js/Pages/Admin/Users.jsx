@@ -1068,7 +1068,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
           <div
             className={`w-full ${
               selectedUser
-                ? "lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] pr-2 [scrollbar-width:thin] space-y-3"
+                ? "lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] pr-2 [scrollbar-width:thin] space-y-3"
                 : viewFormat === "cards"
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                 : "flex-1 min-w-0"
@@ -1230,7 +1230,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
             ) : (
               /* Full-width Data Table (when not inspecting and Table View is chosen) */
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden flex flex-col">
-                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-17rem)] min-h-[380px] custom-scrollbar">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-14.5rem)] min-h-[360px] custom-scrollbar">
                   <table className="w-full text-left border-collapse min-w-[860px]">
                     <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-gray-200 text-[10px] font-bold text-gray-600 uppercase tracking-wider">
                       <tr>
@@ -1437,7 +1437,7 @@ export default function Users({ users = [], categories = [], canViewAll = false,
           {selectedUser && (
             <div
               id="admin-user-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 shrink-0 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col lg:sticky lg:top-4 h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] shadow-2xl shadow-blue-950/20 z-20"
+              className="w-full lg:w-1/2 xl:w-5/12 shrink-0 bg-white border-2 border-blue-400/80 rounded-3xl overflow-hidden flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] shadow-2xl shadow-blue-950/20 z-20"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-2">

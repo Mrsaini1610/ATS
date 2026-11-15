@@ -1257,7 +1257,7 @@ export default function Applications({
           <div
             className={`w-full min-w-0 ${
               selectedApp
-                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] pr-2 [scrollbar-width:thin]"
+                ? "hidden lg:block lg:w-1/2 xl:w-7/12 overflow-y-auto h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] pr-2 [scrollbar-width:thin]"
                 : "w-full"
             }`}
           >
@@ -1465,7 +1465,7 @@ export default function Applications({
           {selectedApp && (
             <div
               id="admin-application-detail-panel"
-              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
+              className="w-full lg:w-1/2 xl:w-5/12 bg-white border-2 border-blue-400/80 rounded-3xl shadow-2xl shadow-blue-950/20 flex flex-col lg:sticky lg:top-3 h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] z-20 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
             >
               {/* Header with High-Contrast Navy/Blue Gradient */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shrink-0 z-10">

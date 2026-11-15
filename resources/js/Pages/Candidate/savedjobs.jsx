@@ -84,7 +84,7 @@ function JobDetailPanel({
   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col h-fit bg-white rounded-3xl overflow-hidden">
+    <div className="flex flex-col h-full bg-white rounded-3xl overflow-hidden">
       {/* Top Header Actions (Clean toolbar with Share, Remove, Close) */}
       <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-end gap-2 z-10 shrink-0">
         {/* Share Button */}
@@ -161,8 +161,8 @@ function JobDetailPanel({
         </button>
       </div>
 
-      {/* Main Content Area (Natural Height, No Inner Scroller) */}
-      <div className="px-5 sm:px-7 py-6 space-y-6">
+      {/* Main Content Area (Independent Scroller) */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-5 sm:px-7 py-6 space-y-6">
         {/* Company & Role Overview */}
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white font-extrabold text-base sm:text-lg shrink-0 shadow-md shadow-blue-500/15 overflow-hidden">
@@ -675,7 +675,13 @@ export default function SavedJobs({
         ) : (
           <div className="flex flex-col lg:flex-row gap-6 items-start">
             {/* Left Column: Saved Job Cards */}
-            <div className={`w-full ${selectedJob ? "lg:w-[48%] xl:w-1/2" : "w-full"} transition-all duration-500 ease-out`}>
+            <div
+              className={`w-full ${
+                selectedJob
+                  ? "lg:w-[48%] xl:w-1/2 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] lg:sticky lg:top-18 lg:overflow-y-auto custom-scrollbar pr-1"
+                  : "w-full"
+              } transition-all duration-300 ease-out`}
+            >
               <div className={selectedJob ? "space-y-4" : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5"}>
                 {savedJobs.map((job) => {
                   const companyInitials = (job.company || "Job").slice(0, 2).toUpperCase();
@@ -877,9 +883,9 @@ export default function SavedJobs({
           </div>
         </div>
 
-        {/* Right Column: In-Page Side View for Job Details (Full Height, No Inner Scroller) */}
+        {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
         {selectedJob && (
-          <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-24 h-fit flex flex-col animate-in fade-in slide-in-from-right-4 duration-500 ease-out">
+          <div className="w-full lg:w-[52%] xl:w-1/2 bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden lg:sticky lg:top-18 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
             <JobDetailPanel
               job={selectedJob}
               onClose={() => setSelectedJob(null)}

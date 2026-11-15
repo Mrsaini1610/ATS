@@ -1151,6 +1151,16 @@ export default function JobListings({
       setSelectedJob(null);
     } else {
       setSelectedJob(job);
+      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+        requestAnimationFrame(() => {
+          const anchor = document.getElementById("jobs-results-anchor");
+          if (anchor) {
+            const rect = anchor.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            window.scrollTo({ top: Math.max(0, scrollTop + rect.top - 72), behavior: "smooth" });
+          }
+        });
+      }
     }
   };
 
@@ -1374,12 +1384,12 @@ export default function JobListings({
           </div>
 
           {/* Main Content Layout */}
-          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full">
+          <div id="jobs-results-anchor" className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start w-full">
             {/* Desktop Left Sidebar: Permanent Filters (Collapses on laptop screens when a job is viewed to prevent horizontal squeezing) */}
             <aside
               className={`${
                 selectedJob ? "hidden 2xl:block 2xl:w-56" : "hidden lg:block w-52 xl:w-56"
-              } shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3 shadow-2xs sticky top-16 max-h-[calc(100vh-4.5rem)] overflow-y-auto custom-scrollbar transition-all duration-200`}
+              } shrink-0 bg-white rounded-2xl border border-gray-200/90 p-3 shadow-2xs sticky top-18 max-h-[calc(100vh-5.5rem)] overflow-y-auto custom-scrollbar transition-all duration-200`}
             >
               <FilterSidebar
                 categories={sortedCategories}
@@ -1522,7 +1532,7 @@ export default function JobListings({
                   <div
                     className={`w-full ${
                       selectedJob
-                        ? "lg:w-[42%] xl:w-[38%] 2xl:w-[36%] lg:h-[calc(100vh-5rem)] lg:sticky lg:top-16 lg:overflow-y-auto custom-scrollbar pr-1"
+                        ? "lg:w-[42%] xl:w-[38%] 2xl:w-[36%] lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] lg:sticky lg:top-18 lg:overflow-y-auto custom-scrollbar pr-1"
                         : "w-full"
                     } transition-all duration-300 ease-out`}
                   >
@@ -1723,7 +1733,7 @@ export default function JobListings({
 
                   {/* Right Column: In-Page Side View for Job Details (Fixed to Screen Height with Inner Scroller) */}
                   {selectedJob && (
-                    <div className="hidden lg:flex w-full lg:w-[58%] xl:w-[62%] 2xl:w-[64%] bg-white rounded-2xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-16 lg:h-[calc(100vh-5rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
+                    <div className="hidden lg:flex w-full lg:w-[58%] xl:w-[62%] 2xl:w-[64%] bg-white rounded-2xl border border-gray-200/90 shadow-xl overflow-hidden lg:sticky lg:top-18 lg:h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] flex-col animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
                       <JobDetailPanel
                         job={selectedJob}
                         onClose={() => setSelectedJob(null)}
