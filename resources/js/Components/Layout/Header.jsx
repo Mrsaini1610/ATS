@@ -76,6 +76,36 @@ const POPULAR_LOCALITIES_BY_CITY = {
 
 const POPULAR_CITIES = ["Jaipur", "Delhi NCR", "Bengaluru", "Mumbai", "Pune"];
 
+const KNOWN_COORDINATES = {
+  // Top Cities
+  Jaipur: { latitude: 26.9124, longitude: 75.7873 },
+  Delhi: { latitude: 28.6139, longitude: 77.2090 },
+  "Delhi NCR": { latitude: 28.6139, longitude: 77.2090 },
+  Bengaluru: { latitude: 12.9716, longitude: 77.5946 },
+  Bangalore: { latitude: 12.9716, longitude: 77.5946 },
+  Mumbai: { latitude: 19.0760, longitude: 72.8777 },
+  Gurgaon: { latitude: 28.4595, longitude: 77.0266 },
+  Gurugram: { latitude: 28.4595, longitude: 77.0266 },
+  Noida: { latitude: 28.5355, longitude: 77.3910 },
+  Pune: { latitude: 18.5204, longitude: 73.8567 },
+  Hyderabad: { latitude: 17.3850, longitude: 78.4867 },
+  Chandigarh: { latitude: 30.7333, longitude: 76.7794 },
+  Kolkata: { latitude: 22.5726, longitude: 88.3639 },
+  Ahmedabad: { latitude: 23.0225, longitude: 72.5714 },
+
+  // Jaipur Localities
+  "Vaishali Nagar": { latitude: 26.9065, longitude: 75.7410 },
+  "Mansarovar": { latitude: 26.8620, longitude: 75.7650 },
+  "Malviya Nagar": { latitude: 26.8520, longitude: 75.8050 },
+  "C-Scheme": { latitude: 26.9080, longitude: 75.8020 },
+  "Tonk Road": { latitude: 26.8720, longitude: 75.8010 },
+  "Sitapura": { latitude: 26.7790, longitude: 75.8320 },
+  "Raja Park": { latitude: 26.8950, longitude: 75.8270 },
+  "Sodala": { latitude: 26.8990, longitude: 75.7760 },
+  "Sanganer": { latitude: 26.8200, longitude: 75.7720 },
+  "Jhotwara": { latitude: 26.9535, longitude: 75.7400 },
+};
+
 export default function Header() {
   const { url, props } = usePage();
   const auth = props?.auth;
@@ -462,12 +492,14 @@ export default function Header() {
       cityName = terms[0]?.value;
     }
 
-    applyAndSaveLocation(cityName, areaName);
+    const matchedCoords = (areaName && KNOWN_COORDINATES[areaName]) || (cityName && KNOWN_COORDINATES[cityName]) || null;
+    applyAndSaveLocation(cityName, areaName, matchedCoords?.latitude ?? null, matchedCoords?.longitude ?? null);
   };
 
   // Select a popular locality chip
   const handleSelectLocality = (city, area) => {
-    applyAndSaveLocation(city, area);
+    const matchedCoords = (area && KNOWN_COORDINATES[area]) || (city && KNOWN_COORDINATES[city]) || null;
+    applyAndSaveLocation(city, area, matchedCoords?.latitude ?? null, matchedCoords?.longitude ?? null);
   };
 
   // State -> City -> Area dropdown handlers

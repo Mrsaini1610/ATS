@@ -258,9 +258,13 @@ function JobDetailPanel({
             <p className="text-blue-600 text-sm font-semibold mt-0.5">{job.company}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-gray-500">
               <span className="flex items-center gap-1 font-medium">
-                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                <MapPin className="w-3.5 h-3.5 text-blue-500" />
                 <span>{job.location || "Multiple"}</span>
-                {distance && <span className="text-blue-600 font-bold">• {distance}</span>}
+                {distance && (
+                  <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
+                    • {distance}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5 text-gray-400" />
@@ -820,7 +824,21 @@ export default function JobListings({
   const categoryScrollRef = useRef(null);
   const categoryButtonRefs = useRef({});
 
-  const { getDistanceTo } = useUserCoords(user);
+  const { coords, getDistanceTo, getRawDistanceTo, requestLocation } = useUserCoords(user);
+
+  const handleSortChange = (newSort) => {
+    setSortBy(newSort);
+    if (newSort === "nearest") {
+      if (!coords.latitude) {
+        requestLocation(
+          () => {},
+          (err) => {
+            console.warn("Location permission not granted for nearest sort:", err);
+          }
+        );
+      }
+    }
+  };
 
   // Preserve natural category order - do not reorder selected item to front
   const sortedCategories = useMemo(() => {
@@ -1027,6 +1045,21 @@ export default function JobListings({
     });
 
     return [...list].sort((a, b) => {
+      if (sortBy === "nearest") {
+        const rawA = getRawDistanceTo(a.latitude, a.longitude);
+        const rawB = getRawDistanceTo(b.latitude, b.longitude);
+        const hasA = rawA !== null && !isNaN(rawA);
+        const hasB = rawB !== null && !isNaN(rawB);
+
+        if (hasA && hasB) {
+          if (rawA !== rawB) return rawA - rawB;
+        } else if (hasA) {
+          return -1;
+        } else if (hasB) {
+          return 1;
+        }
+        return (Number(b.id) || 0) - (Number(a.id) || 0);
+      }
       if (sortBy === "popular") {
         const appA = Number(a.applicants || 0);
         const appB = Number(b.applicants || 0);
@@ -1048,7 +1081,7 @@ export default function JobListings({
       // Default: 'latest' -> Newest posts first
       return (Number(b.id) || 0) - (Number(a.id) || 0);
     });
-  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, selectedCompany, salaryRange, sortBy]);
+  }, [jobs, search, location, selectedJobType, selectedExperience, selectedCategory, selectedCompany, salaryRange, sortBy, coords.latitude, coords.longitude, getRawDistanceTo]);
 
   useEffect(() => {
     if (selectedJob) {
@@ -1431,19 +1464,37 @@ export default function JobListings({
                   )}
                 </div>
 
-                {/* Sort By Dropdown */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <span className="text-[11px] text-gray-500 font-medium">Sort:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="text-xs font-semibold bg-gray-50 text-gray-800 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                {/* Sort By Dropdown & Quick Nearest Pill */}
+                <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                  {/* 1-Click Nearest Toggle Pill */}
+                  <button
+                    type="button"
+                    onClick={() => handleSortChange(sortBy === "nearest" ? "latest" : "nearest")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      sortBy === "nearest"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                        : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                    }`}
+                    title="Sort by nearest to your location (Pass wali jobs)"
                   >
-                    <option value="latest">🕒 Latest Jobs</option>
-                    <option value="popular">🔥 Most Popular / Applied</option>
-                    <option value="salary_high">💰 Salary: High to Low</option>
-                    <option value="salary_low">💵 Salary: Low to High</option>
-                  </select>
+                    <MapPin className={`w-3.5 h-3.5 ${sortBy === "nearest" ? "text-white" : "text-blue-600"}`} />
+                    <span>Pass wali jobs</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Sort:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => handleSortChange(e.target.value)}
+                      className="text-xs font-semibold bg-gray-50 text-gray-800 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="nearest">📍 Nearest to Me (Pass wali jobs)</option>
+                      <option value="latest">🕒 Latest Jobs</option>
+                      <option value="popular">🔥 Most Popular / Applied</option>
+                      <option value="salary_high">💰 Salary: High to Low</option>
+                      <option value="salary_low">💵 Salary: Low to High</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1633,10 +1684,10 @@ export default function JobListings({
                         <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
                           {/* Location & Distance */}
                           <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
-                            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                             <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
                             {distance && (
-                              <span className="text-blue-600 font-bold shrink-0 bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
+                              <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
                                 • {distance}
                               </span>
                             )}

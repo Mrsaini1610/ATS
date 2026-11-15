@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "@inertiajs/react";
 import { Clock, MapPin, Briefcase, Sparkles, ArrowRight, CheckCircle2, GraduationCap, AlertCircle } from "lucide-react";
 import { useUserCoords, getJobMinQualification, checkJobEligibility } from "@/Utils/jobHelpers";
@@ -11,7 +11,23 @@ export default function RecentJobsSection({
   onApplyJob,
   onIneligible,
 }) {
-  const { getDistanceTo } = useUserCoords(candidateProfile);
+  const { coords, getDistanceTo, getRawDistanceTo, requestLocation } = useUserCoords(candidateProfile);
+  const [sortByNearest, setSortByNearest] = useState(false);
+
+  const displayedJobs = useMemo(() => {
+    if (!sortByNearest) return recentJobs;
+    return [...recentJobs].sort((a, b) => {
+      const rawA = getRawDistanceTo(a.latitude, a.longitude);
+      const rawB = getRawDistanceTo(b.latitude, b.longitude);
+      const hasA = rawA !== null && !isNaN(rawA);
+      const hasB = rawB !== null && !isNaN(rawB);
+
+      if (hasA && hasB) return rawA - rawB;
+      if (hasA) return -1;
+      if (hasB) return 1;
+      return (Number(b.id) || 0) - (Number(a.id) || 0);
+    });
+  }, [recentJobs, sortByNearest, getRawDistanceTo]);
 
   return (
     <section>
@@ -29,17 +45,38 @@ export default function RecentJobsSection({
           </p>
         </div>
 
-        <Link
-          href="/job-search"
-          className="inline-flex items-center gap-1 text-xs sm:text-sm text-blue-600 font-bold hover:text-blue-700 self-start sm:self-auto"
-        >
-          View all jobs <ArrowRight className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (!sortByNearest && !coords.latitude) {
+                requestLocation();
+              }
+              setSortByNearest((prev) => !prev);
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+              sortByNearest
+                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+            }`}
+            title="Sort recent jobs by distance from your location (Pass wali jobs)"
+          >
+            <MapPin className={`w-3.5 h-3.5 ${sortByNearest ? "text-white" : "text-blue-600"}`} />
+            <span>Pass wali jobs</span>
+          </button>
+
+          <Link
+            href="/job-search"
+            className="inline-flex items-center gap-1 text-xs sm:text-sm text-blue-600 font-bold hover:text-blue-700"
+          >
+            View all jobs <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {recentJobs.length > 0 ? (
-          recentJobs.map((job) => {
+        {displayedJobs.length > 0 ? (
+          displayedJobs.map((job) => {
             const skillList = Array.isArray(job.skills) ? job.skills : [];
             const minQual = getJobMinQualification(job);
             const distance = getDistanceTo(job.latitude, job.longitude);
@@ -159,11 +196,11 @@ export default function RecentJobsSection({
                 {/* Bottom Row: Location & Distance ON LEFT (Where salary was) + Action Button ON RIGHT */}
                 <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
                   {/* Location & Distance */}
-                  <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0 flex-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                     <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
                     {distance && (
-                      <span className="text-blue-600 font-bold shrink-0 bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
+                      <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
                         • {distance}
                       </span>
                     )}

@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 
 /**
- * Standard Haversine Formula for distance between two points in km
+ * Standard Haversine Formula for distance between two points in km (Formatted string)
  */
 export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const d = calculateRawDistanceKm(lat1, lon1, lat2, lon2);
+  if (d === null) return null;
+
+  if (d < 1) {
+    return `${Math.round(d * 1000)} m away`;
+  }
+  return `${d.toFixed(1)} km away`;
+}
+
+/**
+ * Raw Haversine Formula returning numeric distance in km (Float or null)
+ */
+export function calculateRawDistanceKm(lat1, lon1, lat2, lon2) {
   if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
   const numLat1 = parseFloat(lat1);
   const numLon1 = parseFloat(lon1);
@@ -24,12 +37,7 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c;
-
-  if (d < 1) {
-    return `${Math.round(d * 1000)} m away`;
-  }
-  return `${d.toFixed(1)} km away`;
+  return R * c;
 }
 
 /**
@@ -267,9 +275,19 @@ export function useUserCoords(user = null) {
 
     const storedLat = localStorage.getItem("ats_user_lat");
     const storedLng = localStorage.getItem("ats_user_lng");
-    if (storedLat && storedLng) {
+    if (storedLat && storedLng && !isNaN(parseFloat(storedLat)) && !isNaN(parseFloat(storedLng))) {
       return { latitude: parseFloat(storedLat), longitude: parseFloat(storedLng) };
     }
+
+    try {
+      const selected = localStorage.getItem("user_selected_location");
+      if (selected) {
+        const parsed = JSON.parse(selected);
+        if (parsed.latitude && parsed.longitude && !isNaN(parseFloat(parsed.latitude)) && !isNaN(parseFloat(parsed.longitude))) {
+          return { latitude: parseFloat(parsed.latitude), longitude: parseFloat(parsed.longitude) };
+        }
+      }
+    } catch (e) {}
 
     if (user?.latitude && user?.longitude) {
       return { latitude: parseFloat(user.latitude), longitude: parseFloat(user.longitude) };
@@ -280,6 +298,53 @@ export function useUserCoords(user = null) {
 
     return { latitude: null, longitude: null };
   });
+
+  // Sync coords if user object provides coordinates and coords are not set
+  useEffect(() => {
+    if (!coords.latitude) {
+      const uLat = user?.latitude || user?.web_latitude;
+      const uLng = user?.longitude || user?.web_longitude;
+      if (uLat && uLng) {
+        const pLat = parseFloat(uLat);
+        const pLng = parseFloat(uLng);
+        if (!isNaN(pLat) && !isNaN(pLng)) {
+          setCoords({ latitude: pLat, longitude: pLng });
+          if (!localStorage.getItem("ats_user_lat")) {
+            localStorage.setItem("ats_user_lat", String(pLat));
+            localStorage.setItem("ats_user_lng", String(pLng));
+          }
+        }
+      }
+    }
+  }, [user, coords.latitude]);
+
+  // Request browser location on demand
+  const requestLocation = useCallback((onSuccess, onError) => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      if (onError) onError(new Error("Geolocation is not supported by your browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        localStorage.setItem("ats_user_lat", String(latitude));
+        localStorage.setItem("ats_user_lng", String(longitude));
+        setCoords({ latitude, longitude });
+        window.dispatchEvent(
+          new CustomEvent("ats_location_changed", {
+            detail: { latitude, longitude }
+          })
+        );
+        if (onSuccess) onSuccess({ latitude, longitude });
+      },
+      (err) => {
+        console.warn("Geolocation request failed or denied:", err);
+        if (onError) onError(err);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+    );
+  }, []);
 
   useEffect(() => {
     const handleLocationChange = (e) => {
@@ -300,28 +365,55 @@ export function useUserCoords(user = null) {
 
     window.addEventListener("ats_location_changed", handleLocationChange);
 
-    // Passive GPS check if permission is already granted and no coords
-    if (typeof window !== "undefined" && !coords.latitude && navigator.permissions && navigator.geolocation) {
-      navigator.permissions.query({ name: "geolocation" }).then((perm) => {
-        if (perm.state === "granted") {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const { latitude, longitude } = pos.coords;
-              localStorage.setItem("ats_user_lat", String(latitude));
-              localStorage.setItem("ats_user_lng", String(longitude));
-              setCoords({ latitude, longitude });
-            },
-            () => {},
-            { timeout: 5000, maximumAge: 600000 }
-          );
-        }
-      }).catch(() => {});
+    // Passive GPS check if permission is already granted or can be requested
+    if (typeof window !== "undefined" && !coords.latitude && navigator.geolocation) {
+      if (navigator.permissions) {
+        navigator.permissions
+          .query({ name: "geolocation" })
+          .then((perm) => {
+            if (perm.state === "granted" || perm.state === "prompt") {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  const { latitude, longitude } = pos.coords;
+                  localStorage.setItem("ats_user_lat", String(latitude));
+                  localStorage.setItem("ats_user_lng", String(longitude));
+                  setCoords({ latitude, longitude });
+                },
+                () => {},
+                { timeout: 8000, maximumAge: 600000 }
+              );
+            }
+          })
+          .catch(() => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const { latitude, longitude } = pos.coords;
+                localStorage.setItem("ats_user_lat", String(latitude));
+                localStorage.setItem("ats_user_lng", String(longitude));
+                setCoords({ latitude, longitude });
+              },
+              () => {},
+              { timeout: 8000, maximumAge: 600000 }
+            );
+          });
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            localStorage.setItem("ats_user_lat", String(latitude));
+            localStorage.setItem("ats_user_lng", String(longitude));
+            setCoords({ latitude, longitude });
+          },
+          () => {},
+          { timeout: 8000, maximumAge: 600000 }
+        );
+      }
     }
 
     return () => {
       window.removeEventListener("ats_location_changed", handleLocationChange);
     };
-  }, []);
+  }, [coords.latitude]);
 
   const getDistanceTo = useCallback(
     (targetLat, targetLng) => {
@@ -331,6 +423,14 @@ export function useUserCoords(user = null) {
     [coords.latitude, coords.longitude]
   );
 
-  return { coords, getDistanceTo };
+  const getRawDistanceTo = useCallback(
+    (targetLat, targetLng) => {
+      if (!coords.latitude || !coords.longitude || !targetLat || !targetLng) return null;
+      return calculateRawDistanceKm(coords.latitude, coords.longitude, targetLat, targetLng);
+    },
+    [coords.latitude, coords.longitude]
+  );
+
+  return { coords, getDistanceTo, getRawDistanceTo, requestLocation };
 }
 

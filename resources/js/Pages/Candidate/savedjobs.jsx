@@ -188,9 +188,13 @@ function JobDetailPanel({
             </p>
             <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2 text-xs text-gray-500 font-medium">
               <span className="flex items-center gap-1 font-medium">
-                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                <MapPin className="w-3.5 h-3.5 text-blue-500" />
                 <span>{job.location || "Multiple Locations"}</span>
-                {distance && <span className="text-blue-600 font-bold">• {distance}</span>}
+                {distance && (
+                  <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
+                    • {distance}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5 text-gray-400" />
@@ -815,11 +819,11 @@ export default function SavedJobs({
                   {/* Card Bottom: Location & Distance ON LEFT (Where salary was) + Action ON RIGHT */}
                   <div className="pt-2.5 border-t border-gray-100 mt-auto flex items-center justify-between gap-2">
                     {/* Location & Distance */}
-                    <div className="flex items-center gap-1 text-xs text-gray-600 min-w-0 flex-1">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0 flex-1">
+                      <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span className="truncate font-medium">{job.location || "Multiple Locations"}</span>
                       {distance && (
-                        <span className="text-blue-600 font-bold shrink-0 bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
+                        <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
                           • {distance}
                         </span>
                       )}

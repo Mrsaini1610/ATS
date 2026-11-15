@@ -183,10 +183,12 @@ export default function JobDetailModal({
               </p>
               <div className="flex items-center gap-3 text-xs text-gray-500 mt-1.5 flex-wrap">
                 <span className="flex items-center gap-1 font-medium">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
                   <span>{job.location || "Multiple Locations"}</span>
                   {distance && (
-                    <span className="text-blue-600 font-bold">• {distance}</span>
+                    <span className="text-blue-700 font-bold shrink-0 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full text-[11px]">
+                      • {distance}
+                    </span>
                   )}
                 </span>
                 <span className="flex items-center gap-1">
