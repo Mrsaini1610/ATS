@@ -32,8 +32,20 @@ class AuditLogService
         ?Request $request = null
     ): ?AuditLog {
         try {
-            $req = $request ?: request();
+            $req = $request ?: (function_exists('request') ? request() : null);
             $actorData = self::resolveActor($actor);
+
+            // Safety rule: On candidate website routes, if no candidate is logged in,
+            // ALWAYS log as Guest — even if Super Admin / Admin / Team is logged in on the same browser!
+            if ($req && !$req->is('admin*') && !$req->is('api/admin*') && !$actor && !Auth::guard('web')->check()) {
+                $ip = $req->ip() ?: 'Unknown IP';
+                $actorData = [
+                    'type'  => 'guest',
+                    'id'    => null,
+                    'name'  => "Guest ({$ip})",
+                    'email' => null,
+                ];
+            }
 
             // Determine module automatically if omitted
             if (empty($module)) {
@@ -267,7 +279,7 @@ class AuditLogService
     {
         try {
             $req = function_exists('request') ? request() : null;
-            if (!$req || app()->runningInConsole()) {
+            if (!$req || (app()->runningInConsole() && empty($req->server('REQUEST_URI')) && empty($req->server('REQUEST_METHOD')))) {
                 return null;
             }
 
@@ -288,15 +300,17 @@ class AuditLogService
 
             $actorData = self::resolveActor();
 
-            // Do NOT record page views for Admin/SuperAdmin visiting or previewing the candidate portal
-            if (
-                in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff']) ||
-                (!$req->is('admin*') && Auth::guard('admin')->check() && !Auth::guard('web')->check())
-            ) {
-                return null;
-            }
-
             $ip = $req->ip() ?: '127.0.0.1';
+
+            // On candidate portal, if no candidate is logged in via web, ALWAYS log as Guest (never Admin/SuperAdmin)
+            if (!$req->is('admin*') && !Auth::guard('web')->check()) {
+                $actorData = [
+                    'type'  => 'guest',
+                    'id'    => null,
+                    'name'  => "Guest ({$ip})",
+                    'email' => null,
+                ];
+            }
             $pageUrl = $url ?: $req->fullUrl();
 
             // Detect platform (Web or Mobile App)
@@ -357,15 +371,17 @@ class AuditLogService
             $req = function_exists('request') ? request() : null;
             $actorData = self::resolveActor();
 
-            // Do NOT record page views for Admin/SuperAdmin visiting or previewing the candidate portal
-            if (
-                in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff']) ||
-                (!$req->is('admin*') && Auth::guard('admin')->check() && !Auth::guard('web')->check())
-            ) {
-                return null;
-            }
-
             $ip = $req ? $req->ip() : '127.0.0.1';
+
+            // On candidate portal, if no candidate is logged in via web, ALWAYS log as Guest (never Admin/SuperAdmin)
+            if ($req && !$req->is('admin*') && !Auth::guard('web')->check()) {
+                $actorData = [
+                    'type'  => 'guest',
+                    'id'    => null,
+                    'name'  => "Guest ({$ip})",
+                    'email' => null,
+                ];
+            }
 
             // Detect platform
             $platform = 'web';
