@@ -182,7 +182,11 @@ class AuditLogService
             }
         }
 
-        if (Auth::guard('admin')->check()) {
+        $req = function_exists('request') ? request() : null;
+        $isAdminRoute = $req && ($req->is('admin*') || $req->is('api/admin*'));
+
+        // 1. If on Admin panel routes, resolve admin guard
+        if ($isAdminRoute && Auth::guard('admin')->check()) {
             $admin = Auth::guard('admin')->user();
             return [
                 'type'  => $admin->role ?: 'admin',
@@ -192,6 +196,7 @@ class AuditLogService
             ];
         }
 
+        // 2. Candidate guards (web, sanctum, request user)
         if (Auth::guard('web')->check()) {
             $user = Auth::guard('web')->user();
             return [
@@ -214,27 +219,36 @@ class AuditLogService
             }
         }
 
-        if (function_exists('request') && request() && request()->user()) {
-            $user = request()->user();
-            if ($user instanceof \App\Models\User) {
-                return [
-                    'type'  => 'candidate',
-                    'id'    => $user->id,
-                    'name'  => $user->full_name ?: $user->name ?: 'Candidate',
-                    'email' => $user->email ?: $user->phone,
-                ];
-            }
+        if ($req && $req->user() && $req->user() instanceof \App\Models\User) {
+            $user = $req->user();
+            return [
+                'type'  => 'candidate',
+                'id'    => $user->id,
+                'name'  => $user->full_name ?: $user->name ?: 'Candidate',
+                'email' => $user->email ?: $user->phone,
+            ];
         }
 
-        // Check if there is an unauthenticated HTTP request (Guest Visitor)
-        $req = function_exists('request') ? request() : null;
-        if ($req && !app()->runningInConsole()) {
+        // 3. If on public / candidate website ($req exists and NOT an admin route)
+        // Even if admin session cookie exists in browser, treat as Guest on the candidate portal.
+        if ($req && !$isAdminRoute) {
             $ip = $req->ip() ?: 'Unknown IP';
             return [
                 'type'  => 'guest',
                 'id'    => null,
                 'name'  => "Guest ({$ip})",
                 'email' => null,
+            ];
+        }
+
+        // 4. Admin fallback when in admin route or console
+        if (Auth::guard('admin')->check()) {
+            $admin = Auth::guard('admin')->user();
+            return [
+                'type'  => $admin->role ?: 'admin',
+                'id'    => $admin->id,
+                'name'  => $admin->name,
+                'email' => $admin->email,
             ];
         }
 
@@ -273,6 +287,14 @@ class AuditLogService
             }
 
             $actorData = self::resolveActor();
+
+            // Do NOT record page views for Admin/SuperAdmin visiting or previewing the candidate portal
+            if (
+                in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff']) ||
+                (!$req->is('admin*') && Auth::guard('admin')->check() && !Auth::guard('web')->check())
+            ) {
+                return null;
+            }
 
             $ip = $req->ip() ?: '127.0.0.1';
             $pageUrl = $url ?: $req->fullUrl();
@@ -334,6 +356,14 @@ class AuditLogService
         try {
             $req = function_exists('request') ? request() : null;
             $actorData = self::resolveActor();
+
+            // Do NOT record page views for Admin/SuperAdmin visiting or previewing the candidate portal
+            if (
+                in_array($actorData['type'], ['super_admin', 'admin', 'team_member', 'staff']) ||
+                (!$req->is('admin*') && Auth::guard('admin')->check() && !Auth::guard('web')->check())
+            ) {
+                return null;
+            }
 
             $ip = $req ? $req->ip() : '127.0.0.1';
 

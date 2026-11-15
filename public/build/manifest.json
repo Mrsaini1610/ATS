@@ -2256,7 +2256,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-8EdK9QuR.js",
+    "file": "assets/app-DI9O6Zgu.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -2369,7 +2369,7 @@
       "resources/js/Pages/Welcome.jsx"
     ],
     "css": [
-      "assets/app-CusIRwGq.css"
+      "assets/app-Acb3h8fb.css"
     ]
   }
 }
