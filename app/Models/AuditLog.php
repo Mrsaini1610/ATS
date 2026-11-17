@@ -36,6 +36,7 @@ class AuditLog extends Model
 
     protected $appends = [
         'device_name',
+        'location',
     ];
 
     /**
@@ -48,6 +49,33 @@ class AuditLog extends Model
             $this->details,
             $this->platform
         );
+    }
+
+    /**
+     * Get candidate / visitor location (City / State).
+     */
+    public function getLocationAttribute(): ?string
+    {
+        if (!empty($this->details['location'])) {
+            return (string) $this->details['location'];
+        }
+        if (!empty($this->details['city'])) {
+            return (string) $this->details['city'];
+        }
+        if ($this->actor_type === 'candidate' && $this->actor_id) {
+            try {
+                $city = \Illuminate\Support\Facades\Cache::remember(
+                    "candidate_city_{$this->actor_id}",
+                    3600,
+                    fn() => \App\Models\User::where('id', $this->actor_id)->value('city')
+                );
+                if ($city) return $city;
+            } catch (\Throwable $e) {}
+        }
+        if ($this->ip_address === '127.0.0.1' || $this->ip_address === '::1') {
+            return 'Localhost / Dev';
+        }
+        return null;
     }
 }
 

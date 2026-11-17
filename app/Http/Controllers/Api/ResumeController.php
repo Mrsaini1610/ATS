@@ -77,6 +77,21 @@ class ResumeController extends Controller
                 ]);
             });
 
+            \App\Services\AuditLogService::log(
+                action: 'candidate_resume_uploaded',
+                description: "Candidate {$user->full_name} uploaded new resume '{$resume->title}' via Mobile App.",
+                details: [
+                    'resume_id' => $resume->id,
+                    'file_name' => $resume->title,
+                    'platform'  => 'app',
+                ],
+                module: 'candidates',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             return response()->json([
                 'status'  => true,
                 'message' => 'Resume uploaded and set as active default',

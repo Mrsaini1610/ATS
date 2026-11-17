@@ -292,6 +292,22 @@ private function parseAddressComponents(array $geoResult): array
             $freshUser['profile_prompt_snoozed_until'] = $user->profile_prompt_snoozed_until ? $user->profile_prompt_snoozed_until->toIso8601String() : null;
             $freshUser['can_prompt_profile_update'] = !$completionData['is_complete'] && !$isSnoozedFresh;
 
+            \App\Services\AuditLogService::log(
+                action: 'candidate_profile_updated',
+                description: "Candidate {$user->full_name} updated their profile via Mobile App.",
+                details: [
+                    'updated_fields' => array_keys($validator->validated()),
+                    'completion'     => $completionData['percentage'] . '%',
+                    'city'           => $user->city,
+                    'platform'       => 'app',
+                ],
+                module: 'candidates',
+                entity: $user,
+                status: 'success',
+                actor: $user,
+                request: $request
+            );
+
             return response()->json([
                 'status'  => true,
                 'message' => 'Profile updated successfully',

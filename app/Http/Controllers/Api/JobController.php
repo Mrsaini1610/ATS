@@ -27,7 +27,7 @@ class JobController extends Controller
         $user = $request->user();
 
         // Track page visit in audit logs
-        AuditLogService::logPageView('Mobile App Home Feed', '/api/home', ['platform' => 'app']);
+        AuditLogService::logPageView('Mobile App Home Feed', '/api/home', ['platform' => 'app'], $user);
 
         // 1. Candidate Location Coordinates (from request or saved profile)
         $lat = $request->input('latitude') ?? $user?->app_latitude ?? $user?->latitude;
@@ -423,7 +423,7 @@ class JobController extends Controller
             'search'   => $request->input('search'),
             'category' => $request->input('category_id'),
             'platform' => 'app',
-        ]);
+        ], $user);
 
         // 1. Resolve Candidate Location (App GPS coordinates or User DB coordinates)
         $lat = $request->input('latitude') ?? $request->input('lat');
@@ -839,7 +839,7 @@ class JobController extends Controller
         }
 
         // Track job view in audit logs
-        AuditLogService::logJobView($job, ['platform' => 'app']);
+        AuditLogService::logJobView($job, ['platform' => 'app'], $user);
 
         $application = JobApplication::where(function ($q) use ($user) {
                 $q->where('candidate_uuid', $user->uuid)

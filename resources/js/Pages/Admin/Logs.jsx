@@ -16,6 +16,7 @@ import {
   Smartphone,
   Laptop,
   Globe,
+  MapPin,
   Trash2,
   ExternalLink,
   ChevronDown,
@@ -830,6 +831,19 @@ export default function Logs({
                                     </span>
                                   </div>
                                 )}
+                                {(item.location || item.details?.location || item.details?.city) && (
+                                  <div className="mt-1 flex items-center gap-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200"
+                                      title={`Location: ${item.location || item.details?.location || item.details?.city}`}
+                                    >
+                                      <MapPin className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                                      <span className="truncate max-w-[130px]">
+                                        {item.location || item.details?.location || item.details?.city}
+                                      </span>
+                                    </span>
+                                  </div>
+                                )}
                               </td>
 
                               <td className="w-[160px] px-4 py-3 align-middle !whitespace-normal break-words">
@@ -886,6 +900,12 @@ export default function Logs({
                                             <Laptop className="w-3.5 h-3.5 text-slate-600" />
                                           )}
                                           <span>Device: <strong>{item.device_name}</strong></span>
+                                        </span>
+                                      )}
+                                      {(item.location || item.details?.location || item.details?.city) && (
+                                        <span className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-semibold flex items-center gap-1.5">
+                                          <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                                          <span>Location: <strong>{item.location || item.details?.location || item.details?.city}</strong></span>
                                         </span>
                                       )}
                                       {item.ip_address && (

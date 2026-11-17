@@ -293,7 +293,7 @@ class AuditLogController extends Controller
             }
         }
 
-        $headers = ['ID', 'Date Time', 'Actor Role', 'Actor Name', 'Actor Email', 'Action', 'Module', 'Status', 'Description', 'Platform', 'IP Address', 'Metadata / Payload'];
+        $headers = ['ID', 'Date Time', 'Actor Role', 'Actor Name', 'Actor Email', 'Device', 'Location', 'Action', 'Module', 'Status', 'Description', 'Platform', 'IP Address', 'Metadata / Payload'];
         $rows = [];
 
         foreach ($query->get() as $row) {
@@ -303,6 +303,8 @@ class AuditLogController extends Controller
                 strtoupper($row->actor_type),
                 $row->actor_name,
                 $row->actor_email ?? 'N/A',
+                $row->device_name ?: 'Unknown Device',
+                $row->location ?: 'N/A',
                 $row->action,
                 strtoupper($row->module),
                 strtoupper($row->status),

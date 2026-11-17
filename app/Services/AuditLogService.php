@@ -33,11 +33,13 @@ class AuditLogService
     ): ?AuditLog {
         try {
             $req = $request ?: (function_exists('request') ? request() : null);
-            $actorData = self::resolveActor($actor);
+            $actorData = self::resolveActor($actor, $req);
+            $isAdminRoute = $req && ($req->is('admin*') || $req->is('api/admin*'));
 
-            // Safety rule: On candidate website routes, if no candidate is logged in,
-            // ALWAYS log as Guest — even if Super Admin / Admin / Team is logged in on the same browser!
-            if ($req && !$req->is('admin*') && !$req->is('api/admin*') && !$actor && !Auth::guard('web')->check()) {
+            // Safety rule: On candidate website routes (non-admin), if an Admin is logged in,
+            // log as Guest so admin browsing on candidate pages is never recorded as Admin activity.
+            // But if actor is Candidate (from Mobile App or Web), DO NOT degrade them!
+            if ($req && !$isAdminRoute && in_array($actorData['type'] ?? '', ['super_admin', 'admin', 'team_member', 'staff', 'system'], true)) {
                 $ip = $req->ip() ?: 'Unknown IP';
                 $actorData = [
                     'type'  => 'guest',
@@ -68,11 +70,19 @@ class AuditLogService
                     $platform = 'app';
                 }
             }
+            $details['platform'] = $platform;
 
             // Capture human-readable device name for candidate & visitor activity
-            if (empty($details['device_name']) && $req) {
-                $customHeader = $req->header('X-Device-Name') ?: $req->header('X-Device-Model');
-                $details['device_name'] = $customHeader ?: self::parseDeviceName($req->userAgent(), $details, $platform);
+            if (empty($details['device_name']) || $details['device_name'] === 'Flutter App') {
+                $details['device_name'] = self::resolveDeviceName($req, $details, $platform);
+            }
+
+            // Capture location (city / region)
+            if (empty($details['location'])) {
+                $loc = self::resolveLocation($req, $actorData, $details);
+                if ($loc) {
+                    $details['location'] = $loc;
+                }
             }
 
             $audit = AuditLog::create([
@@ -173,7 +183,7 @@ class AuditLogService
     /**
      * Resolve the current actor (Admin, Candidate, or System).
      */
-    protected static function resolveActor($actor = null): array
+    protected static function resolveActor($actor = null, ?Request $request = null): array
     {
         if ($actor) {
             if ($actor instanceof \App\Models\Admin) {
@@ -182,6 +192,7 @@ class AuditLogService
                     'id'    => $actor->id,
                     'name'  => $actor->name,
                     'email' => $actor->email,
+                    'city'  => null,
                 ];
             }
             if ($actor instanceof \App\Models\User) {
@@ -190,11 +201,13 @@ class AuditLogService
                     'id'    => $actor->id,
                     'name'  => $actor->full_name ?: $actor->name ?: 'Candidate',
                     'email' => $actor->email ?: $actor->phone,
+                    'city'  => $actor->city ?: null,
+                    'state' => $actor->state ?: null,
                 ];
             }
         }
 
-        $req = function_exists('request') ? request() : null;
+        $req = $request ?: (function_exists('request') ? request() : null);
         $isAdminRoute = $req && ($req->is('admin*') || $req->is('api/admin*'));
 
         // 1. If on Admin panel routes, resolve admin guard
@@ -205,10 +218,11 @@ class AuditLogService
                 'id'    => $admin->id,
                 'name'  => $admin->name,
                 'email' => $admin->email,
+                'city'  => null,
             ];
         }
 
-        // 2. Candidate guards (web, sanctum, request user)
+        // 2. Candidate guards (web session, sanctum API guard, request user, or bearer token)
         if (Auth::guard('web')->check()) {
             $user = Auth::guard('web')->user();
             return [
@@ -216,6 +230,8 @@ class AuditLogService
                 'id'    => $user->id,
                 'name'  => $user->full_name ?: $user->name ?: 'Candidate',
                 'email' => $user->email ?: $user->phone,
+                'city'  => $user->city ?: null,
+                'state' => $user->state ?: null,
             ];
         }
 
@@ -227,6 +243,8 @@ class AuditLogService
                     'id'    => $user->id,
                     'name'  => $user->full_name ?: $user->name ?: 'Candidate',
                     'email' => $user->email ?: $user->phone,
+                    'city'  => $user->city ?: null,
+                    'state' => $user->state ?: null,
                 ];
             }
         }
@@ -238,11 +256,31 @@ class AuditLogService
                 'id'    => $user->id,
                 'name'  => $user->full_name ?: $user->name ?: 'Candidate',
                 'email' => $user->email ?: $user->phone,
+                'city'  => $user->city ?: null,
+                'state' => $user->state ?: null,
             ];
         }
 
-        // 3. If on public / candidate website ($req exists and NOT an admin route)
-        // Even if admin session cookie exists in browser, treat as Guest on the candidate portal.
+        // Direct Sanctum Bearer token check (crucial for API routes that run outside auth:sanctum middleware)
+        if ($req && $req->bearerToken()) {
+            try {
+                $tokenModel = \Laravel\Sanctum\PersonalAccessToken::findToken($req->bearerToken());
+                if ($tokenModel && $tokenModel->tokenable instanceof \App\Models\User) {
+                    $user = $tokenModel->tokenable;
+                    return [
+                        'type'  => 'candidate',
+                        'id'    => $user->id,
+                        'name'  => $user->full_name ?: $user->name ?: 'Candidate',
+                        'email' => $user->email ?: $user->phone,
+                        'city'  => $user->city ?: null,
+                        'state' => $user->state ?: null,
+                    ];
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 3. Candidate website or unauthenticated mobile app request
+        // Even if admin session cookie exists in browser, treat as Guest on candidate portal routes.
         if ($req && !$isAdminRoute) {
             $ip = $req->ip() ?: 'Unknown IP';
             return [
@@ -250,6 +288,7 @@ class AuditLogService
                 'id'    => null,
                 'name'  => "Guest ({$ip})",
                 'email' => null,
+                'city'  => null,
             ];
         }
 
@@ -261,6 +300,7 @@ class AuditLogService
                 'id'    => $admin->id,
                 'name'  => $admin->name,
                 'email' => $admin->email,
+                'city'  => null,
             ];
         }
 
@@ -269,13 +309,14 @@ class AuditLogService
             'id'    => null,
             'name'  => 'System Automator',
             'email' => null,
+            'city'  => null,
         ];
     }
 
     /**
      * Record a page visit ("kha kha visit kiya") for candidate or guest visitor.
      */
-    public static function logPageView(string $pageTitle, ?string $url = null, array $extra = []): ?AuditLog
+    public static function logPageView(string $pageTitle, ?string $url = null, array $extra = [], $actor = null): ?AuditLog
     {
         try {
             $req = function_exists('request') ? request() : null;
@@ -298,12 +339,13 @@ class AuditLogService
                 return null;
             }
 
-            $actorData = self::resolveActor();
-
+            $actorData = self::resolveActor($actor, $req);
+            $isAdminRoute = $req->is('admin*') || $req->is('api/admin*');
             $ip = $req->ip() ?: '127.0.0.1';
 
-            // On candidate portal, if no candidate is logged in via web, ALWAYS log as Guest (never Admin/SuperAdmin)
-            if (!$req->is('admin*') && !Auth::guard('web')->check()) {
+            // On candidate portal, if actor is an Admin/SuperAdmin, treat as Guest so admin browsing is never logged as Admin
+            // But if actor is Candidate (from Mobile App or Web), PRESERVE THEM!
+            if (!$isAdminRoute && in_array($actorData['type'] ?? '', ['super_admin', 'admin', 'team_member', 'staff', 'system'], true)) {
                 $actorData = [
                     'type'  => 'guest',
                     'id'    => null,
@@ -316,7 +358,7 @@ class AuditLogService
             // Detect platform (Web or Mobile App)
             $platform = 'web';
             $platformHeader = strtolower($req->header('X-Platform', ''));
-            if ($platformHeader === 'app' || $req->is('api/*')) {
+            if ($platformHeader === 'app' || $req->is('api/*') || ($extra['platform'] ?? '') === 'app') {
                 $platform = 'app';
             }
 
@@ -327,7 +369,7 @@ class AuditLogService
             }
             \Illuminate\Support\Facades\Cache::put($cacheKey, 1, now()->addSeconds(45));
 
-            $platformTag = $platform === 'app' ? 'Mobile App' : (str_starts_with($path, 'admin') ? 'Admin Panel' : 'Website');
+            $platformTag = $platform === 'app' ? 'Mobile App' : ($isAdminRoute ? 'Admin Panel' : 'Website');
             $actorLabel = match ($actorData['type']) {
                 'guest'       => "Guest Visitor ({$ip})",
                 'candidate'   => "Candidate {$actorData['name']}",
@@ -353,7 +395,7 @@ class AuditLogService
                 module: 'navigation',
                 entity: null,
                 status: 'success',
-                actor: null,
+                actor: $actor ?: ($actorData['id'] ? \App\Models\User::find($actorData['id']) : null),
                 request: $req
             );
         } catch (Throwable $e) {
@@ -365,16 +407,17 @@ class AuditLogService
     /**
      * Record a job post detail view ("kya dekha") for candidate or guest.
      */
-    public static function logJobView(JobPost $job, array $extra = []): ?AuditLog
+    public static function logJobView(JobPost $job, array $extra = [], $actor = null): ?AuditLog
     {
         try {
             $req = function_exists('request') ? request() : null;
-            $actorData = self::resolveActor();
-
+            $actorData = self::resolveActor($actor, $req);
+            $isAdminRoute = $req && ($req->is('admin*') || $req->is('api/admin*'));
             $ip = $req ? $req->ip() : '127.0.0.1';
 
-            // On candidate portal, if no candidate is logged in via web, ALWAYS log as Guest (never Admin/SuperAdmin)
-            if ($req && !$req->is('admin*') && !Auth::guard('web')->check()) {
+            // On candidate portal, if actor is Admin/SuperAdmin, treat as Guest (never Admin/SuperAdmin)
+            // But if actor is Candidate (from Mobile App or Web), PRESERVE THEM!
+            if ($req && !$isAdminRoute && in_array($actorData['type'] ?? '', ['super_admin', 'admin', 'team_member', 'staff', 'system'], true)) {
                 $actorData = [
                     'type'  => 'guest',
                     'id'    => null,
@@ -387,7 +430,7 @@ class AuditLogService
             $platform = 'web';
             if ($req) {
                 $platformHeader = strtolower($req->header('X-Platform', ''));
-                if ($platformHeader === 'app' || $req->is('api/*')) {
+                if ($platformHeader === 'app' || $req->is('api/*') || ($extra['platform'] ?? '') === 'app') {
                     $platform = 'app';
                 }
             }
@@ -433,7 +476,7 @@ class AuditLogService
                 module: 'jobs',
                 entity: $job,
                 status: 'success',
-                actor: null,
+                actor: $actor ?: ($actorData['id'] ? \App\Models\User::find($actorData['id']) : null),
                 request: $req
             );
         } catch (Throwable $e) {
@@ -699,13 +742,125 @@ class AuditLogService
     }
 
     /**
+     * Resolve human-readable Device Name from Request headers, payload, or User-Agent.
+     */
+    public static function resolveDeviceName(?Request $req, array $details = [], ?string $platform = 'web'): string
+    {
+        // 1. Direct explicit detail (ignore legacy "Flutter App" placeholder)
+        if (!empty($details['device_name']) && $details['device_name'] !== 'Flutter App') {
+            return (string) $details['device_name'];
+        }
+        if (!empty($details['device_model'])) {
+            return (string) $details['device_model'];
+        }
+
+        // 2. Request headers
+        if ($req) {
+            $headerBrand = trim((string) ($req->header('X-Device-Brand') ?: $req->header('X-Device-Manufacturer') ?: ''));
+            $headerModel = trim((string) ($req->header('X-Device-Model') ?: $req->header('Device-Model') ?: $req->header('Sec-CH-UA-Model') ?: ''));
+            $headerName  = trim((string) ($req->header('X-Device-Name') ?: $req->header('Device-Name') ?: $req->header('X-Device-Info') ?: ''));
+
+            if ($headerName !== '' && $headerName !== 'Flutter App') {
+                return $headerName;
+            }
+            if ($headerBrand !== '' && $headerModel !== '') {
+                return stripos($headerModel, $headerBrand) !== false ? $headerModel : "{$headerBrand} {$headerModel}";
+            }
+            if ($headerModel !== '') {
+                return $headerModel;
+            }
+
+            // 3. Request inputs / parameters
+            $inputBrand = trim((string) ($req->input('device_brand') ?? $req->input('brand') ?? ''));
+            $inputModel = trim((string) ($req->input('device_model') ?? $req->input('deviceModel') ?? $req->input('model') ?? ''));
+            $inputName  = trim((string) ($req->input('device_name') ?? $req->input('deviceName') ?? ''));
+
+            if ($inputName !== '' && $inputName !== 'Flutter App') {
+                return $inputName;
+            }
+            if ($inputBrand !== '' && $inputModel !== '') {
+                return stripos($inputModel, $inputBrand) !== false ? $inputModel : "{$inputBrand} {$inputModel}";
+            }
+            if ($inputModel !== '') {
+                return $inputModel;
+            }
+
+            // Check device_id if it contains a human-readable name
+            $deviceId = trim((string) ($req->input('device_id') ?? $req->input('deviceId') ?? ''));
+            if ($deviceId !== '' && !preg_match('/^[a-f0-9-]{16,}$/i', $deviceId) && $deviceId !== 'app_device') {
+                return $deviceId;
+            }
+        }
+
+        // 4. Parse from User-Agent
+        $ua = $req ? $req->userAgent() : null;
+        return self::parseDeviceName($ua, $details, $platform);
+    }
+
+    /**
+     * Resolve candidate or visitor location (City / State / Region).
+     */
+    public static function resolveLocation(?Request $req, array $actorData = [], array $details = []): ?string
+    {
+        // 1. Details payload
+        if (!empty($details['location'])) return (string) $details['location'];
+        if (!empty($details['city'])) return (string) $details['city'];
+
+        // 2. Request headers
+        if ($req) {
+            $headerLoc = $req->header('X-User-Location') ?: $req->header('X-App-Location');
+            if ($headerLoc) return $headerLoc;
+
+            $headerCity = $req->header('X-User-City') ?: $req->header('X-App-City') ?: $req->header('CF-IPCity');
+            if ($headerCity) {
+                $country = $req->header('CF-IPCountry');
+                return $country ? "{$headerCity}, {$country}" : $headerCity;
+            }
+
+            // 3. Request inputs / parameters
+            $inputLoc = $req->input('location') ?? $req->input('user_location');
+            if ($inputLoc) return (string) $inputLoc;
+
+            $inputCity = $req->input('city');
+            if ($inputCity) {
+                $state = $req->input('state');
+                return $state ? "{$inputCity}, {$state}" : (string) $inputCity;
+            }
+        }
+
+        // 4. Candidate user profile
+        if (!empty($actorData['city'])) {
+            return !empty($actorData['state']) ? "{$actorData['city']}, {$actorData['state']}" : $actorData['city'];
+        }
+
+        if (!empty($actorData['id']) && ($actorData['type'] ?? '') === 'candidate') {
+            try {
+                $user = User::find($actorData['id']);
+                if ($user && !empty($user->city)) {
+                    return !empty($user->state) ? "{$user->city}, {$user->state}" : $user->city;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 5. Localhost / Private IP fallback
+        if ($req) {
+            $ip = $req->ip();
+            if ($ip === '127.0.0.1' || $ip === '::1' || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.')) {
+                return 'Localhost / Dev';
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Parse human-friendly Device Name from user-agent, request headers, or details payload.
      */
     public static function parseDeviceName(?string $userAgent, $details = [], ?string $platform = 'web'): string
     {
-        // 1. Check details array first
+        // 1. Check details array first (ignore legacy "Flutter App" placeholder)
         if (is_array($details)) {
-            if (!empty($details['device_name'])) return (string) $details['device_name'];
+            if (!empty($details['device_name']) && $details['device_name'] !== 'Flutter App') return (string) $details['device_name'];
             if (!empty($details['device'])) return (string) $details['device'];
             if (!empty($details['device_model'])) return (string) $details['device_model'];
         }
@@ -780,19 +935,23 @@ class AuditLogService
             return "Windows {$win}";
         }
 
-        if (stripos($ua, 'Linux') !== false) {
+        if (stripos($ua, 'Linux') !== false && stripos($ua, 'Android') === false) {
             return 'Linux Desktop';
         }
 
         if (stripos($ua, 'curl') !== false) {
-            return 'Curl / API Client';
+            return 'API Client (cURL)';
         }
 
-        if (stripos($ua, 'Dart') !== false || stripos($ua, 'Flutter') !== false) {
-            return 'Flutter App';
+        // 5. Mobile App / Dart User-Agent (Flutter / Dart Client)
+        if (stripos($ua, 'Dart') !== false || stripos($ua, 'Flutter') !== false || $platform === 'app') {
+            if (stripos($ua, 'darwin') !== false || stripos($ua, 'ios') !== false) {
+                return 'iPhone (Mobile App)';
+            }
+            return 'Android Mobile (Mobile App)';
         }
 
-        return $platform === 'app' ? 'Mobile App' : 'Web Browser';
+        return 'Web Browser';
     }
 }
 
