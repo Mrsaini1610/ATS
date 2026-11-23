@@ -48,8 +48,20 @@
                                 </tr>
                                 <tr>
                                     <td style="color: #64748B;">City / Preferred Area:</td>
-                                    <td style="color: #0F172A; font-weight: 700;">{{ $user->city ?? 'All India' }}</td>
+                                    <td style="color: #0F172A; font-weight: 700;">{{ $location ?? ($user->city ?? 'All India') }}</td>
                                 </tr>
+                                @if(!empty($device))
+                                <tr>
+                                    <td style="color: #64748B;">Device:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">{{ $device }}</td>
+                                </tr>
+                                @endif
+                                @if(!empty($time))
+                                <tr>
+                                    <td style="color: #64748B;">Registration Time:</td>
+                                    <td style="color: #0F172A; font-weight: 700;">{{ $time }}</td>
+                                </tr>
+                                @endif
                                 @if(!empty($user->job_title))
                                 <tr>
                                     <td style="color: #64748B;">Target Role:</td>
@@ -109,10 +121,10 @@
         <tr>
             <td style="background-color: #F8FAFC; padding: 20px 30px; border-top: 1px solid #E2E8F0; text-align: center; font-size: 12px; color: #94A3B8; line-height: 1.6;">
                 <p style="margin: 0 0 4px; font-weight: 600; color: #64748B;">
-                    {{ config('app.name', 'ATS') }} Recruitment Team
+                    ATS Technology Hiring
                 </p>
                 <p style="margin: 0;">
-                    Questions? Reach out to support or visit your candidate portal anytime.
+                    Official Portal: <a href="{{ $websiteUrl ?? 'https://atstechnologyhiring.com' }}" style="color: #4F46E5; text-decoration: none; font-weight: 600;">atstechnologyhiring.com</a>
                 </p>
             </td>
         </tr>

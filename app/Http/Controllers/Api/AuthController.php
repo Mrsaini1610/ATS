@@ -351,11 +351,26 @@ class AuthController extends Controller
                 request: $request
             );
 
-            // Send welcome mail if candidate has email and profile complete
-            if (!empty($user->email) && $user->isProfileComplete()) {
-                try {
-                    MailService::sendWelcomeCandidate($user);
-                } catch (Throwable $e) {}
+            // Send welcome mail if candidate registered OR Login alert ("Welcome Back") if existing login
+            if (!empty($user->email)) {
+                $meta = [
+                    'platform' => 'app',
+                    'device'   => AuditLogService::resolveDeviceName($request, ['device_id' => $deviceId], 'app'),
+                    'location' => AuditLogService::resolveLocation($request, ['city' => $user->city, 'state' => $user->state, 'type' => 'candidate', 'id' => $user->id]),
+                    'ip'       => $ip,
+                    'time'     => now()->format('d M Y, h:i A'),
+                ];
+                defer(function () use ($user, $isNewUser, $meta) {
+                    try {
+                        if ($isNewUser) {
+                            MailService::sendWelcomeCandidate($user, $meta);
+                        } else {
+                            MailService::sendCandidateLoginAlert($user, $meta);
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('App login/register mail dispatch failed: ' . $e->getMessage());
+                    }
+                });
             }
 
             return response()->json([

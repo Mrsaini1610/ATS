@@ -39,10 +39,11 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
+            'scheme' => env('MAIL_SCHEME', 'smtps'),
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
+            'port' => env('MAIL_PORT', 465),
+            'encryption' => env('MAIL_ENCRYPTION', 'ssl'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
@@ -111,8 +112,22 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'info@atstechnologyhiring.com'),
+        'name' => env('MAIL_FROM_NAME', 'Ats Technology Hiring'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | ATS Main Mailbox & 3 Official Aliases
+    |--------------------------------------------------------------------------
+    */
+    'main_email' => env('MAIL_FROM_ADDRESS', 'info@atstechnologyhiring.com'),
+
+    'aliases' => [
+        'no_reply'     => env('MAIL_ALIAS_NO_REPLY', 'do-not-reply@atstechnologyhiring.com'),
+        'notification' => env('MAIL_ALIAS_NOTIFICATION', 'ats.notification@atstechnologyhiring.com'),
+        'support'      => env('MAIL_ALIAS_SUPPORT', 'support@atstechnologyhiring.com'),
+        'website_url'  => env('WEBSITE_URL', 'https://atstechnologyhiring.com'),
     ],
 
 ];

@@ -219,6 +219,28 @@ class CandidateAuthController extends Controller
                 request: $request
             );
 
+            // Send Registration Welcome Email OR Security Login Alert ("Welcome Back") via defer()
+            if (!empty($user->email)) {
+                $meta = [
+                    'platform' => 'web',
+                    'device'   => AuditLogService::resolveDeviceName($request, [], 'web'),
+                    'location' => AuditLogService::resolveLocation($request, ['city' => $user->city, 'state' => $user->state, 'type' => 'candidate', 'id' => $user->id]),
+                    'ip'       => $request->ip(),
+                    'time'     => now()->format('d M Y, h:i A'),
+                ];
+                defer(function () use ($user, $isNew, $meta) {
+                    try {
+                        if ($isNew) {
+                            MailService::sendWelcomeCandidate($user, $meta);
+                        } else {
+                            MailService::sendCandidateLoginAlert($user, $meta);
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Login/Registration mail dispatch failed: ' . $e->getMessage());
+                    }
+                });
+            }
+
             // Dynamic redirect URL
             $redirectUrl = route('home');
             if ($request->job_id) {

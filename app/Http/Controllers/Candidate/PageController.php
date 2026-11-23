@@ -270,7 +270,7 @@ class PageController extends Controller
             'message' => ['required', 'string', 'max:5000'],
         ]);
 
-        ContactMessage::create([
+        $contactMessage = ContactMessage::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'subject' => $validated['subject'] ?: 'General Inquiry',
@@ -278,6 +278,15 @@ class PageController extends Controller
             'ip' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
+
+        // Dispatch Support Auto-reply & Super Admin Alert from support@atstechnologyhiring.com
+        defer(function () use ($contactMessage) {
+            try {
+                \App\Services\MailService::sendContactMessageReceived($contactMessage);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Contact message mail dispatch failed: ' . $e->getMessage());
+            }
+        });
 
         return back()->with('success', 'Thank you! Your message has been sent successfully. Our support team will get in touch with you soon.');
     }

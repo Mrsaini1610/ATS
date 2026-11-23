@@ -29,6 +29,8 @@ import {
   FileSpreadsheet,
   RotateCcw,
   SlidersHorizontal,
+  Network,
+  Layers,
 } from "lucide-react";
 
 export default function Logs({
@@ -37,13 +39,17 @@ export default function Logs({
   errorLogs,
   serverLog,
   metrics,
+  ipGroups = { data: [], links: [] },
   filters = {},
 }) {
   const [activeTab, setActiveTab] = useState(filters.tab || "audit"); // audit, incomplete, errors, server_log
+  const [viewMode, setViewMode] = useState(filters.view_mode || "list"); // list, ip_groups
   const [search, setSearch] = useState(filters.search || "");
   const [moduleFilter, setModuleFilter] = useState(filters.module || "all");
   const [statusFilter, setStatusFilter] = useState(filters.status || "all");
   const [actorTypeFilter, setActorTypeFilter] = useState(filters.actor_type || "all"); // all, candidate, admin, system
+  const [platformFilter, setPlatformFilter] = useState(filters.platform || "all"); // all, web, app, api
+  const [ipFilter, setIpFilter] = useState(filters.ip || "");
   
   // Date & Month filter state
   const [filterMode, setFilterMode] = useState(filters.filter_mode || "all"); // all, month, date_range, preset
@@ -64,24 +70,36 @@ export default function Logs({
 
   const [expandedRow, setExpandedRow] = useState(null);
   const [expandedError, setExpandedError] = useState(null);
+  const [expandedIpGroup, setExpandedIpGroup] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [logSearch, setLogSearch] = useState("");
   const [logLevelFilter, setLogLevelFilter] = useState("all");
+
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return "N/A";
+    const d = new Date(dateStr);
+    const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${date} ${time}`;
+  };
 
   const applyFilters = (customParams = {}) => {
     router.get(
       route("admin.logs.index"),
       {
         tab: activeTab,
-        search,
-        module: moduleFilter,
-        status: statusFilter,
-        actor_type: actorTypeFilter,
-        filter_mode: filterMode,
-        month: selectedMonth,
-        from_date: fromDate,
-        to_date: toDate,
-        preset,
+        view_mode: customParams.view_mode !== undefined ? customParams.view_mode : viewMode,
+        search: customParams.search !== undefined ? customParams.search : search,
+        module: customParams.module !== undefined ? customParams.module : moduleFilter,
+        status: customParams.status !== undefined ? customParams.status : statusFilter,
+        actor_type: customParams.actor_type !== undefined ? customParams.actor_type : actorTypeFilter,
+        platform: customParams.platform !== undefined ? customParams.platform : platformFilter,
+        ip: customParams.ip !== undefined ? customParams.ip : ipFilter,
+        filter_mode: customParams.filter_mode !== undefined ? customParams.filter_mode : filterMode,
+        month: customParams.month !== undefined ? customParams.month : selectedMonth,
+        from_date: customParams.from_date !== undefined ? customParams.from_date : fromDate,
+        to_date: customParams.to_date !== undefined ? customParams.to_date : toDate,
+        preset: customParams.preset !== undefined ? customParams.preset : preset,
         ...customParams,
       },
       { preserveState: true, preserveScroll: true }
@@ -106,6 +124,8 @@ export default function Logs({
     actorTypeFilter !== "all" ||
     moduleFilter !== "all" ||
     statusFilter !== "all" ||
+    platformFilter !== "all" ||
+    ipFilter ||
     filterMode !== "all" ||
     preset !== "all"
   );
@@ -115,6 +135,8 @@ export default function Logs({
     setActorTypeFilter("all");
     setModuleFilter("all");
     setStatusFilter("all");
+    setPlatformFilter("all");
+    setIpFilter("");
     setFilterMode("all");
     setPreset("all");
     setFromDate("");
@@ -124,6 +146,8 @@ export default function Logs({
       actor_type: "all",
       module: "all",
       status: "all",
+      platform: "all",
+      ip: "",
       filter_mode: "all",
       preset: "all",
       from_date: "",
@@ -141,7 +165,7 @@ export default function Logs({
     const timer = setInterval(() => {
       if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
       router.reload({
-        only: ["activities", "metrics", "errorLogs", "serverLog"],
+        only: ["activities", "metrics", "errorLogs", "serverLog", "ipGroups"],
         preserveScroll: true,
         preserveState: true,
       });
@@ -180,6 +204,8 @@ export default function Logs({
       preset: exportPreset,
       module: moduleFilter,
       actor_type: actorTypeFilter,
+      platform: platformFilter,
+      ...(ipFilter ? { ip: ipFilter } : {}),
     });
 
     window.location.href = `${route("admin.logs.export")}?${params.toString()}`;
@@ -607,6 +633,68 @@ export default function Logs({
         {/* ========================================================================= */}
         {activeTab === "audit" && (
           <div className="space-y-4">
+            {/* View Mode Switcher Header Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white rounded-2xl border border-gray-200 p-2.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode("list");
+                    applyFilters({ view_mode: "list" });
+                  }}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    viewMode === "list"
+                      ? "bg-white text-gray-900 shadow-xs border border-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Activity List View</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 font-semibold text-slate-700">
+                    {activities?.total || 0}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode("ip_groups");
+                    applyFilters({ view_mode: "ip_groups" });
+                  }}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    viewMode === "ip_groups"
+                      ? "bg-white text-indigo-900 shadow-xs border border-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Network className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Group by IP Address</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 font-bold text-indigo-700 border border-indigo-200">
+                    {ipGroups?.total || 0} Groups
+                  </span>
+                </button>
+              </div>
+
+              {/* Active IP filter tag if any */}
+              {ipFilter && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-900">
+                  <Network className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Filtered by IP: <strong className="font-mono">{ipFilter}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIpFilter("");
+                      applyFilters({ ip: "" });
+                    }}
+                    className="ml-1 p-0.5 rounded-md hover:bg-indigo-100 text-indigo-600 cursor-pointer"
+                    title="Clear IP Filter"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Quick Filters Toolbar with Interactive Buttons */}
             <div className="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-2xs space-y-3">
               {/* Row 1: Search bar + Filter/Search Submit + Reset Button */}
@@ -658,8 +746,41 @@ export default function Logs({
                 </div>
               </form>
 
-              {/* Row 2: Filter Buttons by Actor & Status */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-gray-100 text-xs">
+              {/* Row 2: Platform Filter Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs">
+                <span className="font-bold text-gray-500 mr-1 flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                  <Globe className="w-3 h-3 text-indigo-600" /> Platform:
+                </span>
+                {[
+                  { key: "all", label: "All Platforms", icon: Layers },
+                  { key: "web", label: "Web Browser", icon: Globe },
+                  { key: "app", label: "Mobile App", icon: Smartphone },
+                  { key: "api", label: "API", icon: Terminal },
+                ].map((p) => {
+                  const IconComp = p.icon;
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => {
+                        setPlatformFilter(p.key);
+                        applyFilters({ platform: p.key });
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                        platformFilter === p.key
+                          ? "bg-indigo-600 text-white shadow-2xs font-bold"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      <IconComp className="w-3 h-3" />
+                      <span>{p.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Row 3: Filter Buttons by Actor & Status */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 text-xs">
                 {/* Filter by Actor Buttons */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-bold text-gray-500 mr-1 flex items-center gap-1 text-[11px] uppercase tracking-wider">
@@ -720,7 +841,7 @@ export default function Logs({
                 </div>
               </div>
 
-              {/* Row 3: Module Filter Buttons Strip (Click to instantly filter by module) */}
+              {/* Row 4: Module Filter Buttons Strip */}
               <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-gray-100 text-xs custom-scrollbar">
                 <span className="font-bold text-gray-500 shrink-0 text-[11px] uppercase tracking-wider mr-1">
                   Modules:
@@ -755,217 +876,465 @@ export default function Logs({
               </div>
             </div>
 
-            {/* Activities Table Card */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col">
-              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-17.5rem)] min-h-[360px] custom-scrollbar">
-                <table className="w-full min-w-[1020px] table-fixed text-left text-xs border-collapse">
-                  <thead className="sticky top-0 z-20 bg-slate-100 border-b border-gray-200 text-gray-600 font-bold uppercase tracking-wider text-[10px] shadow-xs">
-                    <tr>
-                      <th className="w-[150px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Time & Platform</th>
-                      <th className="w-[180px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Actor (Who)</th>
-                      <th className="w-[160px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Action & Module</th>
-                      <th className="w-[420px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Description</th>
-                      <th className="w-[120px] px-4 py-3.5 text-center bg-slate-100 whitespace-nowrap">Status</th>
-                      <th className="w-[70px] px-4 py-3.5 text-right bg-slate-100 whitespace-nowrap">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {activities.data.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
-                          No audit activity records found for this period.
-                        </td>
-                      </tr>
-                    ) : (
-                      activities.data.map((item) => {
-                        const isExpanded = expandedRow === item.id;
-                        return (
-                          <React.Fragment key={item.id}>
-                            <tr
-                              onClick={() => setExpandedRow(isExpanded ? null : item.id)}
-                              className="hover:bg-blue-50/40 transition cursor-pointer"
-                            >
-                              <td className="w-[150px] px-4 py-3 whitespace-nowrap align-middle">
-                                <div className="font-semibold text-gray-800">
-                                  {new Date(item.created_at).toLocaleDateString("en-GB", {
-                                    day: "2-digit",
-                                    month: "short",
-                                    year: "numeric",
-                                  })}
-                                </div>
-                                <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5 font-medium">
-                                  <span>{new Date(item.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</span>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-0.5">
-                                    {item.platform === "app" ? (
-                                      <Smartphone className="w-3 h-3 text-indigo-500" />
-                                    ) : (
-                                      <Globe className="w-3 h-3 text-blue-500" />
-                                    )}
-                                    {item.platform.toUpperCase()}
-                                  </span>
-                                </div>
-                              </td>
+            {/* VIEW MODE 1: GROUP BY IP ADDRESS VIEW */}
+            {viewMode === "ip_groups" ? (
+              <div className="space-y-3">
+                {/* Info Banner for IP Groups */}
+                <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Network className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                        <span>Activity Groups by IP Address</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-200">
+                          {ipGroups?.total || 0} Unique IPs
+                        </span>
+                      </h4>
+                      <p className="text-xs text-indigo-700 mt-0.5">
+                        User actions grouped by IP address with device, location, platform breakdown, and action counts.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewMode("list");
+                      applyFilters({ view_mode: "list" });
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100/60 font-bold text-xs transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1.5"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Switch to Activity List</span>
+                  </button>
+                </div>
 
-                              <td className="w-[180px] px-4 py-3 align-middle !whitespace-normal break-words">
-                                <div className="whitespace-normal break-words max-w-[175px]">
-                                  {getActorBadge(item.actor_type, item.actor_name)}
-                                </div>
-                                {item.actor_email && (
-                                  <p className="text-[11px] text-gray-400 mt-0.5 whitespace-normal break-words max-w-[175px]" title={item.actor_email}>
-                                    {item.actor_email}
-                                  </p>
-                                )}
-                                {item.device_name && (
-                                  <div className="mt-1 flex items-center gap-1">
-                                    <span
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-                                      title={`Device: ${item.device_name}${item.user_agent ? ' • ' + item.user_agent : ''}`}
-                                    >
-                                      {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
-                                        <Smartphone className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
-                                      ) : (
-                                        <Laptop className="w-2.5 h-2.5 text-slate-500 shrink-0" />
-                                      )}
-                                      <span className="truncate max-w-[130px]">{item.device_name}</span>
-                                    </span>
-                                  </div>
-                                )}
-                                {(item.location || item.details?.location || item.details?.city) && (
-                                  <div className="mt-1 flex items-center gap-1">
-                                    <span
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200"
-                                      title={`Location: ${item.location || item.details?.location || item.details?.city}`}
-                                    >
-                                      <MapPin className="w-2.5 h-2.5 text-rose-500 shrink-0" />
-                                      <span className="truncate max-w-[130px]">
-                                        {item.location || item.details?.location || item.details?.city}
-                                      </span>
-                                    </span>
-                                  </div>
-                                )}
-                              </td>
+                {/* IP Groups List */}
+                {(!ipGroups?.data || ipGroups.data.length === 0) ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-400">
+                    <Network className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                    <p className="text-sm font-semibold">No IP activity groups found matching the current filters.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {ipGroups.data.map((group) => {
+                      const isExpanded = expandedIpGroup === group.ip_address;
+                      const platformsList = (group.platforms || "").split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
 
-                              <td className="w-[160px] px-4 py-3 align-middle !whitespace-normal break-words">
-                                <div className="font-bold text-gray-900 leading-tight">
-                                  {item.action.replace(/_/g, " ")}
-                                </div>
-                                <span className="inline-block mt-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                                  {item.module}
+                      return (
+                        <div
+                          key={group.ip_address}
+                          className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden transition hover:border-indigo-300"
+                        >
+                          <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl font-mono font-bold text-xs bg-slate-900 text-white shadow-xs">
+                                  <Network className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>{group.ip_address}</span>
                                 </span>
-                              </td>
 
-                              <td className="w-[420px] px-4 py-3 pr-4 align-middle !whitespace-normal break-words">
-                                <div className="w-full whitespace-normal break-words">
-                                  <p className="text-gray-800 font-medium leading-relaxed whitespace-normal break-words line-clamp-3">
-                                    {item.description}
-                                  </p>
-                                  {item.ip_address && (
-                                    <span className="text-[10px] text-gray-400 font-mono mt-0.5 block whitespace-normal">
-                                      IP: {item.ip_address}
-                                    </span>
+                                {/* Location Badge */}
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                                  <span>{group.location || "Localhost / Dev"}</span>
+                                </span>
+
+                                {/* Device Badge */}
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {/iphone|android|pixel|samsung|redmi|oneplus/i.test(group.device_name) ? (
+                                    <Smartphone className="w-3 h-3 text-indigo-500 shrink-0" />
+                                  ) : (
+                                    <Laptop className="w-3 h-3 text-slate-500 shrink-0" />
                                   )}
+                                  <span>{group.device_name || "Unknown Device"}</span>
+                                </span>
+
+                                {/* Platform Tags */}
+                                {platformsList.map((plt) => (
+                                  <span
+                                    key={plt}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                      plt === "app"
+                                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                        : plt === "api"
+                                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                                    }`}
+                                  >
+                                    {plt === "app" ? <Smartphone className="w-2.5 h-2.5" /> : <Globe className="w-2.5 h-2.5" />}
+                                    {plt}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {/* Actor names & timestamps */}
+                              <div className="text-xs text-gray-600 flex items-center gap-2 flex-wrap pt-0.5">
+                                <span className="font-semibold text-gray-400 text-[11px] uppercase tracking-wider">Actors:</span>
+                                <span className="font-medium text-gray-800">{group.actors || "Guest User"}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="text-gray-400 text-[11px]">Last Active:</span>
+                                <span className="font-semibold text-gray-700">{formatDateTime(group.last_seen)}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="text-gray-400 text-[11px]">First Seen:</span>
+                                <span className="font-semibold text-gray-700">{formatDateTime(group.first_seen)}</span>
+                              </div>
+                            </div>
+
+                            {/* Right action controls */}
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 font-black text-xs">
+                                <Activity className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{group.total_actions} Activities</span>
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIpFilter(group.ip_address);
+                                  setViewMode("list");
+                                  applyFilters({ ip: group.ip_address, view_mode: "list" });
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                                title="View all activities for this IP in list view"
+                              >
+                                <Filter className="w-3.5 h-3.5" />
+                                <span>View All Logs</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setExpandedIpGroup(isExpanded ? null : group.ip_address)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs transition cursor-pointer"
+                              >
+                                <span>Recent 5</span>
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Collapsible Recent Activities Table */}
+                          {isExpanded && (
+                            <div className="border-t border-gray-100 bg-slate-50/70 p-4">
+                              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
+                                <div className="px-3.5 py-2 bg-slate-100/70 border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                                  <span>Latest 5 Activities for IP {group.ip_address}</span>
+                                  <span className="text-[10px] text-gray-400 font-normal">Click 'View All Logs' to inspect all records</span>
                                 </div>
-                              </td>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px] border-b border-gray-100">
+                                      <tr>
+                                        <th className="px-3 py-2">Time</th>
+                                        <th className="px-3 py-2">Actor</th>
+                                        <th className="px-3 py-2">Action / Module</th>
+                                        <th className="px-3 py-2">Description</th>
+                                        <th className="px-3 py-2 text-center">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {(group.recent_activities || []).map((rec) => (
+                                        <tr key={rec.id} className="hover:bg-slate-50">
+                                          <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-700">
+                                            {formatDateTime(rec.created_at)}
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="font-semibold text-gray-900">{rec.actor_name || "Guest"}</span>
+                                            <span className="block text-[10px] text-gray-400 uppercase">{rec.actor_type}</span>
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="font-bold text-gray-800">{rec.action?.replace(/_/g, " ")}</span>
+                                            <span className="block text-[10px] uppercase text-gray-400">{rec.module}</span>
+                                          </td>
+                                          <td className="px-3 py-2 text-gray-700 max-w-[360px] truncate">
+                                            {rec.description}
+                                          </td>
+                                          <td className="px-3 py-2 text-center whitespace-nowrap">
+                                            {getStatusBadge(rec.status)}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-                              <td className="w-[120px] px-4 py-3 whitespace-nowrap text-center align-middle">
-                                {getStatusBadge(item.status)}
-                              </td>
+                {/* IP Groups Pagination */}
+                {ipGroups?.links && ipGroups.links.length > 3 && (
+                  <div className="sticky bottom-0 z-10 px-4 py-2.5 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-2 bg-white text-xs text-gray-500 shadow-2xs">
+                    <span>
+                      Showing <span className="font-bold text-gray-800">{ipGroups.from || 0}</span> to{" "}
+                      <span className="font-bold text-gray-800">{ipGroups.to || 0}</span> of{" "}
+                      <span className="font-bold text-gray-800">{ipGroups.total}</span> IP groups
+                    </span>
+                    <div className="flex gap-1 flex-wrap justify-center">
+                      {ipGroups.links.map((link, idx) => (
+                        <Link
+                          key={idx}
+                          href={link.url || "#"}
+                          preserveScroll
+                          className={`px-3 py-1 rounded-lg border font-semibold transition ${
+                            link.active
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                              : link.url
+                              ? "bg-white text-gray-700 hover:bg-gray-50 border-gray-200"
+                              : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
+                          }`}
+                          dangerouslySetInnerHTML={{ __html: link.label }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* VIEW MODE 2: ACTIVITIES TABLE CARD (Standard List View) */
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-17.5rem)] min-h-[360px] custom-scrollbar">
+                  <table className="w-full min-w-[1020px] table-fixed text-left text-xs border-collapse">
+                    <thead className="sticky top-0 z-20 bg-slate-100 border-b border-gray-200 text-gray-600 font-bold uppercase tracking-wider text-[10px] shadow-xs">
+                      <tr>
+                        <th className="w-[150px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Time & Platform</th>
+                        <th className="w-[180px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Actor (Who)</th>
+                        <th className="w-[160px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Action & Module</th>
+                        <th className="w-[420px] px-4 py-3.5 bg-slate-100 whitespace-nowrap">Description</th>
+                        <th className="w-[120px] px-4 py-3.5 text-center bg-slate-100 whitespace-nowrap">Status</th>
+                        <th className="w-[70px] px-4 py-3.5 text-right bg-slate-100 whitespace-nowrap">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {activities.data.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                            No audit activity records found for this period.
+                          </td>
+                        </tr>
+                      ) : (
+                        activities.data.map((item) => {
+                          const isExpanded = expandedRow === item.id;
+                          return (
+                            <React.Fragment key={item.id}>
+                              <tr
+                                onClick={() => setExpandedRow(isExpanded ? null : item.id)}
+                                className="hover:bg-blue-50/40 transition cursor-pointer"
+                              >
+                                <td className="w-[150px] px-4 py-3 whitespace-nowrap align-middle">
+                                  <div className="font-semibold text-gray-800">
+                                    {new Date(item.created_at).toLocaleDateString("en-GB", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                  </div>
+                                  <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5 font-medium">
+                                    <span>{new Date(item.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</span>
+                                    <span>•</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPlatformFilter(item.platform);
+                                        applyFilters({ platform: item.platform });
+                                      }}
+                                      className="flex items-center gap-0.5 hover:text-indigo-600 hover:underline cursor-pointer"
+                                      title={`Filter by platform: ${item.platform}`}
+                                    >
+                                      {item.platform === "app" ? (
+                                        <Smartphone className="w-3 h-3 text-indigo-500" />
+                                      ) : (
+                                        <Globe className="w-3 h-3 text-blue-500" />
+                                      )}
+                                      {item.platform.toUpperCase()}
+                                    </button>
+                                  </div>
+                                </td>
 
-                              <td className="w-[70px] min-w-[70px] px-4 py-3 text-right align-middle">
-                                <button
-                                  type="button"
-                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
-                                >
-                                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                                </button>
-                              </td>
-                            </tr>
-
-                            {/* Expanded Details Row */}
-                            {isExpanded && (
-                              <tr className="bg-gray-50/80">
-                                <td colSpan={6} className="px-6 py-4">
-                                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5 shadow-2xs">
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="font-bold text-gray-700">Audit Metadata & Details:</span>
-                                      <span className="text-gray-400">ID #{item.id}</span>
+                                <td className="w-[180px] px-4 py-3 align-middle !whitespace-normal break-words">
+                                  <div className="whitespace-normal break-words max-w-[175px]">
+                                    {getActorBadge(item.actor_type, item.actor_name)}
+                                  </div>
+                                  {item.actor_email && (
+                                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-normal break-words max-w-[175px]" title={item.actor_email}>
+                                      {item.actor_email}
+                                    </p>
+                                  )}
+                                  {item.device_name && (
+                                    <div className="mt-1 flex items-center gap-1">
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                                        title={`Device: ${item.device_name}${item.user_agent ? ' • ' + item.user_agent : ''}`}
+                                      >
+                                        {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
+                                          <Smartphone className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                                        ) : (
+                                          <Laptop className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                        )}
+                                        <span className="truncate max-w-[130px]">{item.device_name}</span>
+                                      </span>
                                     </div>
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                      {item.device_name && (
-                                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg font-semibold flex items-center gap-1.5">
-                                          {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
-                                            <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
-                                          ) : (
-                                            <Laptop className="w-3.5 h-3.5 text-slate-600" />
-                                          )}
-                                          <span>Device: <strong>{item.device_name}</strong></span>
+                                  )}
+                                  {(item.location || item.details?.location || item.details?.city) && (
+                                    <div className="mt-1 flex items-center gap-1">
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200"
+                                        title={`Location: ${item.location || item.details?.location || item.details?.city}`}
+                                      >
+                                        <MapPin className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                                        <span className="truncate max-w-[130px]">
+                                          {item.location || item.details?.location || item.details?.city}
                                         </span>
-                                      )}
-                                      {(item.location || item.details?.location || item.details?.city) && (
-                                        <span className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-semibold flex items-center gap-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-rose-600" />
-                                          <span>Location: <strong>{item.location || item.details?.location || item.details?.city}</strong></span>
-                                        </span>
-                                      )}
-                                      {item.ip_address && (
-                                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg font-mono text-[11px]">
-                                          IP: <strong>{item.ip_address}</strong>
-                                        </span>
-                                      )}
+                                      </span>
                                     </div>
-                                    {item.user_agent && (
-                                      <p className="text-[11px] text-gray-500 font-mono break-all bg-gray-50 p-2 rounded-lg border border-gray-100">
-                                        User-Agent: {item.user_agent}
-                                      </p>
-                                    )}
-                                    {item.details && Object.keys(item.details).length > 0 ? (
-                                      <pre className="text-[11px] font-mono bg-slate-900 text-emerald-400 p-3 rounded-lg overflow-x-auto max-h-48">
-                                        {JSON.stringify(item.details, null, 2)}
-                                      </pre>
-                                    ) : (
-                                      <p className="text-xs text-gray-400 italic">No additional payload parameters.</p>
+                                  )}
+                                </td>
+
+                                <td className="w-[160px] px-4 py-3 align-middle !whitespace-normal break-words">
+                                  <div className="font-bold text-gray-900 leading-tight">
+                                    {item.action.replace(/_/g, " ")}
+                                  </div>
+                                  <span className="inline-block mt-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                                    {item.module}
+                                  </span>
+                                </td>
+
+                                <td className="w-[420px] px-4 py-3 pr-4 align-middle !whitespace-normal break-words">
+                                  <div className="w-full whitespace-normal break-words">
+                                    <p className="text-gray-800 font-medium leading-relaxed whitespace-normal break-words line-clamp-3">
+                                      {item.description}
+                                    </p>
+                                    {item.ip_address && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setIpFilter(item.ip_address);
+                                          applyFilters({ ip: item.ip_address });
+                                        }}
+                                        className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-indigo-600 font-mono mt-0.5 hover:underline cursor-pointer"
+                                        title="Click to filter logs by this IP"
+                                      >
+                                        <Network className="w-2.5 h-2.5 text-indigo-500" />
+                                        <span>IP: {item.ip_address}</span>
+                                      </button>
                                     )}
                                   </div>
                                 </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
 
-              {/* Pagination */}
-              {activities.links && activities.links.length > 3 && (
-                <div className="sticky bottom-0 z-10 px-4 py-2.5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white text-xs text-gray-500 shrink-0 shadow-xs">
-                  <span>
-                    Showing <span className="font-bold text-gray-800">{activities.from || 0}</span> to{" "}
-                    <span className="font-bold text-gray-800">{activities.to || 0}</span> of{" "}
-                    <span className="font-bold text-gray-800">{activities.total}</span> records (10 per page)
-                  </span>
-                  <div className="flex gap-1 flex-wrap justify-center">
-                    {activities.links.map((link, idx) => (
-                      <Link
-                        key={idx}
-                        href={link.url || "#"}
-                        preserveScroll
-                        className={`px-3 py-1 rounded-lg border font-semibold transition ${
-                          link.active
-                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                            : link.url
-                            ? "bg-white text-gray-700 hover:bg-gray-50 border-gray-200"
-                            : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                        }`}
-                        dangerouslySetInnerHTML={{ __html: link.label }}
-                      />
-                    ))}
-                  </div>
+                                <td className="w-[120px] px-4 py-3 whitespace-nowrap text-center align-middle">
+                                  {getStatusBadge(item.status)}
+                                </td>
+
+                                <td className="w-[70px] min-w-[70px] px-4 py-3 text-right align-middle">
+                                  <button
+                                    type="button"
+                                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
+                                  >
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                  </button>
+                                </td>
+                              </tr>
+
+                              {/* Expanded Details Row */}
+                              {isExpanded && (
+                                <tr className="bg-gray-50/80">
+                                  <td colSpan={6} className="px-6 py-4">
+                                    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5 shadow-2xs">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-gray-700">Audit Metadata & Details:</span>
+                                        <span className="text-gray-400">ID #{item.id}</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        {item.device_name && (
+                                          <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg font-semibold flex items-center gap-1.5">
+                                            {item.platform === "app" || /iphone|android|pixel|samsung|redmi|oneplus/i.test(item.device_name) ? (
+                                              <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+                                            ) : (
+                                              <Laptop className="w-3.5 h-3.5 text-slate-600" />
+                                            )}
+                                            <span>Device: <strong>{item.device_name}</strong></span>
+                                          </span>
+                                        )}
+                                        {(item.location || item.details?.location || item.details?.city) && (
+                                          <span className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-semibold flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                                            <span>Location: <strong>{item.location || item.details?.location || item.details?.city}</strong></span>
+                                          </span>
+                                        )}
+                                        {item.ip_address && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setIpFilter(item.ip_address);
+                                              applyFilters({ ip: item.ip_address });
+                                            }}
+                                            className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 text-slate-800 rounded-lg font-mono text-[11px] cursor-pointer"
+                                            title="Click to filter by this IP"
+                                          >
+                                            IP: <strong>{item.ip_address}</strong>
+                                          </button>
+                                        )}
+                                      </div>
+                                      {item.user_agent && (
+                                        <p className="text-[11px] text-gray-500 font-mono break-all bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                          User-Agent: {item.user_agent}
+                                        </p>
+                                      )}
+                                      {item.details && Object.keys(item.details).length > 0 ? (
+                                        <pre className="text-[11px] font-mono bg-slate-900 text-emerald-400 p-3 rounded-lg overflow-x-auto max-h-48">
+                                          {JSON.stringify(item.details, null, 2)}
+                                        </pre>
+                                      ) : (
+                                        <p className="text-xs text-gray-400 italic">No additional payload parameters.</p>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </div>
+
+                {/* Pagination */}
+                {activities.links && activities.links.length > 3 && (
+                  <div className="sticky bottom-0 z-10 px-4 py-2.5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white text-xs text-gray-500 shrink-0 shadow-xs">
+                    <span>
+                      Showing <span className="font-bold text-gray-800">{activities.from || 0}</span> to{" "}
+                      <span className="font-bold text-gray-800">{activities.to || 0}</span> of{" "}
+                      <span className="font-bold text-gray-800">{activities.total}</span> records (10 per page)
+                    </span>
+                    <div className="flex gap-1 flex-wrap justify-center">
+                      {activities.links.map((link, idx) => (
+                        <Link
+                          key={idx}
+                          href={link.url || "#"}
+                          preserveScroll
+                          className={`px-3 py-1 rounded-lg border font-semibold transition ${
+                            link.active
+                              ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                              : link.url
+                              ? "bg-white text-gray-700 hover:bg-gray-50 border-gray-200"
+                              : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
+                          }`}
+                          dangerouslySetInnerHTML={{ __html: link.label }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

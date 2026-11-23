@@ -29,6 +29,9 @@ class AuditLogController extends Controller
         $module      = $request->input('module', 'all');
         $status      = $request->input('status', 'all');
         $actorType   = $request->input('actor_type', 'all'); // all, candidate, admin, system
+        $platform    = $request->input('platform', 'all'); // all, web, app, api
+        $ip          = $request->input('ip');
+        $viewMode    = $request->input('view_mode', 'list'); // list, ip_groups
         $tab         = $request->input('tab', 'audit'); // audit, incomplete, errors, server_log
         $filterMode  = $request->input('filter_mode', 'all'); // all, month, date_range, preset
         $month       = $request->input('month', now()->format('Y-m'));
@@ -45,6 +48,7 @@ class AuditLogController extends Controller
                   ->orWhere('action', 'like', "%{$search}%")
                   ->orWhere('actor_name', 'like', "%{$search}%")
                   ->orWhere('actor_email', 'like', "%{$search}%")
+                  ->orWhere('ip_address', 'like', "%{$search}%")
                   ->orWhere('entity_id', 'like', "%{$search}%");
             });
         }
@@ -55,6 +59,14 @@ class AuditLogController extends Controller
 
         if ($status !== 'all') {
             $auditQuery->where('status', $status);
+        }
+
+        if ($platform !== 'all') {
+            $auditQuery->where('platform', $platform);
+        }
+
+        if (!empty($ip)) {
+            $auditQuery->where('ip_address', $ip);
         }
 
         if ($actorType !== 'all') {
@@ -109,17 +121,55 @@ class AuditLogController extends Controller
             'server_log_path'        => $serverLog['file_path'] ?? '',
         ];
 
+        // 6. IP-based Activity Groups ("IP ke according groups")
+        $ipGroupsQuery = AuditLog::query()
+            ->selectRaw('ip_address, COUNT(*) as total_actions, MAX(created_at) as last_seen, MIN(created_at) as first_seen, GROUP_CONCAT(DISTINCT actor_name SEPARATOR ", ") as actors, GROUP_CONCAT(DISTINCT platform SEPARATOR ", ") as platforms')
+            ->whereNotNull('ip_address')
+            ->where('ip_address', '!=', '')
+            ->groupBy('ip_address')
+            ->orderByDesc('last_seen');
+
+        if (!empty($search)) {
+            $ipGroupsQuery->where(function ($q) use ($search) {
+                $q->where('ip_address', 'like', "%{$search}%")
+                  ->orWhere('actor_name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        if ($platform !== 'all') {
+            $ipGroupsQuery->where('platform', $platform);
+        }
+        if ($dateRange) {
+            $ipGroupsQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+        }
+
+        $ipGroups = $ipGroupsQuery->paginate(10, ['*'], 'ip_page')->withQueryString();
+
+        // Attach recent 5 activities, location, and device to each IP group
+        $ipGroups->getCollection()->transform(function ($group) {
+            $recent = AuditLog::where('ip_address', $group->ip_address)->latest()->take(5)->get();
+            $first = $recent->first();
+            $group->recent_activities = $recent;
+            $group->location = $first?->location ?: 'Localhost / Dev';
+            $group->device_name = $first?->device_name ?: 'Unknown Device';
+            return $group;
+        });
+
         return Inertia::render('Admin/Logs', [
             'activities'          => $activities,
             'incompleteProcesses' => $incompleteProcesses,
             'errorLogs'           => $errorLogs,
             'serverLog'           => $serverLog,
             'metrics'             => $metrics,
+            'ipGroups'            => $ipGroups,
             'filters'             => [
                 'search'      => $search,
                 'module'      => $module,
                 'status'      => $status,
                 'actor_type'  => $actorType,
+                'platform'    => $platform,
+                'ip'          => $ip,
+                'view_mode'   => $viewMode,
                 'tab'         => $tab,
                 'filter_mode' => $filterMode,
                 'month'       => $month,
@@ -144,6 +194,8 @@ class AuditLogController extends Controller
         $preset     = $request->input('preset', 'all');
         $module     = $request->input('module', 'all');
         $actorType  = $request->input('actor_type', 'all');
+        $platform   = $request->input('platform', 'all');
+        $ip         = $request->input('ip');
 
         $dateRange = $this->resolveDateRange($filterMode, $month, $fromDate, $toDate, $preset);
 
@@ -160,7 +212,7 @@ class AuditLogController extends Controller
         $fileName = "ats_{$type}_logs_{$periodLabel}_{$timestamp}." . ($format === 'csv' ? 'csv' : 'xlsx');
 
         // Fetch Export Data
-        $data = $this->getExportData($type, $dateRange, $module, $actorType);
+        $data = $this->getExportData($type, $dateRange, $module, $actorType, $platform, $ip);
 
         if ($format === 'csv') {
             return $this->exportToCsv($fileName, $data['headers'], $data['rows']);
@@ -211,12 +263,15 @@ class AuditLogController extends Controller
     /**
      * Compile table headers and rows based on type.
      */
-    protected function getExportData(string $type, ?array $dateRange, string $module = 'all', string $actorType = 'all'): array
+    protected function getExportData(string $type, ?array $dateRange, string $module = 'all', string $actorType = 'all', string $platform = 'all', ?string $ip = null): array
     {
         if ($type === 'errors') {
             $query = SystemErrorLog::query()->latest();
             if ($dateRange) {
                 $query->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            }
+            if (!empty($ip)) {
+                $query->where('ip_address', $ip);
             }
 
             $headers = ['ID', 'Date Time', 'Status Code', 'Method', 'URL', 'Exception Class', 'Error Message', 'File Location', 'Line', 'Actor', 'IP Address'];
@@ -291,6 +346,12 @@ class AuditLogController extends Controller
             } else {
                 $query->where('actor_type', $actorType);
             }
+        }
+        if ($platform !== 'all') {
+            $query->where('platform', $platform);
+        }
+        if (!empty($ip)) {
+            $query->where('ip_address', $ip);
         }
 
         $headers = ['ID', 'Date Time', 'Actor Role', 'Actor Name', 'Actor Email', 'Device', 'Location', 'Action', 'Module', 'Status', 'Description', 'Platform', 'IP Address', 'Metadata / Payload'];

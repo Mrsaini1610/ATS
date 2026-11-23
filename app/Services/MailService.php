@@ -15,30 +15,71 @@ use Throwable;
 
 class MailService
 {
+    // Main Authenticated Mailbox (Primary Email Account)
+    public const MAIN_EMAIL         = 'info@atstechnologyhiring.com';
+    public const ALIAS_INFO         = self::MAIN_EMAIL; // Alias pointer to main email for compatibility
+
+    // 3 Official Email Aliases of info@atstechnologyhiring.com:
+    public const ALIAS_NO_REPLY     = 'do-not-reply@atstechnologyhiring.com';
+    public const ALIAS_NOTIFICATION = 'ats.notification@atstechnologyhiring.com';
+    public const ALIAS_SUPPORT      = 'support@atstechnologyhiring.com';
+    public const WEBSITE_URL        = 'https://atstechnologyhiring.com';
+
+    public static function getMainEmail(): string
+    {
+        return config('mail.from.address', self::MAIN_EMAIL);
+    }
+
+    public static function getFromNoReply(): string
+    {
+        return config('mail.aliases.no_reply', self::ALIAS_NO_REPLY);
+    }
+
+    public static function getFromNotification(): string
+    {
+        return config('mail.aliases.notification', self::ALIAS_NOTIFICATION);
+    }
+
+    public static function getFromSupport(): string
+    {
+        return config('mail.aliases.support', self::ALIAS_SUPPORT);
+    }
+
+    public static function getWebsiteUrl(): string
+    {
+        return config('mail.aliases.website_url', self::WEBSITE_URL);
+    }
+
     /**
-     * Send a raw HTML email safely with try-catch.
+     * Send a raw HTML email safely with try-catch and custom alias From.
      */
     public static function sendRawHtml(
         string|array $to,
         string $subject,
         string $htmlBody,
-        ?string $recipientName = null
+        ?string $recipientName = null,
+        ?string $fromEmail = null,
+        ?string $fromName = null
     ): bool {
         if (empty($to)) {
             return false;
         }
 
+        $fromEmail = $fromEmail ?: self::getMainEmail();
+        $fromName  = $fromName ?: config('mail.from.name', 'Ats Technology Hiring');
+
         try {
-            Mail::html($htmlBody, function ($message) use ($to, $subject, $recipientName) {
+            Mail::html($htmlBody, function ($message) use ($to, $subject, $recipientName, $fromEmail, $fromName) {
                 if (is_array($to)) {
                     $message->to($to);
                 } else {
                     $message->to($to, $recipientName);
                 }
+                $message->from($fromEmail, $fromName);
                 $message->subject($subject);
             });
 
-            Log::info("MailService: Raw HTML email sent to " . (is_array($to) ? json_encode($to) : $to) . " | Subject: {$subject}");
+            Log::info("MailService: Raw HTML email sent to " . (is_array($to) ? json_encode($to) : $to) . " from {$fromEmail} | Subject: {$subject}");
             return true;
         } catch (Throwable $e) {
             Log::error("MailService: Failed sending raw HTML email to " . (is_array($to) ? json_encode($to) : $to) . " | Error: " . $e->getMessage());
@@ -47,30 +88,41 @@ class MailService
     }
 
     /**
-     * Send a Blade view email safely with try-catch.
+     * Send a Blade view email safely with try-catch and custom alias From.
      */
     public static function sendViewEmail(
         string|array $to,
         string $subject,
         string $view,
         array $viewData = [],
-        ?string $recipientName = null
+        ?string $recipientName = null,
+        ?string $fromEmail = null,
+        ?string $fromName = null
     ): bool {
         if (empty($to)) {
             return false;
         }
 
+        $fromEmail = $fromEmail ?: self::getMainEmail();
+        $fromName  = $fromName ?: config('mail.from.name', 'Ats Technology Hiring');
+
+        // Automatically inject websiteUrl
+        if (!isset($viewData['websiteUrl'])) {
+            $viewData['websiteUrl'] = self::getWebsiteUrl();
+        }
+
         try {
-            Mail::send($view, $viewData, function ($message) use ($to, $subject, $recipientName) {
+            Mail::send($view, $viewData, function ($message) use ($to, $subject, $recipientName, $fromEmail, $fromName) {
                 if (is_array($to)) {
                     $message->to($to);
                 } else {
                     $message->to($to, $recipientName);
                 }
+                $message->from($fromEmail, $fromName);
                 $message->subject($subject);
             });
 
-            Log::info("MailService: View email [{$view}] sent to " . (is_array($to) ? json_encode($to) : $to) . " | Subject: {$subject}");
+            Log::info("MailService: View email [{$view}] sent to " . (is_array($to) ? json_encode($to) : $to) . " from {$fromEmail} | Subject: {$subject}");
             return true;
         } catch (Throwable $e) {
             Log::error("MailService: Failed sending view email [{$view}] to " . (is_array($to) ? json_encode($to) : $to) . " | Error: " . $e->getMessage());
@@ -132,7 +184,9 @@ class MailService
                         'details'      => $details,
                         'actionUrl'    => $actionUrl ?: url('/admin'),
                     ],
-                    $superAdmin->name
+                    $superAdmin->name,
+                    self::getFromNotification(),
+                    'ATS Notifications'
                 );
             }
         }
@@ -180,15 +234,18 @@ class MailService
                     'details'      => $details,
                     'actionUrl'    => $actionUrl ?: url('/admin'),
                 ],
-                $admin->name
+                $admin->name,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
         }
     }
 
     /**
      * TRIGGER 1: Candidate Registration / Profile Complete Welcome Email + Super Admin Alert.
+     * Sent from do-not-reply@atstechnologyhiring.com.
      */
-    public static function sendWelcomeCandidate(User $user): void
+    public static function sendWelcomeCandidate(User $user, array $meta = []): void
     {
         // Avoid sending duplicate welcome emails to the same candidate
         $alreadySent = UserNotification::where('user_id', $user->id)
@@ -200,6 +257,10 @@ class MailService
         }
 
         $candidateName = $user->full_name ?: $user->name ?: 'Candidate';
+        $req           = function_exists('request') ? request() : null;
+        $device        = $meta['device'] ?? ($req ? AuditLogService::resolveDeviceName($req, [], $meta['platform'] ?? 'web') : 'Personal Device');
+        $location      = $meta['location'] ?? ($req ? AuditLogService::resolveLocation($req, ['city' => $user->city, 'state' => $user->state, 'type' => 'candidate', 'id' => $user->id]) : ($user->city ? ($user->state ? "{$user->city}, {$user->state}" : $user->city) : 'India'));
+        $time          = $meta['time'] ?? now()->format('d M Y, h:i A');
 
         // 1. In-App UserNotification & Push Notification
         try {
@@ -215,17 +276,23 @@ class MailService
             Log::warning("MailService: Push/In-app failed for candidate welcome: " . $e->getMessage());
         }
 
-        // 2. Candidate Welcome Email
+        // 2. Candidate Welcome Email (from do-not-reply@atstechnologyhiring.com)
         if (!empty($user->email)) {
             self::sendViewEmail(
                 $user->email,
                 "Welcome to " . config('app.name', 'ATS') . " - Let's Find Your Dream Job! 🎉",
                 'emails.candidate_welcome',
                 [
-                    'user'      => $user,
-                    'actionUrl' => url('/job-search'),
+                    'user'       => $user,
+                    'actionUrl'  => url('/job-search'),
+                    'device'     => $device,
+                    'location'   => $location,
+                    'time'       => $time,
+                    'websiteUrl' => self::getWebsiteUrl(),
                 ],
-                $candidateName
+                $candidateName,
+                self::getFromNoReply(),
+                'Ats Technology Hiring'
             );
         }
 
@@ -240,6 +307,8 @@ class MailService
                 'phone'          => $user->phone ?? 'N/A',
                 'city'           => $user->city ?? 'N/A',
                 'job_title'      => $user->job_title ?? 'N/A',
+                'device'         => $device,
+                'location'       => $location,
             ],
             url('/admin/users')
         );
@@ -264,6 +333,86 @@ class MailService
         } catch (Throwable $e) {
             Log::warning("MailService: Failed notifying admins of candidate registration: " . $e->getMessage());
         }
+    }
+
+    /**
+     * TRIGGER 1B: Candidate Login Alert ("Welcome Back") Email from do-not-reply@atstechnologyhiring.com.
+     */
+    public static function sendCandidateLoginAlert(User $user, array $meta = []): void
+    {
+        if (empty($user->email)) {
+            return;
+        }
+
+        $candidateName = $user->full_name ?: $user->name ?: 'Candidate';
+        $req           = function_exists('request') ? request() : null;
+        $device        = $meta['device'] ?? ($req ? AuditLogService::resolveDeviceName($req, [], $meta['platform'] ?? 'web') : 'Mobile / Computer');
+        $location      = $meta['location'] ?? ($req ? AuditLogService::resolveLocation($req, ['city' => $user->city, 'state' => $user->state, 'type' => 'candidate', 'id' => $user->id]) : ($user->city ?: 'Localhost / Dev'));
+        $time          = $meta['time'] ?? now()->format('d M Y, h:i A');
+        $ip            = $meta['ip'] ?? ($req ? $req->ip() : '127.0.0.1');
+        $platform      = $meta['platform'] ?? ($req && $req->is('api/*') ? 'app' : 'web');
+
+        self::sendViewEmail(
+            $user->email,
+            "Security Alert: Welcome Back! New Login to your ATS Account",
+            'emails.candidate_login_alert',
+            [
+                'candidateName' => $candidateName,
+                'device'        => $device,
+                'location'      => $location ?: 'Jaipur, Rajasthan',
+                'time'          => $time,
+                'ip'            => $ip,
+                'platform'      => $platform,
+                'websiteUrl'    => self::getWebsiteUrl(),
+                'supportEmail'  => self::getFromSupport(),
+            ],
+            $candidateName,
+            self::getFromNoReply(),
+            'Ats Technology Hiring - Security'
+        );
+    }
+
+    /**
+     * Contact Us inquiry acknowledgement from support@atstechnologyhiring.com.
+     */
+    public static function sendContactMessageReceived($contactMessage): void
+    {
+        $name    = $contactMessage->name ?? 'User';
+        $email   = $contactMessage->email ?? null;
+        $subject = $contactMessage->subject ?: 'General Support Inquiry';
+        $msg     = $contactMessage->message ?? '';
+
+        // 1. Auto-reply to user from support@atstechnologyhiring.com
+        if (!empty($email)) {
+            self::sendViewEmail(
+                $email,
+                "Thank You for Contacting ATS Support [Ref #{$contactMessage->id}]",
+                'emails.contact_acknowledgement',
+                [
+                    'name'        => $name,
+                    'subjectText' => $subject,
+                    'messageText' => $msg,
+                    'websiteUrl'  => self::getWebsiteUrl(),
+                ],
+                $name,
+                self::getFromSupport(),
+                'ATS Support Team'
+            );
+        }
+
+        // 2. Alert Super Admin & Support Mailbox
+        self::notifySuperAdmin(
+            "New Contact Inquiry: {$name} - {$subject}",
+            "User {$name} ({$email}) submitted a message via Contact Us form:\n\n{$msg}",
+            [
+                'name'       => $name,
+                'email'      => $email,
+                'subject'    => $subject,
+                'message'    => $msg,
+                'ip'         => $contactMessage->ip ?? (function_exists('request') ? request()->ip() : null),
+                'created_at' => now()->format('d M Y, h:i A'),
+            ]
+        );
     }
 
     /**
@@ -306,7 +455,9 @@ class MailService
                     'messageIntro'      => "Your job post for '{$job->title}' has been saved and is now being processed.",
                     'actionUrl'         => url('/admin/jobs'),
                 ],
-                $job->creator->name
+                $job->creator->name,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
 
             try {
@@ -333,7 +484,9 @@ class MailService
                     'messageIntro'   => "You have been assigned as the coordinator for '{$job->title}' at {$companyName}.",
                     'actionUrl'      => url('/admin/jobs'),
                 ],
-                $job->assignedMember->name
+                $job->assignedMember->name,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
 
             try {
@@ -405,7 +558,9 @@ class MailService
                     'application'   => $application,
                     'actionUrl'     => url('/my-applications'),
                 ],
-                $candidateName
+                $candidateName,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
         }
 
@@ -430,7 +585,9 @@ class MailService
                         'companyName'         => $companyName,
                         'actionUrl'           => url('/admin/applications'),
                     ],
-                    $creator->name
+                    $creator->name,
+                    self::getFromNotification(),
+                    'ATS Notifications'
                 );
             }
 
@@ -466,7 +623,9 @@ class MailService
                         'companyName'         => $companyName,
                         'actionUrl'           => url('/admin/applications'),
                     ],
-                    $assignee->name
+                    $assignee->name,
+                    self::getFromNotification(),
+                    'ATS Notifications'
                 );
             }
 
@@ -545,7 +704,9 @@ class MailService
                     'comments'      => $comments,
                     'actionUrl'     => url('/my-applications'),
                 ],
-                $candidateName
+                $candidateName,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
         }
 
@@ -709,7 +870,9 @@ class MailService
                     'instructions'      => $instructions,
                     'actionUrl'         => url('/my-applications'),
                 ],
-                $candidateName
+                $candidateName,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
         }
 
@@ -775,7 +938,9 @@ class MailService
                         'instructions'      => $instructions,
                         'actionUrl'         => url('/admin/interviews'),
                     ],
-                    $interviewerAdmin->name
+                    $interviewerAdmin->name,
+                    self::getFromNotification(),
+                    'ATS Notifications'
                 );
             }
 
@@ -929,7 +1094,9 @@ class MailService
                     'terms'         => $terms,
                     'actionUrl'     => url('/my-applications'),
                 ],
-                $candidateName
+                $candidateName,
+                self::getFromNotification(),
+                'ATS Notifications'
             );
         }
 
@@ -996,8 +1163,11 @@ class MailService
                 'roleLabel'     => $roleLabel,
                 'loginUrl'      => $loginUrl,
                 'createdByName' => $createdByName ?: 'Administrator',
+                'websiteUrl'    => self::getWebsiteUrl(),
             ],
-            $staffName
+            $staffName,
+            self::getFromNoReply(),
+            'Ats Technology Hiring - Admin Team'
         );
 
         // 2. Super Admin ALWAYS Notified

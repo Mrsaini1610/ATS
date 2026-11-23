@@ -365,11 +365,20 @@ class HomeController extends Controller
             'message' => ['required', 'string', 'max:5000'],
         ]);
 
-        ContactMessage::create([
+        $contactMessage = ContactMessage::create([
             ...$validated,
             'ip' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
+
+        // Dispatch Support Auto-reply & Super Admin Alert from support@atstechnologyhiring.com
+        defer(function () use ($contactMessage) {
+            try {
+                \App\Services\MailService::sendContactMessageReceived($contactMessage);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Contact message mail dispatch failed: ' . $e->getMessage());
+            }
+        });
 
         return back()->with('success', 'Message submitted successfully.');
     }
